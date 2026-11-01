@@ -13,6 +13,14 @@
   },
   "checks": [
     {
+      "name": "changelog",
+      "command": [
+        "python",
+        "infra/checks/check_changelog.py"
+      ],
+      "cwd": "."
+    },
+    {
       "name": "tree",
       "command": [
         "python",

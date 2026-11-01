@@ -41,6 +41,7 @@ godot --path app --headless -s res://tests/run_tests.gd   # 规则层断言
 
 | 命令 | 作用 |
 |---|---|
+| `python infra/checks/check_changelog.py` | 分支上有 `feat` 或 `fix` 提交却没有新的 `changelog.d/` 分片时报错 |
 | `python infra/checks/check_tree.py` | 检查仓库布局：根目录条目是否在白名单内、有无生成物被跟踪 |
 | `python infra/stage_builtin.py` | 把 `content/builtin/*` 打成 zip 暂存到 `app/builtin/`，测试与导出前先跑 |
 | `python infra/export_web.py` | 导出 web 构建到 `build/web/`，需要 `GODOT_BIN` 与 `GODOT_TEMPLATE_APPDATA` |
