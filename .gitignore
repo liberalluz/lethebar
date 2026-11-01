@@ -20,3 +20,8 @@ __pycache__/
 
 # Batch execution state
 .batch/
+
+# IDE
+.idea/
+.vscode/
+
