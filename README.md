@@ -41,6 +41,7 @@ All three commands only check things — **there is nothing to play** before v0.
 
 | Command | What it does |
 |---|---|
+| `python infra/checks/check_tree.py` | Verify the repository layout: root entries, and no tracked generated files |
 | `python infra/stage_builtin.py` | Pack `content/builtin/*` into `app/builtin/*.zip` before tests or export |
 | `godot --path app --headless --quit` | Import assets, rebuild `app/.godot/` |
 | `godot --path app --headless -s res://tests/run_tests.gd` | Rule-layer assertions (protocol, assembly, save encoding) |

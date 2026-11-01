@@ -41,6 +41,7 @@ godot --path app --headless -s res://tests/run_tests.gd   # 规则层断言
 
 | 命令 | 作用 |
 |---|---|
+| `python infra/checks/check_tree.py` | 检查仓库布局：根目录条目是否在白名单内、有无生成物被跟踪 |
 | `python infra/stage_builtin.py` | 把 `content/builtin/*` 打成 zip 暂存到 `app/builtin/`，测试与导出前先跑 |
 | `godot --path app --headless --quit` | 资源导入与 `app/.godot/` 重建 |
 | `godot --path app --headless -s res://tests/run_tests.gd` | 规则层断言（协议、装配、存档编码） |
