@@ -1,0 +1,18 @@
+; Engine configuration file.
+; Kept minimal on purpose: the engine shell is built in batches, not generated.
+
+config_version=5
+
+[application]
+
+config/name="Lethebar"
+config/description="An engine that ships no gameplay, plus plugins that carry both the story and the rules for playing it."
+
+[dotnet]
+
+project/assembly_name="lethebar"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
