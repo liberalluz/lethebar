@@ -16,6 +16,12 @@ const SCREEN_SESSION := "session"
 const SCREEN_SAVES := "saves"
 const SCREEN_NOTICE := "notice"
 
+## The window title carries the screen name. On the web build Godot maps it to
+## `document.title`, which is the only piece of the interface a browser driver
+## can read without OCR — the scene is one canvas, so button text is pixels.
+## It is also honest for a player with many tabs open.
+const TITLE_PREFIX := "Lethebar — "
+
 var loader := PackageLoader.new()
 var saves := SaveStore.new()
 var packages := PackageStore.new()
@@ -55,6 +61,7 @@ func show_landing() -> String:
 	_options.add_child(_button("New game", open_plugins))
 	if session != null:
 		_options.add_child(_button("Continue", enter_session))
+	_announce()
 	return screen
 
 
@@ -70,6 +77,7 @@ func open_plugins() -> String:
 		var label := "%s — %s, %s" % [plugin_id, String(manifest.get("protocol", "")), String(manifest.get("version", ""))]
 		_options.add_child(_button(label, start_plugin.bind(plugin_id)))
 	_options.add_child(_button("Back", show_landing))
+	_announce()
 	return screen
 
 
@@ -115,6 +123,7 @@ func enter_session() -> Dictionary:
 		_options.add_child(_button("Saves", open_saves))
 		_options.add_child(_button("Back to packs", open_plugins))
 	_status.text = _readout(view)
+	_announce()
 	return view
 
 
@@ -143,6 +152,7 @@ func open_saves() -> String:
 		line.add_child(_button("Load", load_from.bind(slot)))
 		_options.add_child(line)
 	_options.add_child(_button("Back", enter_session))
+	_announce()
 	return screen
 
 
@@ -178,6 +188,7 @@ func open_notice(code: String, message: String) -> String:
 	_status.text = "Nothing was installed. You can pick another pack."
 	_clear_options()
 	_options.add_child(_button("Back to packs", open_plugins))
+	_announce()
 	return screen
 
 
@@ -203,6 +214,21 @@ func try_import(bytes: PackedByteArray) -> Dictionary:
 
 func screen_name() -> String:
 	return screen
+
+
+func screen_title() -> String:
+	## What the browser tab says. The probe waits for `plugins` here after it
+	## clicks "New game", so the title is part of the contract, not decoration.
+	return TITLE_PREFIX + screen
+
+
+func _announce() -> void:
+	DisplayServer.window_set_title(screen_title())
+	if OS.has_feature("web"):
+		# Godot's web build does not forward window titles to the document, so the
+		# tab title stays as exported. Mirror the screen onto a plain global that
+		# the smoke probe can read; the click that drives it is a real mouse event.
+		JavaScriptBridge.eval("window.lethebarScreen = %s;" % JSON.stringify(screen), true)
 
 
 func current_view() -> Dictionary:

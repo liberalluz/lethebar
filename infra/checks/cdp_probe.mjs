@@ -160,6 +160,70 @@ for (let run = 0; run < reloads; run += 1) {
 
 const title = await evaluate("document.title");
 const canvases = await evaluate("document.querySelectorAll('canvas').length");
+
+// --- scripted click ---------------------------------------------------------
+// The scene is one canvas: button labels are pixels, so the probe cannot ask
+// the DOM where "New game" is. It pokes the centre column instead — every button
+// spans the full content width — and stops as soon as the shell reports a new
+// screen through `window.lethebarScreen`. A hit is a hit only if the screen
+// changed; a miss costs one more click and changes nothing.
+
+async function screenName() {
+  return await evaluate("window.lethebarScreen || null");
+}
+
+async function clickAt(x, y) {
+  await onSession("Input.dispatchMouseEvent", {
+    type: "mousePressed",
+    x,
+    y,
+    button: "left",
+    buttons: 1,
+    clickCount: 1,
+  });
+  await onSession("Input.dispatchMouseEvent", {
+    type: "mouseReleased",
+    x,
+    y,
+    button: "left",
+    buttons: 0,
+    clickCount: 1,
+  });
+}
+
+async function pokeUntil(target, limit) {
+  // `limit` is the number of vertical steps tried, not a timeout: the loop is
+  // bounded so a broken build fails fast instead of poking for a minute.
+  const size = await evaluate("[window.innerWidth, window.innerHeight]");
+  const x = Math.round(size[0] / 2);
+  let clicks = 0;
+  for (let y = 60; y < size[1] - 40; y += 24) {
+    await clickAt(x, y);
+    clicks += 1;
+    await sleep(150);
+    const screen = await screenName();
+    if (screen === target) return { found: true, clicks };
+    if (clicks >= limit) break;
+  }
+  return { found: false, clicks };
+}
+
+const landingScreen = await screenName();
+const clickStarted = Math.round(await evaluate("performance.now()"));
+let clickToSceneMs = null;
+let interaction = { landing: landingScreen, plugins: { found: false, clicks: 0 }, session: { found: false, clicks: 0 } };
+
+if (landingScreen === "landing") {
+  interaction.plugins = await pokeUntil("plugins", 24);
+  if (interaction.plugins.found) {
+    interaction.session = await pokeUntil("session", 12);
+    if (interaction.session.found) {
+      clickToSceneMs = Math.round((await evaluate("performance.now()")) - clickStarted);
+    }
+  }
+}
+trace(`interaction: ${JSON.stringify(interaction)} in ${clickToSceneMs} ms`);
+
 const storage = await evaluate(`(() => {
   try {
     localStorage.setItem("lethebar-probe", "ok");
@@ -174,13 +238,16 @@ const storage = await evaluate(`(() => {
 const sorted = [...bootSamples].sort((left, right) => left - right);
 const bootMedianMs = sorted.length ? sorted[Math.floor(sorted.length / 2)] : null;
 
+const interacted = interaction.plugins.found && interaction.session.found;
+
 const ok =
   loaded &&
   typeof title === "string" &&
   title.length > 0 &&
   exceptions.length === 0 &&
   dialogs.length === 0 &&
-  bootSamples.length === reloads;
+  bootSamples.length === reloads &&
+  interacted;
 
 console.log(
   JSON.stringify(
@@ -193,6 +260,8 @@ console.log(
       storageDetail: storage,
       bootSamples,
       bootMedianMs,
+      interaction,
+      clickToSceneMs,
       console: consoleLines.slice(-25),
       exceptions,
       dialogs,
