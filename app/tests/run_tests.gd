@@ -12,6 +12,7 @@ const FIXTURE_DIR := "res://.test-tmp"
 ## Staged by infra/stage_builtin.py: the project root is app/, so the shipped
 ## packages under content/builtin/ are copied in as zips before the suite runs.
 const BUILTIN_PACKAGE := "res://builtin/sanguo.zip"
+const BUILTIN_XIUXIAN := "res://builtin/xiuxian.zip"
 
 var _failures: Array = []
 var _checks := 0
@@ -29,6 +30,7 @@ func _initialize() -> void:
 	_case_proto_001()
 	_case_proto_002()
 	_case_builtin_001()
+	_case_builtin_002()
 	_case_det_001()
 	_case_save_001()
 	_case_save_002()
@@ -289,6 +291,78 @@ func _case_builtin_001() -> void:
 	_check("TC-BUILTIN-001: the power supply mechanic ran", view["state"].has("standing"), str(view["state"]))
 	# Step 4 of the case (save to slot 1, reload, resume) needs the save store from
 	# B4; the gap is recorded in the B3 exit record instead of being asserted here.
+
+
+func _case_builtin_002() -> void:
+	_section("TC-BUILTIN-002 Xiuxian plays its segment and reports progress")
+	var package := FileAccess.get_file_as_bytes(BUILTIN_XIUXIAN)
+	if package.is_empty():
+		_failures.append("staged package missing at %s; run infra/stage_builtin.py" % BUILTIN_XIUXIAN)
+		return
+	var loader := PackageLoader.new()
+	var result := loader.import_bytes(package, _context())
+	_check(
+		"TC-BUILTIN-002: the shipped package installs",
+		result["status"] == "installed",
+		"%s %s" % [String(result.get("code", "-")), String(result.get("message", ""))],
+	)
+	if result["status"] != "installed":
+		return
+	var entry: Dictionary = loader.registry.entry("xiuxian")
+	_check(
+		"TC-BUILTIN-002: it rides the linear protocol, not the one Sanguo uses",
+		String(entry["manifest"]["protocol"]) == "linear@1",
+		String(entry["manifest"]["protocol"]),
+	)
+	var session := Session.create(entry, {"start_counter": 1})
+	var view: Dictionary = session.start()
+	_check("TC-BUILTIN-002: the entry scene shows text", String(view.get("text", "")) != "")
+	var progress: Dictionary = view.get("progress", {})
+	_check("TC-BUILTIN-002: the progress readout is present", not progress.is_empty(), str(view.keys()))
+	_check(
+		"TC-BUILTIN-002: the readout knows the length of the segment",
+		int(progress.get("nodes", 0)) >= 4,
+		str(progress),
+	)
+	var steps: Array = [int(progress.get("steps", 0))]
+	var realms: Array = []
+	while not bool(view.get("finished", false)):
+		var offered: Array = view.get("choices", [])
+		if offered.is_empty():
+			break
+		view = session.choose(0)
+		progress = view.get("progress", {})
+		steps.append(int(progress.get("steps", 0)))
+		var state: Dictionary = view.get("state", {})
+		if state.has("realm"):
+			realms.append(String(state["realm"]))
+	_check("TC-BUILTIN-002: the segment is playable to its end", bool(view.get("finished", false)), str(steps))
+	_check("TC-BUILTIN-002: the end node shows its text", String(view.get("text", "")) != "")
+	_check("TC-BUILTIN-002: the end node offers nothing more", (view.get("choices", []) as Array).is_empty())
+	var growing := steps.size() >= 3
+	for index in range(1, steps.size()):
+		if int(steps[index]) <= int(steps[index - 1]):
+			growing = false
+	_check("TC-BUILTIN-002: progress grows with every step", growing, str(steps))
+	_check(
+		"TC-BUILTIN-002: the realm label follows the choices",
+		realms.size() >= 3 and String(realms[realms.size() - 1]) == "元婴",
+		str(realms),
+	)
+	MemoryBackend.reset()
+	var store := SaveStore.new()
+	var saved_node := session.current
+	var written := store.write(entry, 1, session.snapshot(), "修仙")
+	_check("TC-BUILTIN-002: the segment saves to slot 1", bool(written.get("ok", false)), str(written))
+	var read_back := store.read(entry, 1)
+	var resumed: Session = null
+	if bool(read_back.get("ok", false)):
+		resumed = store.resume(entry, read_back["payload"])
+	_check(
+		"TC-BUILTIN-002: resuming returns to the saved node",
+		resumed != null and resumed.current == saved_node,
+		"resumed %s, saved %s" % [resumed.current if resumed != null else "-", saved_node],
+	)
 
 
 func _case_det_001() -> void:
