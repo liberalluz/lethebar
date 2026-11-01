@@ -85,7 +85,7 @@ Four kinds of output, four rules. The values live in `.nebula-scaffold.json`; ch
 | Kind | Examples | Tracked |
 |---|---|---|
 | Written by a person | `.gd`, `.tscn`, `.tres`, `project.godot`, `export_presets.cfg`, `*.json`, `*.md`, `*.py` | yes |
-| Produced by a tool | `app/.godot/`, `*.uid`, `app/builtin/*.zip`, `*.import`, `build/` | no; add the ignore rule in the same pull request |
+| Produced by a tool | `app/.godot/`, `*.uid`, `app/builtin/*.zip`, `app/export_presets.cfg`, `build/`, `*.import` | no; add the ignore rule in the same pull request |
 
 - The repository root holds only these entries: the directories `app/`, `content/`, `docs/`, `infra/`, `tools/`, `.github/`, `changelog.d/`, and the files `README.md`, `README.zh-CN.md`, `CONTRIBUTING.md`, `CONTRIBUTING.zh-CN.md`, `CONTRIBUTING.ai.md`, `SECURITY.md`, `CHANGELOG.md`, `LICENSE`, `NOTICE`, `AGENTS.md`, `.gitignore`, `.gitattributes`, `.nebula-scaffold.json`.
 - Adding an entry at the root means editing that list in the same pull request. A directory that has no home in the layout is not created.

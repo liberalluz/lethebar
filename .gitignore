@@ -22,6 +22,8 @@ __pycache__/
 
 # Staged built-in packages (infra/stage_builtin.py)
 app/builtin/
+# Export preset staged by infra/export_web.py (source: infra/export_presets/web.cfg)
+app/export_presets.cfg
 
 # Batch execution state
 .batch/
