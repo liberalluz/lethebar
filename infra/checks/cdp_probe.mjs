@@ -1,15 +1,24 @@
 // Drive an already-running headless Chrome over the DevTools protocol.
 //
-// Usage: node cdp_probe.mjs <ws-endpoint> <url>
+// Usage: node cdp_probe.mjs <ws-endpoint> <url> [reloads]
 //
 // Prints one JSON object: page title, canvas count, whether localStorage
-// round-trips, recent console lines and uncaught exceptions. Exit code 0 when
-// the page reached a loaded state with no uncaught exception, 1 otherwise.
+// round-trips, how long the first screen took to settle (one sample per reload),
+// recent console lines and uncaught exceptions. Exit code 0 when every run
+// loaded with no uncaught exception and no dialog, 1 otherwise.
 //
 // The browser is started and stopped by infra/verify_web.py, so this file never
 // spawns a process; Node 22 ships a global WebSocket, so no package is needed.
+//
+// "Settled" means two screenshots 200 ms apart hash the same: the boot splash is
+// gone and the shell has drawn its first screen. It is a proxy for REQ-008 —
+// a real click is not simulated, so the measured span is load → first screen,
+// not click → first scene. The gap is recorded in the batch exit record.
 
-const [endpoint, url] = process.argv.slice(2);
+import { createHash } from "node:crypto";
+
+const [endpoint, url, reloadsArg] = process.argv.slice(2);
+const reloads = Math.max(1, Number(reloadsArg ?? 1));
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const socket = new WebSocket(endpoint);
@@ -80,9 +89,9 @@ function send(method, params = {}, sessionId) {
 
 // A hung probe is worse than a failed one: it leaves a browser and a port behind.
 const watchdog = setTimeout(() => {
-  console.log(JSON.stringify({ ok: false, error: "probe timed out after 90 s" }));
+  console.log(JSON.stringify({ ok: false, error: "probe timed out after 120 s" }));
   process.exit(1);
-}, 90000);
+}, 120000);
 watchdog.unref();
 
 const connected = await new Promise((resolve) => {
@@ -98,7 +107,6 @@ trace("creating a target");
 const { targetId } = await send("Target.createTarget", { url: "about:blank" });
 trace(`attaching to ${targetId}`);
 const { sessionId } = await send("Target.attachToTarget", { targetId, flatten: true });
-trace(`attached with session ${sessionId}`);
 const onSession = (method, params = {}) => send(method, params, sessionId);
 
 await onSession("Runtime.enable");
@@ -111,11 +119,6 @@ socket.addEventListener("message", (event) => {
   if (message.method === "Page.loadEventFired") loaded = true;
 });
 
-await onSession("Page.navigate", { url });
-for (let attempt = 0; attempt < 80 && !loaded; attempt += 1) await sleep(250);
-// The wasm module keeps working after the load event; give it time to report.
-await sleep(4000);
-
 async function evaluate(expression) {
   const { result } = await onSession("Runtime.evaluate", {
     expression,
@@ -123,6 +126,36 @@ async function evaluate(expression) {
     awaitPromise: true,
   });
   return result.value;
+}
+
+async function frameHash() {
+  const { data } = await onSession("Page.captureScreenshot", { format: "jpeg", quality: 20 });
+  return createHash("sha1").update(data).digest("hex").slice(0, 12);
+}
+
+async function settle() {
+  // Two identical frames 200 ms apart mean the splash is gone and the shell has
+  // drawn its first screen; the clock stops at the second one.
+  let previous = "";
+  let stable = 0;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const hash = await frameHash();
+    stable = hash === previous ? stable + 1 : 0;
+    previous = hash;
+    if (stable >= 2) return Math.round(await evaluate("performance.now()"));
+    await sleep(200);
+  }
+  return null;
+}
+
+const bootSamples = [];
+for (let run = 0; run < reloads; run += 1) {
+  loaded = false;
+  await onSession("Page.navigate", { url });
+  for (let attempt = 0; attempt < 80 && !loaded; attempt += 1) await sleep(250);
+  const settled = loaded ? await settle() : null;
+  if (settled !== null) bootSamples.push(settled);
+  trace(`run ${run + 1}/${reloads}: ${settled === null ? "no settled frame" : `${settled} ms`}`);
 }
 
 const title = await evaluate("document.title");
@@ -138,7 +171,16 @@ const storage = await evaluate(`(() => {
   }
 })()`);
 
-const ok = loaded && typeof title === "string" && title.length > 0 && exceptions.length === 0;
+const sorted = [...bootSamples].sort((left, right) => left - right);
+const bootMedianMs = sorted.length ? sorted[Math.floor(sorted.length / 2)] : null;
+
+const ok =
+  loaded &&
+  typeof title === "string" &&
+  title.length > 0 &&
+  exceptions.length === 0 &&
+  dialogs.length === 0 &&
+  bootSamples.length === reloads;
 
 console.log(
   JSON.stringify(
@@ -149,6 +191,8 @@ console.log(
       canvases,
       storageWorks: storage === true,
       storageDetail: storage,
+      bootSamples,
+      bootMedianMs,
       console: consoleLines.slice(-25),
       exceptions,
       dialogs,

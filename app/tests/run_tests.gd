@@ -35,6 +35,8 @@ func _initialize() -> void:
 	_case_package_survives()
 	_case_off_003()
 	_case_no_clock()
+	_case_ux_001()
+	_case_shell_refusal()
 
 	print("")
 	if _failures.is_empty():
@@ -631,3 +633,64 @@ func _play(entry: Dictionary, counter: int) -> String:
 	session.start()
 	session.choose(0)
 	return JSON.stringify(session.snapshot())
+
+
+# --- shell cases (B5a) -------------------------------------------------------
+#
+# The shell is driven through its own methods, not through synthetic clicks: a
+# click is a button wiring, and the wiring is one line per button. What the case
+# proves is the path a player walks and what they see at each step, which is what
+# TC-UX-001 asks for.
+
+func _shell() -> Shell:
+	var shell := Shell.new()
+	# The sandbox cannot write user://, so staging goes to the fixture folder the
+	# other cases already use. The shipped default stays user:// for the browser.
+	shell.work_dir = FIXTURE_DIR
+	shell._ready()
+	return shell
+
+
+func _case_ux_001() -> void:
+	_section("TC-UX-001 a first-time player reaches a game without instructions")
+	var shell := _shell()
+	_check("TC-UX-001: the app opens on the landing screen", shell.screen_name() == "landing")
+	_check("TC-UX-001: the landing screen names the product", shell.visible_text().contains("Lethebar"))
+	_check("TC-UX-001: the way in is a labelled button", shell.visible_text().contains("New game"))
+	shell.open_plugins()
+	_check("TC-UX-001: the plugin list opens", shell.screen_name() == "plugins")
+	_check("TC-UX-001: the shipped pack is listed", shell.builtin_ids.has("sanguo"), str(shell.builtin_ids))
+	var view := shell.start_plugin("sanguo")
+	_check("TC-UX-001: picking a pack starts a session", shell.screen_name() == "session")
+	_check("TC-UX-001: the first scene shows its text", String(view.get("text", "")) != "")
+	_check("TC-UX-001: the first scene offers a next step", view.get("choices", []).size() >= 1)
+	var first_node := String(view.get("node", ""))
+	view = shell.choose(0)
+	_check("TC-UX-001: a choice advances the scene", String(view.get("node", "")) != first_node)
+	# The readout follows the mechanic's state, so it is asserted after the first
+	# choice has moved power, not on the entry scene where nothing has happened yet.
+	_check("TC-UX-001: the mechanic readout is visible", shell.visible_text().contains("power"), shell.visible_text())
+	shell.save_to(1)
+	_check("TC-UX-001: saving reports the slot", shell.visible_text().contains("Saved to slot 1"), shell.visible_text())
+	var saved_node := String(shell.current_view().get("node", ""))
+	shell.choose(0)
+	shell.load_from(1)
+	_check(
+		"TC-UX-001: loading the slot restores the saved node",
+		String(shell.current_view().get("node", "")) == saved_node,
+		"%s vs %s" % [String(shell.current_view().get("node", "")), saved_node],
+	)
+	_check("TC-UX-001: the restored scene is a session screen", shell.screen_name() == "session")
+
+
+func _case_shell_refusal() -> void:
+	_section("TC-PKG-001 a refused package leaves the shell usable")
+	var shell := _shell()
+	var view := shell.try_import("this is not a zip".to_utf8_buffer())
+	_check("TC-PKG-001: the shell shows a refusal screen", shell.screen_name() == "notice")
+	_check("TC-PKG-001: the refusal carries its V- code", String(view.get("code", "")) == "V-01", str(view.get("code", "")))
+	shell.open_plugins()
+	_check("TC-PKG-001: the packs are still listed after a refusal", shell.builtin_ids.has("sanguo"))
+	shell.start_plugin("sanguo")
+	_check("TC-PKG-001: a pack still starts after a refusal", shell.screen_name() == "session")
+
