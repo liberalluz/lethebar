@@ -24,6 +24,8 @@ func _initialize() -> void:
 	_case_pkg_004()
 	_case_pkg_005()
 	_case_proto_001()
+	_case_proto_002()
+	_case_builtin_001()
 	_case_det_001()
 	_case_no_clock()
 
@@ -183,6 +185,99 @@ func _case_proto_001() -> void:
 	_check("TC-PROTO-001: a finished flow stays put", closed["node"] == "n2", String(closed["node"]))
 
 
+# --- B3: turn_based@1 and the built-in Sanguo package ------------------------
+
+func _case_proto_002() -> void:
+	_section("TC-PROTO-002 a turn-based segment runs three decision rounds to an outcome")
+	var loader := PackageLoader.new()
+	var installed := loader.import_bytes(_turn_package("turns"), _context())
+	_check("TC-PROTO-002: turn-based fixture installs", installed["status"] == "installed", String(installed.get("code", "")))
+	var session := Session.create(loader.registry.entry("test-turn"), {"start_counter": 1})
+	_check("TC-PROTO-002: a turn-based session can be created", session != null)
+	if session == null:
+		return
+	var opening := session.start()
+	_check("TC-PROTO-002: round 1 opens", int(opening.get("round", 0)) == 1, str(opening.get("round", "-")))
+	_check("TC-PROTO-002: the entry text is shown", opening["text"] == "第一回合", String(opening["text"]))
+
+	var second := session.choose(0)
+	_check("TC-PROTO-002: the second round opens", int(second.get("round", 0)) == 2, str(second.get("round", "-")))
+	_check("TC-PROTO-002: an intent opens the next round node", second["node"] == "t2", String(second["node"]))
+	var third := session.choose(1)
+	_check("TC-PROTO-002: the third round opens", int(third.get("round", 0)) == 3, str(third.get("round", "-")))
+	_check("TC-PROTO-002: a third round is still playable", not third["finished"], str(third["finished"]))
+	var outcome := session.choose(0)
+	_check("TC-PROTO-002: the outcome is reached", outcome["finished"] == true, str(outcome["finished"]))
+	_check("TC-PROTO-002: the outcome shows its text", outcome["text"] == "结局", String(outcome["text"]))
+	_check("TC-PROTO-002: a finished segment reports its last round", int(outcome.get("round", 0)) == 3, str(outcome.get("round", "-")))
+	_check("TC-PROTO-002: the round stays out of the save payload", not session.snapshot().has("round"), str(session.snapshot().keys()))
+
+	_section("TC-PROTO-002 declared mechanics are read out; undeclared ones stay absent")
+	var rich_loader := PackageLoader.new()
+	rich_loader.import_bytes(_readout_package(
+		"readout-c", ["power", "progress"],
+		{"rules": [{"when": {"key": "power", "op": "gte", "value": 3}, "set": {"regime": "strong"}}]},
+		[{"label": "整备", "next": "r2", "effects": [{"power": {"add": 3}}]}],
+	), _context())
+	var rich := Session.create(rich_loader.registry.entry("test-readout-c"), {"start_counter": 1})
+	_check("TC-PROTO-002: readout fixture C creates a session", rich != null)
+	if rich != null:
+		var rich_open := rich.start()
+		_check("TC-PROTO-002: a declared progress mechanic is shown", rich_open.has("progress"), str(rich_open.keys()))
+		var rich_after := rich.choose(0)
+		_check("TC-PROTO-002: C's own rule table produced the state", String(rich_after["state"].get("regime", "")) == "strong", str(rich_after["state"]))
+		_check("TC-PROTO-002: the readout is C's value, not a default", float(rich_after["state"].get("power", -1.0)) == 3.0, str(rich_after["state"]))
+
+	var bare_loader := PackageLoader.new()
+	bare_loader.import_bytes(_readout_package(
+		"readout-d", [],
+		{},
+		[{"label": "整备", "next": "r2", "effects": []}],
+	), _context())
+	var bare := Session.create(bare_loader.registry.entry("test-readout-d"), {"start_counter": 1})
+	_check("TC-PROTO-002: readout fixture D creates a session", bare != null)
+	if bare != null:
+		var bare_open := bare.start()
+		_check("TC-PROTO-002: no progress display without the mechanic", not bare_open.has("progress"), str(bare_open.keys()))
+		_check("TC-PROTO-002: no default state is invented", bare_open["state"].is_empty(), str(bare_open["state"]))
+
+
+func _case_builtin_001() -> void:
+	_section("TC-BUILTIN-001 Sanguo plays three decision turns from the shipped package")
+	var loader := PackageLoader.new()
+	var result := loader.import_bytes(_builtin_package("res://content/builtin/sanguo", "sanguo"), _context())
+	_check(
+		"TC-BUILTIN-001: the shipped package installs",
+		result["status"] == "installed",
+		"%s %s" % [String(result.get("code", "-")), String(result.get("message", ""))],
+	)
+	_check("TC-BUILTIN-001: it installs with no warnings", result.get("warnings", []).is_empty(), str(result.get("warnings", [])))
+	if result["status"] != "installed":
+		return
+	var session := Session.create(loader.registry.entry("sanguo"), {"start_counter": 1})
+	_check("TC-BUILTIN-001: a Sanguo session starts", session != null)
+	if session == null:
+		return
+	var view := session.start()
+	_check("TC-BUILTIN-001: the entry scene shows text", String(view["text"]) != "")
+	_check("TC-BUILTIN-001: the entry scene offers a next step", view["choices"].size() >= 1)
+	var chosen: Array = []
+	var turn := 0
+	while turn < 3:
+		var offered: Array = view["choices"]
+		if offered.is_empty():
+			break
+		chosen.append(String(offered[0]["label"]))
+		view = session.choose(0)
+		turn += 1
+	_check("TC-BUILTIN-001: all three turns are playable", chosen.size() == 3, str(chosen))
+	_check("TC-BUILTIN-001: the end node is reached", view["finished"] == true)
+	_check("TC-BUILTIN-001: the end node shows its text", String(view["text"]) != "")
+	_check("TC-BUILTIN-001: the power supply mechanic ran", view["state"].has("standing"), str(view["state"]))
+	# Step 4 of the case (save to slot 1, reload, resume) needs the save store from
+	# B4; the gap is recorded in the B3 exit record instead of being asserted here.
+
+
 func _case_det_001() -> void:
 	_section("TC-DET-001 the same choices reproduce the same snapshot")
 	var loader := PackageLoader.new()
@@ -207,7 +302,12 @@ func _case_det_001() -> void:
 func _case_no_clock() -> void:
 	_section("SDD §5 the play layer reads no clock and no disk")
 	var banned := ["Time.", "OS.get_", "FileAccess", "DirAccess"]
-	for path in ["res://app/core/session.gd", "res://app/protocols/linear_v1.gd", "res://app/core/mechanics.gd"]:
+	for path in [
+		"res://app/core/session.gd",
+		"res://app/protocols/linear_v1.gd",
+		"res://app/protocols/turn_based_v1.gd",
+		"res://app/core/mechanics.gd",
+	]:
 		var source := FileAccess.get_file_as_string(path)
 		var hits: Array = []
 		for needle in banned:
@@ -325,6 +425,91 @@ func _linear_package(name: String) -> PackedByteArray:
 		],
 	}
 	return _package(name, {"mechanics": ["power", "progress"]}, [], [], nodes, mechanics)
+
+
+func _turn_package(name: String) -> PackedByteArray:
+	## Three rounds plus an ending: t1 → t2 → t3 → t4, one node per round.
+	var nodes := {
+		"nodes": [
+			{"id": "t1", "text": "第一回合", "assets": [], "choices": [
+				{"label": "进军", "next": "t2", "effects": []},
+				{"label": "扎营", "next": "t2", "effects": []},
+			]},
+			{"id": "t2", "text": "第二回合", "assets": [], "choices": [
+				{"label": "进军", "next": "t3", "effects": []},
+				{"label": "扎营", "next": "t3", "effects": []},
+			]},
+			{"id": "t3", "text": "第三回合", "assets": [], "choices": [
+				{"label": "决战", "next": "t4", "effects": []},
+				{"label": "退兵", "next": "t4", "effects": []},
+			]},
+			{"id": "t4", "text": "结局", "assets": [], "choices": []},
+		],
+	}
+	return _package(name, {
+		"id": "test-turn",
+		"name": "Test Turn",
+		"protocol": "turn_based@1",
+		"mechanics": [],
+		"entry": "t1",
+	}, [], [], nodes)
+
+
+func _readout_package(name: String, mechanics_list: Array, mechanics: Dictionary, choices: Array) -> PackedByteArray:
+	## One decision node that can move a state key, then an ending node, so a case
+	## can compare what a session shows with and without declared mechanics.
+	var nodes := {
+		"nodes": [
+			{"id": "r1", "text": "读数", "assets": [], "choices": choices},
+			{"id": "r2", "text": "结束", "assets": [], "choices": []},
+		],
+	}
+	return _package(name, {
+		"id": "test-%s" % name,
+		"name": name,
+		"mechanics": mechanics_list,
+		"entry": "r1",
+	}, [], [], nodes, mechanics)
+
+
+func _builtin_package(dir_path: String, zip_name: String) -> PackedByteArray:
+	## Packs a shipped package directory exactly as it sits on disk, so the test
+	## exercises the same files the game ships instead of a hand-written mirror.
+	var entries: Array = []
+	_collect_files(dir_path, "", entries)
+	if entries.is_empty():
+		_failures.append("no files under %s" % dir_path)
+		return PackedByteArray()
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(FIXTURE_DIR))
+	var path := "%s/%s.zip" % [FIXTURE_DIR, zip_name]
+	var packer := ZIPPacker.new()
+	if packer.open(path) != OK:
+		_failures.append("could not create fixture %s" % zip_name)
+		return PackedByteArray()
+	for entry in entries:
+		var bytes := FileAccess.get_file_as_bytes("%s/%s" % [dir_path, entry])
+		_write_entry(packer, String(entry), bytes)
+	packer.close()
+	return FileAccess.get_file_as_bytes(path)
+
+
+func _collect_files(dir_path: String, prefix: String, out: Array) -> void:
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var name := dir.get_next()
+	while name != "":
+		if name.begins_with("."):
+			name = dir.get_next()
+			continue
+		var relative := name if prefix == "" else "%s/%s" % [prefix, name]
+		if dir.current_is_dir():
+			_collect_files("%s/%s" % [dir_path, name], relative, out)
+		else:
+			out.append(relative)
+		name = dir.get_next()
+	dir.list_dir_end()
 
 
 func _play(entry: Dictionary, counter: int) -> String:
