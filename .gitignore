@@ -13,6 +13,12 @@ dist/
 __pycache__/
 *.pyc
 
+# Godot import cache
+.godot/
+
+# Test fixtures written by tests/run_tests.gd
+.test-tmp/
+
 # Batch execution state
 .batch/
 
