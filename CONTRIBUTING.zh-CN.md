@@ -6,6 +6,7 @@
 
 - 读 `AGENTS.md`。
 - 读 `docs/specs/git-conventions.md` §2–§4。
+- AI 参与的改动读 `CONTRIBUTING.ai.md`。
 - 一个改动 = 一个批次 = 一个 PR。
 
 ## 流程
@@ -21,6 +22,6 @@
 
 ## 评审
 
-- 作者不能自审。
+- 作者不能自审；作者是 AI 时，由人签字。
 - 评审 diff、测试和证据。
 - 豁免要记录，不能只口头同意。
