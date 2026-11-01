@@ -177,6 +177,22 @@ def main() -> int:
         report["ok"] = False
         report["perfFailure"] = f"first screen settled at {median} ms, budget {PERF_BUDGET_MS} ms"
 
+    # TC-PLAT-001 asks for a usable first screen, which means a click has to
+    # work, and TC-PERF-001 measures selecting a pack to accepting input — not
+    # page load. The probe clicks "New game" and a pack with real mouse events
+    # and reports how long the two clicks took to land on the first scene.
+    interaction = report.get("interaction") or {}
+    if report.get("ok") and not (interaction.get("plugins") or {}).get("found"):
+        report["ok"] = False
+        report["interactionFailure"] = "the first screen did not answer a click on New game"
+    click_to_scene = report.get("clickToSceneMs")
+    if report.get("ok") and not (interaction.get("session") or {}).get("found"):
+        report["ok"] = False
+        report["interactionFailure"] = "the pack list did not answer a click on a pack"
+    if report.get("ok") and (click_to_scene is None or click_to_scene > PERF_BUDGET_MS):
+        report["ok"] = False
+        report["perfFailure"] = f"pack choice reached a scene in {click_to_scene} ms, budget {PERF_BUDGET_MS} ms"
+
     print(json.dumps(report, indent=2))
     return 0 if report.get("ok") else 1
 
