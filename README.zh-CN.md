@@ -30,18 +30,20 @@
 ```bash
 git clone https://github.com/liberalluz/lethebar.git
 cd lethebar
-godot --headless --quit                        # 导入资源；生成 .godot/（已忽略）
-godot --headless -s res://tests/run_tests.gd   # 规则层断言
+python infra/stage_builtin.py                  # 把内置包暂存进 app/
+godot --path app --headless --quit              # 导入资源；生成 app/.godot/（已忽略）
+godot --path app --headless -s res://tests/run_tests.gd   # 规则层断言
 ```
 
-两条命令都只做检查，**跑起来看不到游戏**——v0.0.0 之前本仓库没有可玩内容。
+三条命令都只做检查，**跑起来看不到游戏**——v0.0.0 之前本仓库没有可玩内容。
 
 ## 命令
 
 | 命令 | 作用 |
 |---|---|
-| `godot --headless --quit` | 资源导入与 `.godot/` 重建 |
-| `godot --headless -s res://tests/run_tests.gd` | 规则层断言（协议、装配、存档编码） |
+| `python infra/stage_builtin.py` | 把 `content/builtin/*` 打成 zip 暂存到 `app/builtin/`，测试与导出前先跑 |
+| `godot --path app --headless --quit` | 资源导入与 `app/.godot/` 重建 |
+| `godot --path app --headless -s res://tests/run_tests.gd` | 规则层断言（协议、装配、存档编码） |
 | `python tools/batch/batch.py` | 按批卡生成分支与检查清单 |
 
 目前**没有 CI**。上面这张表就是当前的门禁，本地跑通才算过；等 CI 建起来后，这张表必须与工作流同一个 PR 一起改。
@@ -50,9 +52,9 @@ godot --headless -s res://tests/run_tests.gd   # 规则层断言
 
 | 目录 | 职责 |
 |---|---|
-| `app/` | 引擎代码：`core/`（规则运行时）、`protocols/`（协议注册表）、`render/`（渲染运行时）、`ui/` |
+| `app/` | Godot 工程根（`project.godot`）与引擎代码：`core/`（规则运行时）、`protocols/`（协议注册表）、`render/`（渲染运行时）、`ui/`、`tests/`（无头断言） |
 | `content/` | 内置插件包与其数据，一个包一个目录 |
-| `infra/` | 构建、导出、部署脚本 |
+| `infra/` | 构建、导出、部署脚本，含 `stage_builtin.py` |
 | `docs/` | 规格、决策、intent（[docs/README.md](docs/README.md)） |
 | `tools/` | 批次执行与仓库策略工具 |
 

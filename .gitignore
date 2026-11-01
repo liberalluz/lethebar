@@ -13,11 +13,15 @@ dist/
 __pycache__/
 *.pyc
 
-# Godot import cache
+# Godot editor scaffolding
 .godot/
+*.uid
 
-# Test fixtures written by tests/run_tests.gd
+# Test fixtures written by app/tests/run_tests.gd
 .test-tmp/
+
+# Staged built-in packages (infra/stage_builtin.py)
+app/builtin/
 
 # Batch execution state
 .batch/

@@ -13,6 +13,14 @@
   },
   "checks": [
     {
+      "name": "stage",
+      "command": [
+        "python",
+        "infra/stage_builtin.py"
+      ],
+      "cwd": "."
+    },
+    {
       "name": "import",
       "command": [
         "godot",
