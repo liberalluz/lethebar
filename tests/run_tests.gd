@@ -27,6 +27,10 @@ func _initialize() -> void:
 	_case_proto_002()
 	_case_builtin_001()
 	_case_det_001()
+	_case_save_001()
+	_case_save_002()
+	_case_package_survives()
+	_case_off_003()
 	_case_no_clock()
 
 	print("")
@@ -297,6 +301,124 @@ func _case_det_001() -> void:
 	keys.sort()
 	var expected := ["finished", "node", "plugin", "protocol", "rng", "schema", "state", "version", "visited"]
 	_check("TC-DET-001: the payload keeps its declared shape", str(keys) == str(expected), str(keys))
+
+
+func _case_save_001() -> void:
+	_section("TC-SAVE-001 three slots per plugin, readable after a reload")
+	MemoryBackend.reset()
+	var entry: Dictionary = PackageLoader.new().import_bytes(_turn_package("saves"), _context())["entry"]
+	var store := SaveStore.new()
+	var session := Session.create(entry)
+	session.start()
+	var written := store.write(entry, 1, session.snapshot(), "第一回合")
+	_check("TC-SAVE-001: slot 1 accepts a save", written["ok"], String(written["message"]))
+	session.choose(0)
+	session.choose(0)
+	var later := session.snapshot()
+	_check("TC-SAVE-001: the run moved forward before the second save", later["node"] == "t3", String(later["node"]))
+	_check("TC-SAVE-001: slot 2 accepts a save", store.write(entry, 2, later, "第三回合")["ok"])
+
+	var after := SaveStore.new()
+	var first_read := after.read(entry, 1)
+	var second_read := after.read(entry, 2)
+	var first_again := after.read(entry, 1)
+	_check("TC-SAVE-001: slot 1 reads back after the reload", first_read["ok"] and first_read["payload"]["node"] == "t1", str(first_read))
+	_check("TC-SAVE-001: slot 2 reads back after the reload", second_read["ok"] and second_read["payload"]["node"] == "t3", str(second_read))
+	_check("TC-SAVE-001: slot 1 reads back a second time", first_again["ok"] and first_again["payload"]["node"] == "t1", str(first_again))
+	_check("TC-SAVE-001: slot 3 is writable on the same run", after.write(entry, 3, later)["ok"] and after.read(entry, 3)["ok"])
+
+	var rows := after.slots(entry)
+	_check("TC-SAVE-001: the slot list always has three rows", rows.size() == 3, str(rows.size()))
+	_check("TC-SAVE-001: a filled row carries saved-at and preview", rows[0]["savedAt"] != "" and rows[0]["preview"] == "第一回合", str(rows[0]))
+	_check("TC-SAVE-001: every row reports its slot number", rows[0]["slot"] == 1 and rows[2]["slot"] == 3, str(rows))
+
+	var resumed := after.resume(entry, first_read["payload"])
+	_check("TC-SAVE-001: resume returns to the saved node", resumed != null and resumed.current == "t1", "null" if resumed == null else resumed.current)
+
+	var other: Dictionary = PackageLoader.new().import_bytes(_linear_package("saves-other"), _context())["entry"]
+	var other_store := SaveStore.new()
+	var other_read := other_store.read(other, 1)
+	_check("TC-SAVE-001: a second plugin starts with empty slots", not other_read["ok"] and String(other_read["code"]) == SaveStore.CODE_EMPTY, str(other_read))
+	var other_rows := other_store.slots(other)
+	_check("TC-SAVE-001: an untouched slot row is marked empty", other_rows[0]["empty"] == true, str(other_rows[0]))
+	_check("TC-SAVE-001: the first plugin's slots are untouched", other_store.read(entry, 1)["ok"])
+
+
+func _case_save_002() -> void:
+	_section("TC-SAVE-002 an unknown save schema is refused, not migrated")
+	MemoryBackend.reset()
+	var entry: Dictionary = PackageLoader.new().import_bytes(_turn_package("schema-gate"), _context())["entry"]
+	var store := SaveStore.new()
+	var session := Session.create(entry)
+	session.start()
+	_check("TC-SAVE-002: a valid save lands in slot 2", store.write(entry, 2, session.snapshot())["ok"])
+
+	var injected := {
+		"schema": 2.0,
+		"plugin": {"id": "test-turn", "version": "1.0.0"},
+		"node": "t1",
+		"state": {},
+		"rng": 7,
+		"visited": ["t1"],
+		"finished": false,
+		"savedAt": "2026-01-01T00:00:00",
+	}
+	_check(
+		"TC-SAVE-002: an unknown schema is injected into slot 1",
+		MemoryBackend.new().write(SaveStore.key_for("test-turn", 1), JSON.stringify(injected)),
+	)
+	var refused := store.read(entry, 1)
+	_check("TC-SAVE-002: loading it is refused", not refused["ok"], str(refused))
+	_check("TC-SAVE-002: the refusal names the schema rule", String(refused["code"]) == SaveStore.CODE_SCHEMA, String(refused["code"]))
+	_check(
+		"TC-SAVE-002: the message names both versions",
+		String(refused["message"]).contains("2") and String(refused["message"]).contains("1"),
+		String(refused["message"]),
+	)
+	_check(
+		"TC-SAVE-002: the refused payload is not rewritten",
+		MemoryBackend.new().read(SaveStore.key_for("test-turn", 1)).contains("\"schema\":2"),
+	)
+	var good := store.read(entry, 2)
+	_check("TC-SAVE-002: the valid slot still loads", good["ok"], str(good))
+	var resumed := store.resume(entry, good["payload"])
+	_check("TC-SAVE-002: the game stays interactive after a refusal", resumed != null and resumed.choose(0)["node"] == "t2")
+
+
+func _case_package_survives() -> void:
+	_section("TC-OFF-004 an imported package survives a reload with no network")
+	MemoryBackend.reset()
+	var entry: Dictionary = PackageLoader.new().import_bytes(_linear_package("offline"), _context())["entry"]
+	_check("TC-OFF-004: the imported package is persisted", PackageStore.new().persist(entry))
+
+	var reloaded := PackageLoader.new()
+	var restored := PackageStore.new().restore_into(reloaded, _context())
+	_check("TC-OFF-004: it comes back installed", restored.has("test-linear"), str(restored))
+	_check("TC-OFF-004: the registry holds one plugin", reloaded.registry.count() == 1, str(reloaded.registry.count()))
+	var session := Session.create(reloaded.registry.entry("test-linear"))
+	_check("TC-OFF-004: the restored plugin builds a session", session != null)
+	if session == null:
+		return
+	session.start()
+	session.choose(0)
+	_check("TC-OFF-004: it is playable from storage alone", session.current == "n2", session.current)
+
+
+func _case_off_003() -> void:
+	_section("TC-OFF-003 the runtime makes zero network requests")
+	var banned := ["HTTPClient", "HTTPRequest", "fetch(", "XMLHttpRequest", "NetworkedMultiplayer"]
+	var sources: Array = []
+	_collect_files("res://app", "", sources)
+	_check("TC-OFF-003: app sources were found", not sources.is_empty(), str(sources.size()))
+	var offenders: Array = []
+	for relative in sources:
+		if not String(relative).ends_with(".gd"):
+			continue
+		var source := FileAccess.get_file_as_string("res://app/%s" % relative)
+		for needle in banned:
+			if source.contains(needle):
+				offenders.append("%s: %s" % [relative, needle])
+	_check("TC-OFF-003: no runtime file opens a network path", offenders.is_empty(), str(offenders))
 
 
 func _case_no_clock() -> void:
