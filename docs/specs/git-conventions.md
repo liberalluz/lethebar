@@ -52,6 +52,7 @@ Scopes: pick exactly one from the closed list below.
 ## 4. Merge
 
 - Squash merge by default.
+- A squashed commit takes its subject from the branch commit, so the subject stays English and the PR title stays in the PR. Do not change the repository merge settings to route PR titles into `main`.
 - The author does not self-approve.
 - No direct push to `main`.
 - A failed check is fixed, not bypassed.
@@ -76,4 +77,5 @@ Four kinds of output, four rules. The values live in `.nebula-scaffold.json`; ch
 
 - A PR title keeps the `type(scope)` prefix in English and the text after the colon in Chinese: `docs(readme)：小节「目录」改名「项目结构」`.
 - A PR body uses the five template sections; do not invent another structure.
-- Commit subjects stay English per §2. Squash merge takes the PR title as the commit subject, so commits landing on `main` are Chinese from `v0.0.0` onward while branch commits stay English. Do not hand-translate either one.
+- Commit messages stay English per §2, including the squashed commits on `main`. The subject of a squashed commit is the subject of the branch commit, so it is English as well; do not hand-translate it.
+- This rule applies from `v0.0.0`. Commits merged before it keep the language they were written in and are not rewritten.
