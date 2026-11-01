@@ -21,7 +21,21 @@ process/<topic>      process/tooling only
 ```
 
 Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `ci`.
-Scopes: the module or area.
+Scopes: pick exactly one from the closed list below.
+
+| Scope | Covers |
+|---|---|
+| `app` | Engine code: `app/core`, `app/protocols`, `app/render`, `app/ui` |
+| `plugin` | Plugin contract: manifest fields, validation codes `V-0x`, protocol interface, `specVersion` |
+| `content` | Built-in packs and their data: `content/builtin/*` |
+| `infra` | Build, export, deploy, CI, and `tools/repo` policy scripts |
+| `docs` | Everything under `docs/` except the conventions below: specs, decisions, intent, runbooks |
+| `repo` | Repository conventions: `README`, `CONTRIBUTING`, `SECURITY`, `CODEOWNERS`, `docs/specs/git-conventions.md`, topics, `.gitignore` |
+| `tools` | Batch execution: `tools/batch` |
+
+- One scope per commit, no second level. `docs(srs)` is not allowed; write `docs(docs): add REQ-018 to the SRS`.
+- The scope follows what the change is about, not where the file sits: `git-conventions.md` lives in `docs/` but its changes are `repo`.
+- Adding a scope means editing this table first, in the same pull request as its first use.
 
 - Subject is imperative and short.
 - Body explains why, not what.
