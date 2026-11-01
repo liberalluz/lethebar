@@ -1,0 +1,37 @@
+{
+  "base": "main",
+  "branch_prefix": "batch/",
+  "scope": {
+    "ignore": [
+      "**/.godot/**",
+      "**/build/**"
+    ],
+    "generated": [
+      "**/.godot/**",
+      "**/build/**"
+    ]
+  },
+  "checks": [
+    {
+      "name": "import",
+      "command": [
+        "godot",
+        "--headless",
+        "--quit"
+      ],
+      "cwd": "app"
+    },
+    {
+      "name": "test",
+      "command": [
+        "godot",
+        "--headless",
+        "-s",
+        "res://tests/run_tests.gd"
+      ],
+      "cwd": "app"
+    }
+  ],
+  "pr_create": [],
+  "merge": []
+}

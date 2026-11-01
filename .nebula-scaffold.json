@@ -1,0 +1,46 @@
+{
+  "project": "lethebar",
+  "stack": "godot",
+  "platforms": [
+    "browser",
+    "ios"
+  ],
+  "components": [
+    {
+      "name": "client",
+      "stack": "godot",
+      "dirs": [
+        "app",
+        "content",
+        "infra"
+      ],
+      "platforms": [
+        "browser",
+        "ios"
+      ]
+    }
+  ],
+  "repoLocale": {
+    "primary": "en-US",
+    "supported": [
+      "en-US",
+      "zh-CN"
+    ],
+    "scheme": "suffix"
+  },
+  "docsLocale": {
+    "primary": "en-US",
+    "supported": [
+      "en-US",
+      "zh-CN"
+    ],
+    "scheme": "suffix",
+    "external": "en-US",
+    "changelog": "en-US"
+  },
+  "prLocale": "zh-CN",
+  "created_at": "2026-11-01T07:06:59.832134+00:00",
+  "execution": {
+    "batch": "tools/batch"
+  }
+}
