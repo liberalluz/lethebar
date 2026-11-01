@@ -363,6 +363,25 @@ func _case_builtin_002() -> void:
 		resumed != null and resumed.current == saved_node,
 		"resumed %s, saved %s" % [resumed.current if resumed != null else "-", saved_node],
 	)
+	var shell := _shell()
+	shell.open_plugins()
+	_check(
+		"TC-BUILTIN-002: the list shows both built-in genres",
+		shell.builtin_ids.has("xiuxian") and shell.builtin_ids.has("sanguo"),
+		str(shell.builtin_ids),
+	)
+	shell.start_plugin("xiuxian")
+	_check(
+		"TC-BUILTIN-002: the progress readout is on screen",
+		shell.visible_text().contains("step 1/"),
+		shell.visible_text(),
+	)
+	shell.choose(0)
+	_check(
+		"TC-BUILTIN-002: the readout moves with the player",
+		shell.visible_text().contains("step 2/"),
+		shell.visible_text(),
+	)
 
 
 func _case_det_001() -> void:

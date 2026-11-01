@@ -7,7 +7,7 @@ extends Control
 ## window (B5a). Nothing here reads storage directly — saves and imported
 ## packages go through `SaveStore` and `PackageStore`.
 
-const BUILTIN_PACKAGES := ["res://builtin/sanguo.zip"]
+const BUILTIN_DIR := "res://builtin"
 const SLOT_COUNT := 3
 
 const SCREEN_LANDING := "landing"
@@ -274,13 +274,26 @@ func _build_chrome() -> void:
 
 func _install_builtins() -> void:
 	builtin_ids.clear()
-	for path in BUILTIN_PACKAGES:
-		if not FileAccess.file_exists(path):
-			continue
+	for path in _builtin_packages():
 		var bytes := FileAccess.get_file_as_bytes(path)
 		var result := loader.import_bytes(bytes, _context())
 		if String(result.get("status", "")) == "installed":
 			builtin_ids.append(String(result["entry"]["id"]))
+
+
+func _builtin_packages() -> Array:
+	## The shell reads the staged directory instead of naming packages: adding a
+	## genre must not require editing the render layer, or the point of the plugin
+	## layer is lost the moment a second pack ships (B5b card, deviation recorded).
+	var found: Array = []
+	var directory := DirAccess.open(BUILTIN_DIR)
+	if directory == null:
+		return found
+	for name in directory.get_files():
+		if name.ends_with(".zip"):
+			found.append("%s/%s" % [BUILTIN_DIR, name])
+	found.sort()
+	return found
 
 
 func _clear_options() -> void:
