@@ -78,7 +78,7 @@ godot --headless -s res://tests/run_tests.gd   # 规则层断言
 
 `docs/` 的放置判据：应当如何 → `specs/`；定没定 → `decisions/`；为什么 → `intent/`；怎么操作 → `runbooks/`。
 
-## 参与
+## 参与贡献
 
 - 提交前读 [CONTRIBUTING.md](CONTRIBUTING.md)
 - 用 AI 改代码的，另读 [CONTRIBUTING.ai.md](CONTRIBUTING.ai.md)：AI 改动需人审查并附测试或证据，作者不能自审
