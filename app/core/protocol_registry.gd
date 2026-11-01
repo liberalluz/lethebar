@@ -8,6 +8,7 @@ extends RefCounted
 
 const IMPLEMENTATIONS := {
 	"linear@1": preload("res://app/protocols/linear_v1.gd"),
+	"turn_based@1": preload("res://app/protocols/turn_based_v1.gd"),
 }
 
 
