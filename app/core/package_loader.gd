@@ -12,6 +12,7 @@ extends RefCounted
 
 const MANIFEST_PATH := "manifest.json"
 const NODES_PATH := "data/nodes.json"
+const MECHANICS_PATH := "data/mechanics.json"
 const DEFAULT_WORK_DIR := "user://pkg"
 
 var registry: InstallRegistry
@@ -50,6 +51,7 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 
 	var manifest: Dictionary = manifest_variant
 	var node_ids: Array = []
+	var data := {"nodes": [], "mechanics": {}}
 
 	if files.has(NODES_PATH):
 		var nodes_variant: Variant = JSON.parse_string(reader.read_file(NODES_PATH).get_string_from_utf8())
@@ -57,6 +59,11 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 			for node in nodes_variant["nodes"]:
 				if node is Dictionary and node.has("id"):
 					node_ids.append(String(node["id"]))
+			data["nodes"] = nodes_variant["nodes"]
+	if files.has(MECHANICS_PATH):
+		var mechanics_variant: Variant = JSON.parse_string(reader.read_file(MECHANICS_PATH).get_string_from_utf8())
+		if mechanics_variant is Dictionary:
+			data["mechanics"] = mechanics_variant
 	reader.close()
 	_discard(scratch)
 
@@ -66,14 +73,14 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 	check_context["node_ids"] = node_ids
 	check_context["installed"] = registry.versions()
 	if not check_context.has("protocols"):
-		check_context["protocols"] = PackageValidator.KNOWN_PROTOCOLS
+		check_context["protocols"] = ProtocolRegistry.known_ids()
 
 	var issues := PackageValidator.validate(manifest, check_context)
 	var fatal := PackageValidator.first_fatal(issues)
 	if not fatal.is_empty():
 		return _rejected(String(fatal["code"]), String(fatal["field"]), String(fatal["message"]), issues)
 
-	var record := registry.install(manifest, bytes)
+	var record := registry.install(manifest, bytes, data)
 	var warnings: Array = []
 	for issue in issues:
 		if not issue.get("fatal", false):
