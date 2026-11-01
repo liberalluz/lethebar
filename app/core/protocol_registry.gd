@@ -7,8 +7,8 @@ extends RefCounted
 ## "the engine does not know gameplay, only protocols" checkable.
 
 const IMPLEMENTATIONS := {
-	"linear@1": preload("res://app/protocols/linear_v1.gd"),
-	"turn_based@1": preload("res://app/protocols/turn_based_v1.gd"),
+	"linear@1": preload("res://protocols/linear_v1.gd"),
+	"turn_based@1": preload("res://protocols/turn_based_v1.gd"),
 }
 
 

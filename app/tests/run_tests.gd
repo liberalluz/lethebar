@@ -1,7 +1,7 @@
 extends SceneTree
 ## Headless assertions for the package loader (batch B1).
 ##
-## Run: godot --headless --path . -s res://tests/run_tests.gd
+## Run: godot --path app --headless -s res://tests/run_tests.gd
 ##
 ## The cases are grouped by the STD case they belong to. Anything that needs a
 ## browser (the import control, the 2 s list refresh, starting a plugin) stays in
@@ -9,6 +9,9 @@ extends SceneTree
 
 const ENGINE_VERSION := "4.7.2"
 const FIXTURE_DIR := "res://.test-tmp"
+## Staged by infra/stage_builtin.py: the project root is app/, so the shipped
+## packages under content/builtin/ are copied in as zips before the suite runs.
+const BUILTIN_PACKAGE := "res://builtin/sanguo.zip"
 
 var _failures: Array = []
 var _checks := 0
@@ -249,7 +252,11 @@ func _case_proto_002() -> void:
 func _case_builtin_001() -> void:
 	_section("TC-BUILTIN-001 Sanguo plays three decision turns from the shipped package")
 	var loader := PackageLoader.new()
-	var result := loader.import_bytes(_builtin_package("res://content/builtin/sanguo", "sanguo"), _context())
+	var package := FileAccess.get_file_as_bytes(BUILTIN_PACKAGE)
+	if package.is_empty():
+		_failures.append("staged package missing at %s; run infra/stage_builtin.py" % BUILTIN_PACKAGE)
+		return
+	var result := loader.import_bytes(package, _context())
 	_check(
 		"TC-BUILTIN-001: the shipped package installs",
 		result["status"] == "installed",
@@ -408,16 +415,20 @@ func _case_off_003() -> void:
 	_section("TC-OFF-003 the runtime makes zero network requests")
 	var banned := ["HTTPClient", "HTTPRequest", "fetch(", "XMLHttpRequest", "NetworkedMultiplayer"]
 	var sources: Array = []
-	_collect_files("res://app", "", sources)
-	_check("TC-OFF-003: app sources were found", not sources.is_empty(), str(sources.size()))
+	for root in ["res://core", "res://protocols"]:
+		var found: Array = []
+		_collect_files(root, "", found)
+		for relative in found:
+			sources.append("%s/%s" % [root, relative])
+	_check("TC-OFF-003: runtime sources were found", not sources.is_empty(), str(sources.size()))
 	var offenders: Array = []
-	for relative in sources:
-		if not String(relative).ends_with(".gd"):
+	for path in sources:
+		if not String(path).ends_with(".gd"):
 			continue
-		var source := FileAccess.get_file_as_string("res://app/%s" % relative)
+		var source := FileAccess.get_file_as_string(String(path))
 		for needle in banned:
 			if source.contains(needle):
-				offenders.append("%s: %s" % [relative, needle])
+				offenders.append("%s: %s" % [path, needle])
 	_check("TC-OFF-003: no runtime file opens a network path", offenders.is_empty(), str(offenders))
 
 
@@ -425,10 +436,10 @@ func _case_no_clock() -> void:
 	_section("SDD §5 the play layer reads no clock and no disk")
 	var banned := ["Time.", "OS.get_", "FileAccess", "DirAccess"]
 	for path in [
-		"res://app/core/session.gd",
-		"res://app/protocols/linear_v1.gd",
-		"res://app/protocols/turn_based_v1.gd",
-		"res://app/core/mechanics.gd",
+		"res://core/session.gd",
+		"res://protocols/linear_v1.gd",
+		"res://protocols/turn_based_v1.gd",
+		"res://core/mechanics.gd",
 	]:
 		var source := FileAccess.get_file_as_string(path)
 		var hits: Array = []
@@ -592,27 +603,6 @@ func _readout_package(name: String, mechanics_list: Array, mechanics: Dictionary
 		"mechanics": mechanics_list,
 		"entry": "r1",
 	}, [], [], nodes, mechanics)
-
-
-func _builtin_package(dir_path: String, zip_name: String) -> PackedByteArray:
-	## Packs a shipped package directory exactly as it sits on disk, so the test
-	## exercises the same files the game ships instead of a hand-written mirror.
-	var entries: Array = []
-	_collect_files(dir_path, "", entries)
-	if entries.is_empty():
-		_failures.append("no files under %s" % dir_path)
-		return PackedByteArray()
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(FIXTURE_DIR))
-	var path := "%s/%s.zip" % [FIXTURE_DIR, zip_name]
-	var packer := ZIPPacker.new()
-	if packer.open(path) != OK:
-		_failures.append("could not create fixture %s" % zip_name)
-		return PackedByteArray()
-	for entry in entries:
-		var bytes := FileAccess.get_file_as_bytes("%s/%s" % [dir_path, entry])
-		_write_entry(packer, String(entry), bytes)
-	packer.close()
-	return FileAccess.get_file_as_bytes(path)
 
 
 func _collect_files(dir_path: String, prefix: String, out: Array) -> void:

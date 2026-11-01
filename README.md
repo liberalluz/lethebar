@@ -30,18 +30,20 @@ This repository is public now because the plugin spec should be seen and challen
 ```bash
 git clone https://github.com/liberalluz/lethebar.git
 cd lethebar
-godot --headless --quit                        # import assets; creates .godot/ (git-ignored)
-godot --headless -s res://tests/run_tests.gd   # rule-layer assertions
+python infra/stage_builtin.py                  # stage built-in packs into app/
+godot --path app --headless --quit              # import assets; creates app/.godot/ (git-ignored)
+godot --path app --headless -s res://tests/run_tests.gd   # rule-layer assertions
 ```
 
-Both commands only check things — **there is nothing to play** before v0.0.0.
+All three commands only check things — **there is nothing to play** before v0.0.0.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `godot --headless --quit` | Import assets, rebuild `.godot/` |
-| `godot --headless -s res://tests/run_tests.gd` | Rule-layer assertions (protocol, assembly, save encoding) |
+| `python infra/stage_builtin.py` | Pack `content/builtin/*` into `app/builtin/*.zip` before tests or export |
+| `godot --path app --headless --quit` | Import assets, rebuild `app/.godot/` |
+| `godot --path app --headless -s res://tests/run_tests.gd` | Rule-layer assertions (protocol, assembly, save encoding) |
 | `python tools/batch/batch.py` | Create the branch and checklist from a batch card |
 
 There is **no CI yet**. The table above is the current gate: a local pass is the only pass. Once CI exists, this table must change in the same PR as the workflow.
@@ -50,9 +52,9 @@ There is **no CI yet**. The table above is the current gate: a local pass is the
 
 | Directory | Responsibility |
 |---|---|
-| `app/` | Engine code: `core/` (rules runtime), `protocols/` (protocol registry), `render/` (render runtime), `ui/` |
+| `app/` | The Godot project root (`project.godot`) and the engine: `core/` (rules runtime), `protocols/` (protocol registry), `render/` (render runtime), `ui/`, `tests/` (headless assertions) |
 | `content/` | Built-in plugin packs and their data, one directory per pack |
-| `infra/` | Build, export and deployment scripts |
+| `infra/` | Build, export and deployment scripts, including `stage_builtin.py` |
 | `docs/` | Specs, decisions, intent ([docs/README.md](docs/README.md)) |
 | `tools/` | Batch execution and repository policy tools |
 
