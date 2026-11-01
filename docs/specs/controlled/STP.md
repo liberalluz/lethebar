@@ -1,0 +1,87 @@
+# STP — Test plan (v0.0.0)
+
+English · [简体中文](STP.zh-CN.md)
+
+## Scope
+
+Covers the seventeen P1 requirements of `SRS.md` (v0.0.0) against the design in
+`SDD.md`. Does not cover the plugin market, the plugin editor, 3D, multiplayer,
+accounts, cloud saves, or the native iOS build; those are out of scope for
+v0.0.0 and have no tests here by design.
+
+## Strategy
+
+Three levels, cheapest first:
+
+1. **Rule level** — protocol and package validation exercised without rendering,
+   through a headless entry point. This is where most cases live.
+2. **Integration level** — package import → validation → install → session, run
+   in the engine without a visible window.
+3. **Browser level** — the exported build driven by hand in a real browser,
+   because "works in a browser" cannot be proven inside the engine.
+
+Determinism and offline behaviour get dedicated cases because they are structural
+claims: if they fail, the architecture claim fails, not just a feature.
+
+## Environments
+
+| Env | What | Used for |
+|---|---|---|
+| E1 | Godot 4 headless, Linux/Windows desktop | rule and integration cases |
+| E2 | Chrome/Edge (latest, desktop) | browser cases, performance, offline |
+| E3 | Safari on iOS (latest) | read-only smoke, offline reload |
+| E4 | Node (no engine) | JSON-level fixture checks (manifest, save payload shape) |
+
+## Entry criteria
+
+- `SRS.md` and `SDD.md` reviewed and committed (`BL-1` candidate).
+- Plugin specification 1.0.0 published in `SDD.md` §3–§5 and frozen for the test
+  run.
+- At least one valid package fixture and one invalid fixture per validation code.
+- The headless entry point exists (see R-01).
+
+## Exit criteria
+
+- Every `TC-*` below executed and recorded with pass or fail plus evidence.
+- No open blocking or severe defect.
+- Every P1 requirement covered by a passing case or an explicitly recorded gap.
+- Offline cases (TC-OFF-*) pass on E2 and E3, not only E2.
+
+## Risks to the test plan
+
+| ID | Risk | Effect | Mitigation |
+|---|---|---|---|
+| R-01 | Godot headless test running is unproven for this project | rule-level automation may not exist in week 1 | prove it in the first batch with a trivial assertion; fallback is a Node harness over the JSON fixtures plus manual engine runs, recorded as a coverage reduction |
+| R-02 | Browser offline reload test depends on service-worker behaviour that differs between Chromium and Safari | offline claim may hold on one engine only | run TC-OFF-* on both E2 and E3; a Safari-only failure is a defect, not a caveat |
+| R-03 | First-session timing (TC-PERF-001, TC-UX-001) is measured by humans and drifts | numbers are noisy | fix device class and network (cold cache), sample three runs, record the median |
+| R-04 | Determinism test can pass accidentally if the seed is constant | false confidence | TC-DET-001 uses two different seeds and asserts the outputs differ |
+
+## Test plan
+
+| Test | Covers | Exit |
+|---|---|---|
+| `TC-PLAT-001` | `REQ-001` | Exported build served from a static directory opens in E2 with no account prompt and no installer step; the first screen is interactive. |
+| `TC-OFF-001` | `REQ-002` | After one online load, disable the network, reload, and a new session starts from a built-in plugin with zero failed requests in the device log. |
+| `TC-OFF-002` | `REQ-002` | With the network disabled after reload, slot 1 of a built-in plugin loads and the node shown equals the saved node. |
+| `TC-OFF-003` | `REQ-003` | During a full session (choose, three advances, save) the request counter stays at zero except the initial document load. |
+| `TC-OFF-004` | `REQ-002` | First-ever load happens online, then the device is taken offline and relaunched from the home screen: the entry screen renders and lists both built-in plugins. |
+| `TC-PKG-001` | `REQ-004` | Importing a valid `.zip` through the file picker shows the plugin in the list within 2 seconds and it starts without a reload. |
+| `TC-PKG-002` | `REQ-005` | A package that fails any of `V-01`…`V-07`, `V-09` is rejected with its code shown, is not installed, and the previous plugin still starts. |
+| `TC-PKG-003` | `REQ-011` | A package whose manifest references one missing asset installs with `V-08` warning; the affected slot renders its text and the game does not crash. |
+| `TC-PKG-004` | `REQ-006` | Three plugins installed: the list shows three, exactly one is active, and switching between them never leaves two sessions advancing. |
+| `TC-PKG-005` | `REQ-007` | A plugin written only from `SDD.md` §3–§5 by someone who has not seen the engine source installs and runs with zero engine changes (verified by an unchanged build hash). |
+| `TC-PROTO-001` | `REQ-009` | Two plugins using different protocols both run; switching the active plugin changes the interaction (planned advance vs turn choice) and the build hash is unchanged. |
+| `TC-PROTO-002` | `REQ-010` | A plugin declaring a power-supply and a progress mechanic shows both effects in the session readout; a plugin declaring none shows neither. |
+| `TC-SAVE-001` | `REQ-012` | Three slots are writable and independently readable; saving to slot 2 then loading slot 1 returns slot 1's node, and vice versa. |
+| `TC-SAVE-002` | `REQ-013` | A save payload with `schema: 2.0.0` is refused with a visible message; the slot is not overwritten and the game stays playable. |
+| `TC-BUILTIN-001` | `REQ-014` | The built-in Sanguo plugin starts, completes all three decision turns, reaches its end node, and can be saved and resumed at the recorded node. |
+| `TC-BUILTIN-002` | `REQ-015` | The built-in Xiuxian plugin starts, reaches its end node, and can be saved and resumed; if cut per `SRS.md` §4 this row records "not delivered", not "failed". |
+| `TC-DET-001` | `REQ-016` | The same choice sequence with the same seed produces a byte-identical session snapshot on two runs, and a different seed produces a different one. |
+| `TC-PERF-001` | `REQ-008` | From plugin selection to the first interactive scene is ≤ 5 s on E2 with a warm cache, measured as the median of three runs. |
+| `TC-UX-001` | `REQ-017` | Five first-time participants with no instructions each reach an interactive first session in ≤ 10 minutes without help from the author; at least four succeed. |
+
+## Gaps
+
+None for v0.0.0. `TBD-001`…`TBD-003` in `SRS.md` §5 are specification gaps, not
+test gaps: they change how many slots exist and which plugins ship, not whether
+the product can be verified.
