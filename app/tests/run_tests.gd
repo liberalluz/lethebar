@@ -40,6 +40,7 @@ func _initialize() -> void:
 	_case_no_clock()
 	_case_ux_001()
 	_case_shell_refusal()
+	_case_import_control()
 
 	print("")
 	if _failures.is_empty():
@@ -745,6 +746,9 @@ func _shell() -> Shell:
 	# slot from one case into the next and make "three empty slots" untrue.
 	MemoryBackend.reset()
 	shell.saves = SaveStore.new(MemoryBackend.new())
+	# Imported packs go to memory too: a file backend would carry the pack from
+	# this case into every later one that lists the installed packs.
+	shell.packages = PackageStore.new(MemoryBackend.new())
 	shell._ready()
 	return shell
 
@@ -820,4 +824,35 @@ func _case_shell_refusal() -> void:
 	_check("TC-PKG-001: the packs are still listed after a refusal", shell.builtin_ids.has("sanguo"))
 	shell.start_plugin("sanguo")
 	_check("TC-PKG-001: a pack still starts after a refusal", shell.screen_name() == "session")
+
+
+func _case_import_control() -> void:
+	# The player's half of TC-PKG-001: the pack list has an install control, and
+	# the bytes it hands over come back as base64 — the same shape the injected
+	# file input produces in the browser, so this covers the decode step too.
+	_section("TC-PKG-001 a pack chosen from a file is validated and installed")
+	var shell := _shell()
+	shell.open_plugins()
+	_check(
+		"TC-PKG-001: the pack list offers an install control",
+		shell.visible_text().contains("Install a pack"),
+		shell.visible_text(),
+	)
+	var bytes := _package("import-fixture", {"id": "imported-pack", "name": "Imported Pack"})
+	var view := shell.install_from_base64(Marshalls.raw_to_base64(bytes))
+	_check("TC-PKG-001: a chosen file installs its pack", shell.builtin_ids.has("imported-pack"), str(shell.builtin_ids))
+	_check("TC-PKG-001: installing starts the pack", shell.screen_name() == "session")
+	_check("TC-PKG-001: the imported pack is playable", String(view.get("text", "")) != "", str(view))
+	var refusal := shell.install_from_base64(Marshalls.raw_to_base64("not a zip".to_utf8_buffer()))
+	_check(
+		"TC-PKG-001: a file that is not a package is refused with its code",
+		shell.screen_name() == "notice" and String(refusal.get("code", "")) == "V-01",
+		"%s / %s" % [shell.screen_name(), String(refusal.get("code", ""))],
+	)
+	shell.open_plugins()
+	_check(
+		"TC-PKG-001: an installed pack survives a refused file",
+		shell.builtin_ids.has("imported-pack") and shell.builtin_ids.has("sanguo"),
+		str(shell.builtin_ids),
+	)
 

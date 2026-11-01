@@ -16,8 +16,9 @@
 // not click → first scene. The gap is recorded in the batch exit record.
 
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 
-const [endpoint, url, reloadsArg] = process.argv.slice(2);
+const [endpoint, url, reloadsArg, importZip] = process.argv.slice(2);
 const reloads = Math.max(1, Number(reloadsArg ?? 1));
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -249,11 +250,72 @@ async function openFirstPack() {
   return Boolean(await waitState((state) => state.screen === "session"));
 }
 
+// The install button opens the page's file input. The picker itself cannot be
+// driven headlessly, so the chooser is intercepted (a native dialog would block
+// the page) and the file is handed to the input afterwards: the `change` handler
+// that runs is the one a player's own file would run.
+let chooserNode = null;
+socket.addEventListener("message", (event) => {
+  const message = JSON.parse(event.data);
+  if (message.method === "Page.fileChooserOpened") chooserNode = message.params.backendNodeId;
+});
+
+async function feedFile(zipPath) {
+  const base64 = readFileSync(zipPath).toString("base64");
+  return await evaluate(`(() => {
+    const binary = atob(${JSON.stringify(base64)});
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    const input = document.getElementById("lethebar-import");
+    if (!input) return "no input";
+    const file = new File([bytes], "smoke-pack.zip", { type: "application/zip" });
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    input.files = transfer.files;
+    input.dispatchEvent(new Event("change"));
+    return "attached " + input.files.length;
+  })()`);
+}
+
+async function installPack(zipPath) {
+  const before = ((await appState()) || {}).packs || [];
+  chooserNode = null;
+  await onSession("Page.setInterceptFileChooserDialog", { enabled: true });
+  const askedBefore = await evaluate("window.lethebarAsked || 0");
+  const clicked = await clickLabel("Install a pack…");
+  if (clicked === null) {
+    await onSession("Page.setInterceptFileChooserDialog", { enabled: false });
+    return null;
+  }
+  for (let attempt = 0; attempt < 40 && chooserNode === null; attempt += 1) await sleep(100);
+  await onSession("Page.setInterceptFileChooserDialog", { enabled: false });
+  const askedAfter = await evaluate("window.lethebarAsked || 0");
+  if (chooserNode === null) return null;
+  // The click proves the button reached the injected bridge; the rest is the
+  // same read → decode → validate path a player's own file takes.
+  interactionAsked = askedAfter > askedBefore;
+  const fed = await feedFile(zipPath);
+  const state = await waitState((value) => (value.packs || []).length > before.length, 60);
+  trace(`install: ${fed}, imported ${state === null ? "nothing" : "a pack"}`);
+  if (state === null) return null;
+  return (state.packs || []).find((id) => !before.includes(id)) || null;
+}
+
 const landingScreen = await screenName();
 const clickStarted = Math.round(await evaluate("performance.now()"));
 let clickToSceneMs = null;
+let interactionAsked = false;
 const requestsBeforeInteraction = requestsSeen;
-const interaction = { landing: landingScreen, plugins: false, session: false, saved: false, offline: false };
+const interaction = {
+  landing: landingScreen,
+  plugins: false,
+  session: false,
+  saved: false,
+  imported: false,
+  asked: false,
+  installed: null,
+  offline: false,
+};
 
 if (landingScreen === "landing") {
   interaction.plugins = (await clickLabel("New game")) !== null;
@@ -273,6 +335,20 @@ if (landingScreen === "landing") {
     }
   }
 }
+
+// TC-PKG-001/TC-OFF-004: a pack the player installs must be accepted by the
+// same validation as a built-in one, and must still be installed after a
+// reload. Both halves start from this click.
+if (interaction.saved && importZip) {
+  await clickLabel("Back");
+  await waitState((state) => state.screen === "session");
+  await clickLabel("Back to packs");
+  if (await waitState((state) => state.screen === "plugins")) {
+    interaction.installed = await installPack(importZip);
+    interaction.imported = interaction.installed !== null;
+    interaction.asked = interactionAsked;
+  }
+}
 const interactionRequests = requestsSeen - requestsBeforeInteraction;
 trace(`interaction: ${JSON.stringify(interaction)} in ${clickToSceneMs} ms`);
 
@@ -284,6 +360,8 @@ let offline = {
   attempted: false,
   landing: false,
   packs: 0,
+  packIds: [],
+  importedRestored: null,
   sessions: false,
   slotsRestored: 0,
 };
@@ -300,7 +378,11 @@ if (interaction.saved) {
   const back = await waitState((state) => state.screen === "landing", 100);
   offline.landing = back !== null;
   if (back) {
-    offline.packs = (back.packs || []).length;
+    offline.packIds = back.packs || [];
+    offline.packs = offline.packIds.length;
+    // TC-OFF-004: the pack the player installed is in the same store as the
+    // saves, so it either comes back from IndexedDB or it was never really there.
+    offline.importedRestored = interaction.installed ? offline.packIds.includes(interaction.installed) : null;
     offline.sessions = await openFirstPack();
     if (offline.sessions) {
       await clickLabel("Saves");
@@ -337,6 +419,7 @@ const interacted = interaction.plugins && interaction.session && interaction.sav
 // the unit tests only proves the engine code has no HTTP API in it.
 const sessionQuiet = interactionRequests === 0;
 const offlineOk = offline.landing && offline.packs >= 2 && offline.sessions && offline.slotsRestored >= 1;
+const importOk = importZip ? interaction.imported && offline.importedRestored === true : true;
 
 const ok =
   loaded &&
@@ -347,7 +430,8 @@ const ok =
   bootSamples.length === reloads &&
   interacted &&
   sessionQuiet &&
-  offlineOk;
+  offlineOk &&
+  importOk;
 
 console.log(
   JSON.stringify(
