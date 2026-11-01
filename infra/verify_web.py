@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Load the exported web build in a headless browser and report what happened.
 
-This is the smoke test for the web pipeline, not a gameplay test: the engine has
-no render layer yet, so the page boots, unpacks the project and stops. What this
-script proves is that the pieces around the engine work — a browser can fetch the
-build, the wasm module instantiates, the page raises no uncaught exception, and
-browser storage is usable.
+This checks the web pipeline, not gameplay: a browser fetches the build, the wasm
+module instantiates, the shell draws its first screen, no dialog blocks it, no
+exception escapes, and browser storage is usable. The first screen is measured
+on three reloads and reported as a median, because REQ-008 gives it five seconds.
+
+The settled screen is a proxy for "click start, see the first scene" — the probe
+screenshots instead of clicking, so the measured span is load → first screen.
+The gap is recorded in the batch exit record rather than hidden here.
 
 The browser is started here and killed by process tree afterwards, because a
 headless Chrome left behind by a crashed probe keeps a port and a profile lock.
@@ -14,7 +17,7 @@ Environment:
     CHROME_BIN  Browser to drive. Defaults to the first Chrome or Edge install.
 
 Usage:
-    python infra/verify_web.py [--dir build/web]
+    python infra/verify_web.py [--dir build/web] [--reloads 3]
 """
 
 from __future__ import annotations
@@ -36,6 +39,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 PROBE = REPO_ROOT / "infra" / "checks" / "cdp_probe.mjs"
 DEFAULT_DIR = REPO_ROOT / "build" / "web"
 SCRATCH = REPO_ROOT / ".test-tmp"
+PERF_BUDGET_MS = 5000
 
 CHROME_CANDIDATES = (
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -91,6 +95,7 @@ def devtools_endpoint(port: int, deadline: float) -> str | None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dir", type=Path, default=DEFAULT_DIR, help="exported build")
+    parser.add_argument("--reloads", type=int, default=3, help="reloads timed for the median")
     args = parser.parse_args()
 
     build = args.dir.resolve()
@@ -137,7 +142,7 @@ def main() -> int:
 
         try:
             result = subprocess.run(
-                ["node", str(PROBE), endpoint, url],
+                ["node", str(PROBE), endpoint, url, str(args.reloads)],
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
@@ -164,6 +169,13 @@ def main() -> int:
         print(payload)
         print(result.stderr.strip()[-1500:])
         return 1
+
+    # REQ-008 gives the first screen five seconds; the probe reports a median
+    # over the reloads, so a single slow run does not decide the batch.
+    median = report.get("bootMedianMs")
+    if report.get("ok") and (median is None or median > PERF_BUDGET_MS):
+        report["ok"] = False
+        report["perfFailure"] = f"first screen settled at {median} ms, budget {PERF_BUDGET_MS} ms"
 
     print(json.dumps(report, indent=2))
     return 0 if report.get("ok") else 1
