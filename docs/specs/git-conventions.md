@@ -48,3 +48,18 @@ Scopes: the module or area.
 - Tag: `vX.Y.Z`.
 - `CHANGELOG.md` must have the matching version before tagging.
 - Content packs use `pack/<space>/vX.Y.Z` when tagged.
+
+## 6. Language
+
+Four kinds of output, four rules. The values live in `.nebula-scaffold.json`; change that file first, then this table.
+
+| Output | Language | Config key |
+|---|---|---|
+| `README`, `CONTRIBUTING`, `SECURITY` | both, English first | `repoLocale` (`en-US` primary, `zh-CN` supported) |
+| `docs/specs/controlled/*` | English source plus `zh-CN` translation | `docsLocale` |
+| Out-of-repo documents (`lethebar-docs`) | English | `docsLocale.external` |
+| Pull request title and body | Chinese | `prLocale` (`zh-CN`) |
+
+- A PR title keeps the `type(scope)` prefix in English and the text after the colon in Chinese: `docs(readme)：小节「目录」改名「项目结构」`.
+- A PR body uses the five template sections; do not invent another structure.
+- Commit subjects stay English per §2. Squash merge takes the PR title as the commit subject, so commits landing on `main` are Chinese from `v0.0.0` onward while branch commits stay English. Do not hand-translate either one.
