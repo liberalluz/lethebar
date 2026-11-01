@@ -79,3 +79,15 @@ Four kinds of output, four rules. The values live in `.nebula-scaffold.json`; ch
 - A PR body uses the five template sections; do not invent another structure.
 - Commit messages stay English per §2, including the squashed commits on `main`. The subject of a squashed commit is the subject of the branch commit, so it is English as well; do not hand-translate it.
 - This rule applies from `v0.0.0`. Commits merged before it keep the language they were written in and are not rewritten.
+
+## 7. Generated files
+
+| Kind | Examples | Tracked |
+|---|---|---|
+| Written by a person | `.gd`, `.tscn`, `.tres`, `project.godot`, `export_presets.cfg`, `*.json`, `*.md`, `*.py` | yes |
+| Produced by a tool | `app/.godot/`, `*.uid`, `app/builtin/*.zip`, `*.import`, `build/` | no; add the ignore rule in the same pull request |
+
+- The repository root holds only these entries: the directories `app/`, `content/`, `docs/`, `infra/`, `tools/`, `.github/`, `changelog.d/`, and the files `README.md`, `README.zh-CN.md`, `CONTRIBUTING.md`, `CONTRIBUTING.zh-CN.md`, `CONTRIBUTING.ai.md`, `SECURITY.md`, `CHANGELOG.md`, `LICENSE`, `NOTICE`, `AGENTS.md`, `.gitignore`, `.gitattributes`, `.nebula-scaffold.json`.
+- Adding an entry at the root means editing that list in the same pull request. A directory that has no home in the layout is not created.
+- `python infra/checks/check_tree.py` enforces the list and the ignore rules; a local pass is required before opening a pull request.
+- Run `git status` after any Godot or build command. An untracked file is either a new source file to add or a generated file to ignore; it is never left unexplained.

@@ -13,6 +13,14 @@
   },
   "checks": [
     {
+      "name": "tree",
+      "command": [
+        "python",
+        "infra/checks/check_tree.py"
+      ],
+      "cwd": "."
+    },
+    {
       "name": "stage",
       "command": [
         "python",
