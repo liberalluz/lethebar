@@ -46,7 +46,7 @@ Both commands only check things — **there is nothing to play** before v0.0.0.
 
 There is **no CI yet**. The table above is the current gate: a local pass is the only pass. Once CI exists, this table must change in the same PR as the workflow.
 
-## Layout
+## Project structure
 
 | Directory | Responsibility |
 |---|---|
