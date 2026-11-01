@@ -23,6 +23,9 @@ func _initialize() -> void:
 	_case_pkg_003()
 	_case_pkg_004()
 	_case_pkg_005()
+	_case_proto_001()
+	_case_det_001()
+	_case_no_clock()
 
 	print("")
 	if _failures.is_empty():
@@ -117,7 +120,7 @@ func _case_pkg_004() -> void:
 	var loader := PackageLoader.new()
 	loader.import_bytes(_package("valid"), _context())
 	loader.import_bytes(
-		_package("second", {"id": "test-turn", "name": "Test Turn", "protocol": "turn_based@1", "entry": "n1"}),
+		_package("second", {"id": "test-turn", "name": "Test Turn", "protocol": "linear@1", "entry": "n1"}),
 		_context(),
 	)
 	loader.import_bytes(
@@ -137,7 +140,7 @@ func _case_pkg_005() -> void:
 	var spec_only := _package("spec-only", {
 		"id": "spec-only-pack",
 		"name": "Spec Only",
-		"protocol": "turn_based@1",
+		"protocol": "linear@1",
 		"capabilities": ["text", "audio"],
 		"mechanics": ["momentum"],
 		"entry": "start",
@@ -145,6 +148,72 @@ func _case_pkg_005() -> void:
 	var result := loader.import_bytes(spec_only, _context())
 	_check("TC-PKG-005: imports unchanged", result["status"] == "installed", String(result.get("code", "")))
 	_check("TC-PKG-005: manifest stored verbatim", String(loader.registry.entry("spec-only-pack")["manifest"]["name"]) == "Spec Only")
+
+
+# --- B2: protocol, session, determinism --------------------------------------
+
+func _case_proto_001() -> void:
+	_section("TC-PROTO-001 a linear flow runs from start to an outcome")
+	var loader := PackageLoader.new()
+	var result := loader.import_bytes(_linear_package("flow"), _context())
+	_check("TC-PROTO-001: fixture installs", result["status"] == "installed", String(result.get("code", "")))
+	var session := Session.create(loader.registry.entry("test-linear"), {"start_counter": 1})
+	_check("TC-PROTO-001: a session can be created", session != null)
+	if session == null:
+		return
+	var opening := session.start()
+	_check("TC-PROTO-001: starts at the entry node", opening["node"] == "n1", String(opening["node"]))
+	_check("TC-PROTO-001: the node text is shown", opening["text"] == "门口", String(opening["text"]))
+	_check("TC-PROTO-001: both choices are offered", opening["choices"].size() == 2, str(opening["choices"]))
+	_check("TC-PROTO-001: the progress display is derived", opening.has("progress"), str(opening.keys()))
+
+	var refused := session.choose(9)
+	_check("TC-PROTO-001: a choice out of range changes nothing", refused["node"] == "n1", String(refused["node"]))
+	_check("TC-PROTO-001: the refusal is a warning", session.warnings.size() >= 1, str(session.warnings))
+
+	var outcome := session.choose(0)
+	_check("TC-PROTO-001: a choice advances the node", outcome["node"] == "n2", String(outcome["node"]))
+	_check("TC-PROTO-001: the outcome text is shown", outcome["text"] == "左路", String(outcome["text"]))
+	_check("TC-PROTO-001: a node without choices finishes", outcome["finished"] == true)
+	_check("TC-PROTO-001: the choice effect moved the state", float(outcome["state"].get("power", 0.0)) < 0.0, str(outcome["state"]))
+	_check("TC-PROTO-001: the mechanic rule fired", outcome["state"].has("exhausted"), str(outcome["state"]))
+	_check("TC-PROTO-001: the snapshot holds the outcome", session.snapshot()["node"] == "n2", str(session.snapshot()))
+
+	var closed := session.choose(0)
+	_check("TC-PROTO-001: a finished flow stays put", closed["node"] == "n2", String(closed["node"]))
+
+
+func _case_det_001() -> void:
+	_section("TC-DET-001 the same choices reproduce the same snapshot")
+	var loader := PackageLoader.new()
+	loader.import_bytes(_linear_package("determinism"), _context())
+	var entry := loader.registry.entry("test-linear")
+	var first := _play(entry, 1)
+	var again := _play(entry, 1)
+	var other := _play(entry, 2)
+	_check("TC-DET-001: the same seed repeats exactly", first == again, first)
+	_check("TC-DET-001: another seed diverges", first != other, first)
+	_check(
+		"TC-DET-001: no clock leaks into the payload",
+		not first.contains("savedAt") and not first.contains("\"time\""),
+		first,
+	)
+	var keys: Array = JSON.parse_string(first).keys()
+	keys.sort()
+	var expected := ["finished", "node", "plugin", "protocol", "rng", "schema", "state", "version", "visited"]
+	_check("TC-DET-001: the payload keeps its declared shape", str(keys) == str(expected), str(keys))
+
+
+func _case_no_clock() -> void:
+	_section("SDD §5 the play layer reads no clock and no disk")
+	var banned := ["Time.", "OS.get_", "FileAccess", "DirAccess"]
+	for path in ["res://app/core/session.gd", "res://app/protocols/linear_v1.gd", "res://app/core/mechanics.gd"]:
+		var source := FileAccess.get_file_as_string(path)
+		var hits: Array = []
+		for needle in banned:
+			if source.contains(needle):
+				hits.append(needle)
+		_check("%s avoids %s" % [path.get_file(), ", ".join(banned)], source != "" and hits.is_empty(), str(hits))
 
 
 # --- helpers -----------------------------------------------------------------
@@ -189,8 +258,9 @@ func _package(
 	drop: Array = [],
 	extra_files: Array = [],
 	nodes_override: Dictionary = {},
+	mechanics_override: Dictionary = {},
 ) -> PackedByteArray:
-	## Builds a fixture zip in user:// and returns its bytes. `extra_files` are
+	## Builds a fixture zip in res:// and returns its bytes. `extra_files` are
 	## paths that exist in the zip with dummy content.
 	var manifest := _manifest_defaults()
 	for key in overrides:
@@ -201,7 +271,9 @@ func _package(
 	var nodes := nodes_override if not nodes_override.is_empty() else {
 		"nodes": [{"id": "n1", "text": "A node.", "choices": []}],
 	}
-	var mechanics := {"rules": [{"when": "state.count > 0", "set": {"state.count": 0}}]}
+	var mechanics := mechanics_override if not mechanics_override.is_empty() else {
+		"rules": [],
+	}
 
 	# Fixtures live under res:// so the suite works without a writable user://
 	# directory; the folder is git-ignored.
@@ -227,3 +299,38 @@ func _write_entry(packer: ZIPPacker, entry_path: String, bytes: PackedByteArray)
 	packer.start_file(entry_path)
 	packer.write_file(bytes)
 	packer.close_file()
+
+
+func _linear_package(name: String) -> PackedByteArray:
+	## Three nodes: one decision, two outcomes. The left branch runs the power
+	## supply down to where the plugin's own rule marks it exhausted.
+	var nodes := {
+		"nodes": [
+			{
+				"id": "n1",
+				"text": "门口",
+				"assets": [],
+				"choices": [
+					{"label": "向左", "next": "n2", "effects": [{"power": {"add": -1}}]},
+					{"label": "向右", "next": "n3", "effects": []},
+				],
+			},
+			{"id": "n2", "text": "左路", "assets": [], "choices": []},
+			{"id": "n3", "text": "右路", "assets": [], "choices": []},
+		],
+	}
+	var mechanics := {
+		"rules": [
+			{"when": {"key": "power", "op": "lte", "value": -1}, "set": {"exhausted": {"value": true}}},
+		],
+	}
+	return _package(name, {"mechanics": ["power", "progress"]}, [], [], nodes, mechanics)
+
+
+func _play(entry: Dictionary, counter: int) -> String:
+	var session := Session.create(entry, {"start_counter": counter})
+	if session == null:
+		return ""
+	session.start()
+	session.choose(0)
+	return JSON.stringify(session.snapshot())

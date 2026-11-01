@@ -3,7 +3,11 @@ extends RefCounted
 ## Validation checks V-02..V-09 from SDD §4.2. V-01 belongs to the loader,
 ## because it needs the zip bytes rather than the manifest.
 
-const KNOWN_PROTOCOLS := ["linear@1", "turn_based@1"]
+## Protocols that can actually play a package right now. `V-06` reads this list
+## instead of a hard-coded copy, so "declared but not implemented" cannot drift
+## from the registry (SDD §5.2). `turn_based@1` joins the registry with B3.
+static func known_protocols() -> Array:
+	return ProtocolRegistry.known_ids()
 
 ## Supported specVersion window for v0.0.0 (SRS `TBD-003`).
 const SPEC_MIN := "1.0.0"
@@ -68,7 +72,7 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 		))
 
 	# V-06 — the protocol has to exist in the registry.
-	var protocols: Array = context.get("protocols", KNOWN_PROTOCOLS)
+	var protocols: Array = context.get("protocols", known_protocols())
 	if not protocols.has(manifest["protocol"]):
 		issues.append(_issue("V-06", "protocol", "unknown protocol: %s" % manifest["protocol"], true))
 

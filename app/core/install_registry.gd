@@ -37,12 +37,20 @@ func entry(plugin_id: String) -> Dictionary:
 	return _entries.get(plugin_id, {})
 
 
-func install(manifest: Dictionary, package_bytes: PackedByteArray) -> Dictionary:
+func install(
+	manifest: Dictionary,
+	package_bytes: PackedByteArray,
+	data: Dictionary = {}
+) -> Dictionary:
+	## `data` is the parsed payload (`nodes`, `mechanics`) kept in memory so a
+	## session never has to open the package again. The persisted record (§4.3)
+	## is still `{id, version, manifest, packageBytes}`; this is a runtime cache.
 	var record := {
 		"id": String(manifest["id"]),
 		"version": String(manifest["version"]),
 		"manifest": manifest,
 		"package_bytes": package_bytes,
+		"data": data,
 	}
 	_entries[record["id"]] = record
 	return record
