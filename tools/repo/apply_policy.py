@@ -126,8 +126,9 @@ def diff_policy(policy: dict, visibility: str, protection: dict | None) -> list[
         ),
     }
     for key, value in comparisons.items():
-        if bool(protection.get(key)) != value:
-            diffs.append(f"{key}: {bool(protection.get(key))} -> {value}")
+        current = bool((protection.get(key) or {}).get("enabled", False))
+        if current != value:
+            diffs.append(f"{key}: {current} -> {value}")
     return diffs
 
 
