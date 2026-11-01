@@ -41,6 +41,7 @@ All three commands only check things — **there is nothing to play** before v0.
 
 | Command | What it does |
 |---|---|
+| `python infra/checks/check_changelog.py` | Fail when a branch has a `feat` or `fix` commit without a new `changelog.d/` fragment |
 | `python infra/checks/check_tree.py` | Verify the repository layout: root entries, and no tracked generated files |
 | `python infra/stage_builtin.py` | Pack `content/builtin/*` into `app/builtin/*.zip` before tests or export |
 | `python infra/export_web.py` | Export the web build to `build/web/`; needs `GODOT_BIN` and `GODOT_TEMPLATE_APPDATA` |
