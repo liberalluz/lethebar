@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -35,6 +36,8 @@ PRESET_STAGED = PROJECT_ROOT / "export_presets.cfg"
 PRESET_NAME = "Web"
 DEFAULT_OUTPUT = REPO_ROOT / "build" / "web"
 EXPECTED_FILES = ("index.html", "index.js", "index.wasm", "index.pck")
+SERVICE_WORKER = "index.service.worker.js"
+PAYLOAD_FILES = ("index.wasm", "index.pck")
 
 
 def godot_binary() -> str:
@@ -105,6 +108,50 @@ def run_export(binary: str, output: Path, appdata: Path) -> None:
         raise SystemExit(f"web export failed\n{tail}")
 
 
+def precache_payload(output: Path) -> None:
+    """Move the engine payload into the service worker's pre-cache list.
+
+    Godot's generated worker splits its lists: `CACHED_FILES` is fetched during
+    `install`, while `CACHEABLE_FILES` is only stored when the page happens to
+    request it through the worker. A player who loads once and then goes offline
+    would therefore miss `index.wasm` and `index.pck` — the only two files the
+    app cannot start without. Offline reload is a `TC-OFF-001` promise, so the
+    payload is pre-cached instead.
+
+    The worker is generated, so this is a post-export edit rather than a source
+    change; it fails loudly if the shape it edits ever changes.
+    """
+    worker = output / SERVICE_WORKER
+    if not worker.is_file():
+        raise SystemExit(
+            f"{SERVICE_WORKER} is missing; enable progressive_web_app in the preset"
+        )
+    text = worker.read_text(encoding="utf-8")
+    cached = re.search(r"const CACHED_FILES\s*=\s*\[(.*?)\];", text, re.S)
+    cacheable = re.search(r"const CACHEABLE_FILES\s*=\s*\[(.*?)\];", text, re.S)
+    if cached is None or cacheable is None:
+        raise SystemExit(f"{SERVICE_WORKER} no longer has the lists this script edits")
+    names = re.findall(r'"([^"]+)"', cached.group(1))
+    lazy = re.findall(r'"([^"]+)"', cacheable.group(1))
+    for name in lazy:
+        if name not in names:
+            names.append(name)
+    missing = [name for name in PAYLOAD_FILES if name not in names]
+    if missing:
+        raise SystemExit(f"the worker does not know about {', '.join(missing)}")
+    replacement = "const CACHED_FILES = [" + ", ".join(f'"{n}"' for n in names) + "];"
+    # Replace the later span first: the earlier text is longer than what it was,
+    # so applying the first edit first would shift the second span's offsets and
+    # splice the file in the wrong place.
+    spans = [
+        (cacheable.start(), cacheable.end(), "const CACHEABLE_FILES = [];"),
+        (cached.start(), cached.end(), replacement),
+    ]
+    for start, end, text_for_span in sorted(spans, reverse=True):
+        text = text[:start] + text_for_span + text[end:]
+    worker.write_text(text, encoding="utf-8")
+
+
 def report(output: Path) -> int:
     missing = [name for name in EXPECTED_FILES if not (output / name).is_file()]
     for path in sorted(output.iterdir()):
@@ -133,6 +180,7 @@ def main() -> int:
         run_export(binary, args.output, appdata)
     finally:
         PRESET_STAGED.unlink(missing_ok=True)
+    precache_payload(args.output)
     return report(args.output)
 
 

@@ -182,16 +182,41 @@ def main() -> int:
     # page load. The probe clicks "New game" and a pack with real mouse events
     # and reports how long the two clicks took to land on the first scene.
     interaction = report.get("interaction") or {}
-    if report.get("ok") and not (interaction.get("plugins") or {}).get("found"):
+    if report.get("ok") and not interaction.get("plugins"):
         report["ok"] = False
         report["interactionFailure"] = "the first screen did not answer a click on New game"
     click_to_scene = report.get("clickToSceneMs")
-    if report.get("ok") and not (interaction.get("session") or {}).get("found"):
+    if report.get("ok") and not interaction.get("session"):
         report["ok"] = False
         report["interactionFailure"] = "the pack list did not answer a click on a pack"
+    if report.get("ok") and not interaction.get("saved"):
+        report["ok"] = False
+        report["interactionFailure"] = "the save screen did not answer a click on Save"
     if report.get("ok") and (click_to_scene is None or click_to_scene > PERF_BUDGET_MS):
         report["ok"] = False
         report["perfFailure"] = f"pack choice reached a scene in {click_to_scene} ms, budget {PERF_BUDGET_MS} ms"
+
+    # TC-OFF-001/002: after a real disconnect the page must reload to the same
+    # landing screen with its packs and its saved slot. TC-OFF-003: playing a
+    # session must not touch the network at all.
+    offline = report.get("offline") or {}
+    if report.get("ok") and not offline.get("landing"):
+        report["ok"] = False
+        report["offlineFailure"] = "the page did not come back from cache while offline"
+    if report.get("ok") and (offline.get("packs") or 0) < 2:
+        report["ok"] = False
+        report["offlineFailure"] = f"offline reload showed {offline.get('packs')} pack(s), expected 2"
+    if report.get("ok") and not offline.get("sessions"):
+        report["ok"] = False
+        report["offlineFailure"] = "a pack could not be opened offline"
+    if report.get("ok") and (offline.get("slotsRestored") or 0) < 1:
+        report["ok"] = False
+        report["offlineFailure"] = "the saved slot did not survive the offline reload"
+    if report.get("ok") and report.get("interactionRequests") != 0:
+        report["ok"] = False
+        report["offlineFailure"] = (
+            f"a session made {report.get('interactionRequests')} network request(s), expected 0"
+        )
 
     print(json.dumps(report, indent=2))
     return 0 if report.get("ok") else 1
