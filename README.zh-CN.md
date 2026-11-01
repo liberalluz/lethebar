@@ -43,6 +43,8 @@ godot --path app --headless -s res://tests/run_tests.gd   # 规则层断言
 |---|---|
 | `python infra/checks/check_tree.py` | 检查仓库布局：根目录条目是否在白名单内、有无生成物被跟踪 |
 | `python infra/stage_builtin.py` | 把 `content/builtin/*` 打成 zip 暂存到 `app/builtin/`，测试与导出前先跑 |
+| `python infra/export_web.py` | 导出 web 构建到 `build/web/`，需要 `GODOT_BIN` 与 `GODOT_TEMPLATE_APPDATA` |
+| `python infra/verify_web.py` | 用无头 Chrome 加载该构建并输出控制台结果，需要 `node` |
 | `godot --path app --headless --quit` | 资源导入与 `app/.godot/` 重建 |
 | `godot --path app --headless -s res://tests/run_tests.gd` | 规则层断言（协议、装配、存档编码） |
 | `python tools/batch/batch.py` | 按批卡生成分支与检查清单 |

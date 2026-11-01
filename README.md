@@ -43,6 +43,8 @@ All three commands only check things — **there is nothing to play** before v0.
 |---|---|
 | `python infra/checks/check_tree.py` | Verify the repository layout: root entries, and no tracked generated files |
 | `python infra/stage_builtin.py` | Pack `content/builtin/*` into `app/builtin/*.zip` before tests or export |
+| `python infra/export_web.py` | Export the web build to `build/web/`; needs `GODOT_BIN` and `GODOT_TEMPLATE_APPDATA` |
+| `python infra/verify_web.py` | Load that build in headless Chrome and report console output; needs `node` |
 | `godot --path app --headless --quit` | Import assets, rebuild `app/.godot/` |
 | `godot --path app --headless -s res://tests/run_tests.gd` | Rule-layer assertions (protocol, assembly, save encoding) |
 | `python tools/batch/batch.py` | Create the branch and checklist from a batch card |

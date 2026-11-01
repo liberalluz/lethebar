@@ -48,6 +48,7 @@ GENERATED_PATTERNS = (
     (".godot/", lambda path: "/.godot/" in f"/{path}"),
     (".import", lambda path: path.endswith(".import")),
     ("app/builtin/", lambda path: path.startswith("app/builtin/")),
+    ("staged export preset", lambda path: path == "app/export_presets.cfg"),
     ("build/", lambda path: path.startswith("build/") or "/build/" in path),
     (".test-tmp/", lambda path: "/.test-tmp/" in f"/{path}"),
 )
