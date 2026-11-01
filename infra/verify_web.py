@@ -33,6 +33,7 @@ import sys
 import threading
 import time
 import urllib.request
+import zipfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -40,6 +41,7 @@ PROBE = REPO_ROOT / "infra" / "checks" / "cdp_probe.mjs"
 DEFAULT_DIR = REPO_ROOT / "build" / "web"
 SCRATCH = REPO_ROOT / ".test-tmp"
 PERF_BUDGET_MS = 5000
+SMOKE_PACK_ID = "smoke-pack"
 
 CHROME_CANDIDATES = (
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -92,6 +94,36 @@ def devtools_endpoint(port: int, deadline: float) -> str | None:
     return None
 
 
+def write_smoke_pack() -> Path:
+    """A package the build has never seen, for the browser to install.
+
+    It is written here rather than shipped: a file the export already contains
+    would be a cache hit, not an import (TC-PKG-001, TC-OFF-004).
+    """
+    SCRATCH.mkdir(exist_ok=True)
+    path = SCRATCH / f"{SMOKE_PACK_ID}.zip"
+    manifest = {
+        "id": SMOKE_PACK_ID,
+        "version": "1.0.0",
+        "specVersion": "1.0.0",
+        "engine": ">=4.3.0 <5.0.0",
+        "name": "Smoke Pack",
+        "protocol": "linear@1",
+        "capabilities": ["text"],
+        "mechanics": ["basic"],
+        "entry": "s1",
+        "saveSchema": 1,
+        "assets": [],
+    }
+    nodes = {"nodes": [{"id": "s1", "text": "A pack that came from a file.", "assets": [], "choices": []}]}
+    mechanics = {"rules": []}
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("manifest.json", json.dumps(manifest, indent=2))
+        archive.writestr("data/nodes.json", json.dumps(nodes, indent=2))
+        archive.writestr("data/mechanics.json", json.dumps(mechanics, indent=2))
+    return path
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dir", type=Path, default=DEFAULT_DIR, help="exported build")
@@ -111,6 +143,7 @@ def main() -> int:
     print(f"driving {chrome}")
 
     SCRATCH.mkdir(exist_ok=True)
+    smoke_pack = write_smoke_pack()
     profile = SCRATCH / f"chrome-{debug_port}"
     log = SCRATCH / "chrome.log"
     profile.mkdir(parents=True, exist_ok=True)
@@ -142,11 +175,11 @@ def main() -> int:
 
         try:
             result = subprocess.run(
-                ["node", str(PROBE), endpoint, url, str(args.reloads)],
+                ["node", str(PROBE), endpoint, url, str(args.reloads), str(smoke_pack)],
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
-                timeout=150,
+                timeout=180,
             )
         except subprocess.TimeoutExpired as expired:
             print("the probe did not finish; its trace follows")
@@ -200,6 +233,20 @@ def main() -> int:
     # landing screen with its packs and its saved slot. TC-OFF-003: playing a
     # session must not touch the network at all.
     offline = report.get("offline") or {}
+
+    # TC-PKG-001: installing a pack is a click on a real file, and TC-OFF-004
+    # asks whether that pack is still installed after a reload with the network
+    # cut. Both are answered by the same click, so a failure here is one of two
+    # defects and the probe report says which half broke.
+    if report.get("ok") and not interaction.get("imported"):
+        report["ok"] = False
+        report["interactionFailure"] = (
+            f"installing {SMOKE_PACK_ID}.zip through the button did not add a pack"
+        )
+    if report.get("ok") and offline.get("importedRestored") is not True:
+        report["ok"] = False
+        report["offlineFailure"] = "the installed pack did not come back after the offline reload"
+
     if report.get("ok") and not offline.get("landing"):
         report["ok"] = False
         report["offlineFailure"] = "the page did not come back from cache while offline"
@@ -219,6 +266,9 @@ def main() -> int:
         )
 
     print(json.dumps(report, indent=2))
+    if not report.get("ok"):
+        # The probe's stderr is its trace: it says which click missed.
+        print(result.stderr.strip()[-2000:])
     return 0 if report.get("ok") else 1
 
 

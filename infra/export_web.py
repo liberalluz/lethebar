@@ -152,6 +152,61 @@ def precache_payload(output: Path) -> None:
     worker.write_text(text, encoding="utf-8")
 
 
+IMPORT_BRIDGE = """
+<input id="lethebar-import" type="file" accept=".zip" style="display:none">
+<script>
+// The browser cannot hand a path to the engine, so the player's file arrives
+// through this input instead. The bytes go to the shell as base64 through the
+// callback the shell registers; nothing leaves the page (REQ-003).
+(function () {
+  var input = document.getElementById("lethebar-import");
+  if (!input) return;
+  window.lethebarAskForFile = function () {
+    window.lethebarAsked = (window.lethebarAsked || 0) + 1;
+    input.click();
+  };
+  input.addEventListener("change", function () {
+    var file = input.files && input.files[0];
+    if (!file) { return; }
+    var reader = new FileReader();
+    reader.onload = function () {
+      var bytes = new Uint8Array(reader.result);
+      var binary = "";
+      for (var index = 0; index < bytes.length; index += 1) {
+        binary += String.fromCharCode(bytes[index]);
+      }
+      input.value = "";
+      if (window.lethebarReceiveFile) {
+        window.lethebarReceiveFile(window.btoa(binary), file.name);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+})();
+</script>
+"""
+
+
+def inject_import_bridge(output: Path) -> None:
+    """Add the file-input the "Install a pack…" button opens.
+
+    Godot's web export has no way to reach the player's disk: an
+    `<input type="file">` in the page is the only door, and the shell asks for it
+    through `window.lethebarAskForFile`. The input is generated output, so this
+    is a post-export edit of `index.html`; it fails loudly rather than shipping a
+    page with a button that does nothing.
+    """
+    page = output / "index.html"
+    if not page.is_file():
+        raise SystemExit("index.html is missing; run the export first")
+    text = page.read_text(encoding="utf-8")
+    if "lethebarAskForFile" in text:
+        return
+    if "</body>" not in text:
+        raise SystemExit("index.html has no </body>; the bridge cannot be placed")
+    page.write_text(text.replace("</body>", IMPORT_BRIDGE + "</body>"), encoding="utf-8")
+
+
 def report(output: Path) -> int:
     missing = [name for name in EXPECTED_FILES if not (output / name).is_file()]
     for path in sorted(output.iterdir()):
@@ -181,6 +236,7 @@ def main() -> int:
     finally:
         PRESET_STAGED.unlink(missing_ok=True)
     precache_payload(args.output)
+    inject_import_bridge(args.output)
     return report(args.output)
 
 

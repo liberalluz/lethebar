@@ -45,6 +45,11 @@ var _options: VBoxContainer
 var _status: RichTextLabel
 var _margin: MarginContainer
 var _box: VBoxContainer
+## Set while a desktop picker is open, so a second click does not stack dialogs.
+var _picker: FileDialog = null
+## The JS callback must stay referenced from here: assigning it to `window` alone
+## lets the engine collect it, and the bridge then exists but never calls back.
+var _import_callback: JavaScriptObject = null
 
 
 func _ready() -> void:
@@ -52,6 +57,7 @@ func _ready() -> void:
 	resized.connect(_fit_text)
 	_fit_text()
 	_install_builtins()
+	_connect_import_bridge()
 	show_landing()
 
 
@@ -75,7 +81,7 @@ func show_landing() -> String:
 func open_plugins() -> String:
 	screen = SCREEN_PLUGINS
 	_heading.text = "Choose a pack"
-	_sub.text = "Installed packs. Each one brings its own story and rules."
+	_sub.text = "Installed packs. Each one brings its own story and rules. You can install one from a .zip file."
 	_status.text = "" if not builtin_ids.is_empty() else "No pack installed. Stage the built-in packs first."
 	_clear_options()
 	for plugin_id in builtin_ids:
@@ -83,6 +89,7 @@ func open_plugins() -> String:
 		var manifest: Dictionary = record.get("manifest", {})
 		var label := "%s — %s, %s" % [plugin_id, String(manifest.get("protocol", "")), String(manifest.get("version", ""))]
 		_options.add_child(_button(label, start_plugin.bind(plugin_id)))
+	_options.add_child(_button("Install a pack…", request_install))
 	_options.add_child(_button("Back", show_landing))
 	_announce()
 	return screen
@@ -215,6 +222,72 @@ func try_import(bytes: PackedByteArray) -> Dictionary:
 	session = Session.create(entry, {"start_counter": 1})
 	session.start()
 	return enter_session()
+
+
+# --- installing a pack ------------------------------------------------------
+
+func request_install() -> void:
+	## The browser has no file system to browse: the only way to a player's disk
+	## is an `<input type="file">`, which `infra/export_web.py` injects next to the
+	## canvas and wires to `window.lethebarReceiveFile`. Desktop builds open a
+	## native dialog instead, so the same button works when the project runs in
+	## the editor.
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("window.lethebarAskForFile && window.lethebarAskForFile();", true)
+		return
+	if _picker != null and is_instance_valid(_picker):
+		_picker.popup_centered_ratio(0.6)
+		return
+	_picker = FileDialog.new()
+	_picker.access = FileDialog.ACCESS_FILESYSTEM
+	_picker.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	_picker.add_filter("*.zip", "Plugin package")
+	_picker.file_selected.connect(_on_file_chosen)
+	_picker.canceled.connect(_on_picker_closed)
+	add_child(_picker)
+	_picker.popup_centered_ratio(0.6)
+
+
+func _on_picker_closed() -> void:
+	if _picker != null and is_instance_valid(_picker):
+		_picker.queue_free()
+	_picker = null
+
+
+func _on_file_chosen(path: String) -> void:
+	_on_picker_closed()
+	install_from_bytes(FileAccess.get_file_as_bytes(path))
+
+
+func _connect_import_bridge() -> void:
+	## The injected input hands the chosen file back as base64, because a
+	## JavaScript string is the only thing `JavaScriptBridge` carries. Decoding
+	## lives here rather than in JavaScript so the base64 path is covered by the
+	## headless suite (`_case_import_control`).
+	if not OS.has_feature("web"):
+		return
+	var window := JavaScriptBridge.get_interface("window")
+	_import_callback = JavaScriptBridge.create_callback(_on_file_picked)
+	window.lethebarReceiveFile = _import_callback
+
+
+func _on_file_picked(arguments: Array) -> void:
+	if arguments.is_empty():
+		return
+	install_from_base64(String(arguments[0]))
+
+
+func install_from_base64(encoded: String) -> Dictionary:
+	## What the browser bridge calls. Kept separate from the byte entry point so a
+	## test can drive the decode step without a browser.
+	return install_from_bytes(Marshalls.base64_to_raw(encoded))
+
+
+func install_from_bytes(bytes: PackedByteArray) -> Dictionary:
+	## One entry for the button, the dialog and the tests. A file the player
+	## picked is not more trusted than one that shipped: it goes through the same
+	## V-01…V-09 checks and a refusal leaves the installed packs alone.
+	return try_import(bytes)
 
 
 # --- read-only accessors (tests and the smoke probe) ------------------------
