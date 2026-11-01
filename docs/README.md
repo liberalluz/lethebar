@@ -1,4 +1,4 @@
-# lethebar — docs
+# Lethebar — docs
 
 | Dir | Purpose |
 |---|---|
