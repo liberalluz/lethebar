@@ -112,6 +112,16 @@ const onSession = (method, params = {}) => send(method, params, sessionId);
 await onSession("Runtime.enable");
 await onSession("Log.enable");
 await onSession("Page.enable");
+await onSession("Network.enable");
+
+// Requests are counted for the interaction window only: loading the page is
+// allowed to fetch the build, playing a session is not allowed to fetch
+// anything (TC-OFF-003).
+let requestsSeen = 0;
+socket.addEventListener("message", (event) => {
+  const message = JSON.parse(event.data);
+  if (message.method === "Network.requestWillBeSent") requestsSeen += 1;
+});
 
 let loaded = false;
 socket.addEventListener("message", (event) => {
@@ -163,13 +173,14 @@ const canvases = await evaluate("document.querySelectorAll('canvas').length");
 
 // --- scripted click ---------------------------------------------------------
 // The scene is one canvas: button labels are pixels, so the probe cannot ask
-// the DOM where "New game" is. It pokes the centre column instead — every button
-// spans the full content width — and stops as soon as the shell reports a new
-// screen through `window.lethebarScreen`. A hit is a hit only if the screen
-// changed; a miss costs one more click and changes nothing.
+// the DOM where "New game" is. The shell publishes the centre of every visible
+// button as `window.lethebarHits`, and the probe clicks those coordinates. The
+// box is only a convenience: every step is proven by a change in
+// `window.lethebarState`, so a wrong box makes the click miss and the step
+// fail — it can never make a broken screen pass.
 
 async function screenName() {
-  return await evaluate("window.lethebarScreen || null");
+  return await evaluate("(window.lethebarState && window.lethebarState.screen) || null");
 }
 
 async function clickAt(x, y) {
@@ -191,38 +202,120 @@ async function clickAt(x, y) {
   });
 }
 
-async function pokeUntil(target, limit) {
-  // `limit` is the number of vertical steps tried, not a timeout: the loop is
-  // bounded so a broken build fails fast instead of poking for a minute.
-  const size = await evaluate("[window.innerWidth, window.innerHeight]");
-  const x = Math.round(size[0] / 2);
-  let clicks = 0;
-  for (let y = 60; y < size[1] - 40; y += 24) {
-    await clickAt(x, y);
-    clicks += 1;
+async function appState() {
+  return await evaluate("window.lethebarState || null");
+}
+
+async function visibleHits() {
+  return (await evaluate("window.lethebarHits || []")) || [];
+}
+
+async function clickLabel(label, limit = 40) {
+  // The hit list is republished one frame after a screen changes, hence the
+  // retry loop: the first read can still describe the previous screen.
+  for (let attempt = 0; attempt < limit; attempt += 1) {
+    const list = await visibleHits();
+    const hit =
+      list.find((item) => item.label === label) ||
+      list.find((item) => item.label.startsWith(label));
+    if (hit) {
+      // The shell publishes viewport fractions; the driver turns them into
+      // window pixels, so a different window size changes nothing.
+      const size = await evaluate("[window.innerWidth, window.innerHeight]");
+      await clickAt(Math.round(hit.fx * size[0]), Math.round(hit.fy * size[1]));
+      await sleep(250);
+      return hit.label;
+    }
     await sleep(150);
-    const screen = await screenName();
-    if (screen === target) return { found: true, clicks };
-    if (clicks >= limit) break;
   }
-  return { found: false, clicks };
+  return null;
+}
+
+async function waitState(predicate, limit = 60) {
+  for (let attempt = 0; attempt < limit; attempt += 1) {
+    const value = await appState();
+    if (value && predicate(value)) return value;
+    await sleep(200);
+  }
+  return null;
+}
+
+async function openFirstPack() {
+  await clickLabel("New game");
+  if (!(await waitState((state) => state.screen === "plugins"))) return false;
+  const packs = (await appState()).packs || [];
+  if (packs.length === 0) return false;
+  await clickLabel(String(packs[0]));
+  return Boolean(await waitState((state) => state.screen === "session"));
 }
 
 const landingScreen = await screenName();
 const clickStarted = Math.round(await evaluate("performance.now()"));
 let clickToSceneMs = null;
-let interaction = { landing: landingScreen, plugins: { found: false, clicks: 0 }, session: { found: false, clicks: 0 } };
+const requestsBeforeInteraction = requestsSeen;
+const interaction = { landing: landingScreen, plugins: false, session: false, saved: false, offline: false };
 
 if (landingScreen === "landing") {
-  interaction.plugins = await pokeUntil("plugins", 24);
-  if (interaction.plugins.found) {
-    interaction.session = await pokeUntil("session", 12);
-    if (interaction.session.found) {
+  interaction.plugins = (await clickLabel("New game")) !== null;
+  if (interaction.plugins) {
+    const packs = (await appState()).packs || [];
+    interaction.session = packs.length > 0 && (await clickLabel(String(packs[0]))) !== null;
+    if (interaction.session && (await waitState((state) => state.screen === "session"))) {
       clickToSceneMs = Math.round((await evaluate("performance.now()")) - clickStarted);
+      // Save a slot so the offline reload has something to prove came back.
+      await clickLabel("Saves");
+      if (await waitState((state) => state.screen === "saves")) {
+        await clickLabel("Save");
+        interaction.saved = Boolean(
+          await waitState((state) => (state.slots || []).some((slot) => slot.length > 0), 30),
+        );
+      }
     }
   }
 }
+const interactionRequests = requestsSeen - requestsBeforeInteraction;
 trace(`interaction: ${JSON.stringify(interaction)} in ${clickToSceneMs} ms`);
+
+// --- offline reload ---------------------------------------------------------
+// TC-OFF-001/002: cut the network, reload, and expect the same shell with the
+// packs and the saved slot still there. Everything must come from the service
+// worker's cache; a missing file shows up as a page that never reaches landing.
+let offline = {
+  attempted: false,
+  landing: false,
+  packs: 0,
+  sessions: false,
+  slotsRestored: 0,
+};
+
+if (interaction.saved) {
+  offline.attempted = true;
+  await onSession("Network.emulateNetworkConditions", {
+    offline: true,
+    latency: 0,
+    downloadThroughput: 0,
+    uploadThroughput: 0,
+  });
+  await onSession("Page.navigate", { url });
+  const back = await waitState((state) => state.screen === "landing", 100);
+  offline.landing = back !== null;
+  if (back) {
+    offline.packs = (back.packs || []).length;
+    offline.sessions = await openFirstPack();
+    if (offline.sessions) {
+      await clickLabel("Saves");
+      const saves = await waitState((state) => state.screen === "saves", 30);
+      if (saves) offline.slotsRestored = (saves.slots || []).filter((slot) => slot.length > 0).length;
+    }
+  }
+  await onSession("Network.emulateNetworkConditions", {
+    offline: false,
+    latency: 0,
+    downloadThroughput: -1,
+    uploadThroughput: -1,
+  });
+}
+trace(`offline: ${JSON.stringify(offline)}`);
 
 const storage = await evaluate(`(() => {
   try {
@@ -238,7 +331,12 @@ const storage = await evaluate(`(() => {
 const sorted = [...bootSamples].sort((left, right) => left - right);
 const bootMedianMs = sorted.length ? sorted[Math.floor(sorted.length / 2)] : null;
 
-const interacted = interaction.plugins.found && interaction.session.found;
+const interacted = interaction.plugins && interaction.session && interaction.saved;
+// TC-OFF-003: once the app is running, a session must not reach the network.
+// Counting `Network.requestWillBeSent` is the real measure; the source scan in
+// the unit tests only proves the engine code has no HTTP API in it.
+const sessionQuiet = interactionRequests === 0;
+const offlineOk = offline.landing && offline.packs >= 2 && offline.sessions && offline.slotsRestored >= 1;
 
 const ok =
   loaded &&
@@ -247,7 +345,9 @@ const ok =
   exceptions.length === 0 &&
   dialogs.length === 0 &&
   bootSamples.length === reloads &&
-  interacted;
+  interacted &&
+  sessionQuiet &&
+  offlineOk;
 
 console.log(
   JSON.stringify(
@@ -262,6 +362,8 @@ console.log(
       bootMedianMs,
       interaction,
       clickToSceneMs,
+      interactionRequests,
+      offline,
       console: consoleLines.slice(-25),
       exceptions,
       dialogs,

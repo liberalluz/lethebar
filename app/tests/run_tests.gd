@@ -35,6 +35,7 @@ func _initialize() -> void:
 	_case_save_001()
 	_case_save_002()
 	_case_package_survives()
+	_case_file_backend()
 	_case_off_003()
 	_case_no_clock()
 	_case_ux_001()
@@ -740,8 +741,41 @@ func _shell() -> Shell:
 	# The sandbox cannot write user://, so staging goes to the fixture folder the
 	# other cases already use. The shipped default stays user:// for the browser.
 	shell.work_dir = FIXTURE_DIR
+	# Saves in the suite go to the memory backend: a file backend would carry a
+	# slot from one case into the next and make "three empty slots" untrue.
+	MemoryBackend.reset()
+	shell.saves = SaveStore.new(MemoryBackend.new())
 	shell._ready()
 	return shell
+
+
+func _case_file_backend() -> void:
+	# The backend the browser actually uses. A second instance over the same
+	# folder is what a page reload looks like to the stores, so this is the
+	# headless half of TC-OFF-002: the bytes are on disk, not in a variable.
+	_section("TC-OFF-002 saves survive a store that was rebuilt from the same folder")
+	var root := "%s/store-case" % FIXTURE_DIR
+	_clear_dir(root)
+	var first := FileBackend.new(root)
+	_check("TC-OFF-002: a write reports success", first.write("save:sanguo:1", "payload"))
+	_check("TC-OFF-002: the key is listed", first.keys().has("save:sanguo:1"), str(first.keys()))
+	var second := FileBackend.new(root)
+	_check("TC-OFF-002: a fresh backend reads it back", second.read("save:sanguo:1") == "payload")
+	var store := SaveStore.new(second)
+	_check("TC-OFF-002: a store built over the folder sees the key", store.backend.keys().has("save:sanguo:1"))
+	_check("TC-OFF-002: erase removes it", second.erase("save:sanguo:1") and not second.has("save:sanguo:1"))
+	# A key with a separator must not escape the folder.
+	_check("TC-OFF-002: slashes in a key stay inside the folder", first.write("a/b", "x") and first.keys().has("a/b"))
+	_clear_dir(root)
+
+
+func _clear_dir(path: String) -> void:
+	var directory := DirAccess.open(path)
+	if directory == null:
+		return
+	for name in directory.get_files():
+		DirAccess.remove_absolute("%s/%s" % [path, name])
+
 
 
 func _case_ux_001() -> void:

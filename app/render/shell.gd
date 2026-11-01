@@ -23,8 +23,11 @@ const SCREEN_NOTICE := "notice"
 const TITLE_PREFIX := "Lethebar — "
 
 var loader := PackageLoader.new()
-var saves := SaveStore.new()
-var packages := PackageStore.new()
+## Saves and imported packages live in `user://`, which the web build keeps in
+## IndexedDB: a slot survives a reload (TC-OFF-001/002/004). Tests swap both
+## stores for the memory backend before `_ready()`.
+var saves := SaveStore.new(FileBackend.new())
+var packages := PackageStore.new(FileBackend.new())
 
 var screen := SCREEN_LANDING
 var session: Session = null
@@ -37,13 +40,17 @@ var builtin_ids: Array = []
 var work_dir := "user://pkg"
 
 var _heading: Label
-var _sub: Label
+var _sub: RichTextLabel
 var _options: VBoxContainer
-var _status: Label
+var _status: RichTextLabel
+var _margin: MarginContainer
+var _box: VBoxContainer
 
 
 func _ready() -> void:
 	_build_chrome()
+	resized.connect(_fit_text)
+	_fit_text()
 	_install_builtins()
 	show_landing()
 
@@ -222,13 +229,80 @@ func screen_title() -> String:
 	return TITLE_PREFIX + screen
 
 
+func slot_previews() -> Array:
+	## Three entries, `""` for an empty slot. The probe uses the first one to
+	## tell "the save landed" from "the click missed", and to check after a
+	## reload that the slot came back (TC-OFF-002).
+	var out: Array = []
+	if entry.is_empty():
+		return out
+	for row in saves.slots(entry):
+		out.append("" if bool(row.get("empty", true)) else String(row.get("preview", "")))
+	return out
+
+
 func _announce() -> void:
 	DisplayServer.window_set_title(screen_title())
 	if OS.has_feature("web"):
 		# Godot's web build does not forward window titles to the document, so the
-		# tab title stays as exported. Mirror the screen onto a plain global that
-		# the smoke probe can read; the click that drives it is a real mouse event.
-		JavaScriptBridge.eval("window.lethebarScreen = %s;" % JSON.stringify(screen), true)
+		# tab title stays as exported. Mirror what a driver needs onto one global:
+		# which screen is up, which packs are installed, which slots hold a save.
+		# Reading it is the only way to assert on a canvas without OCR; every
+		# change it reports was still caused by a real click.
+		var state := {
+			"screen": screen,
+			"packs": builtin_ids.duplicate(),
+			"slots": slot_previews(),
+		}
+		JavaScriptBridge.eval("window.lethebarState = %s;" % JSON.stringify(state), true)
+	# Layout is only settled after the frame that added the buttons, so the hit
+	# boxes are published one idle frame later. A wrong box makes a click miss,
+	# and the assertion on `lethebarState` still has to pass, so this cannot
+	# turn a broken screen into a green run.
+	call_deferred("_publish_hits")
+
+
+func _fit_text() -> void:
+	## Wrapped text keeps asking for the width of its narrowest column, which
+	## grows the whole column far past the window (the probe caught every button
+	## sitting below the fold). Pinning the minimum width to the window solves it:
+	## the labels then measure their height against the width they really have.
+	var width := maxf(get_viewport_rect().size.x - 48.0, 120.0)
+	for label in [_sub, _status]:
+		if label != null:
+			(label as Control).custom_minimum_size = Vector2(width, 0.0)
+
+
+func _publish_hits() -> void:
+	if not OS.has_feature("web"):
+		return
+	_fit_text()
+	# The labels just changed width, so their height (and every button below
+	# them) moves on the next frame; publishing before that would hand the
+	# driver yesterday's boxes.
+	await get_tree().process_frame
+	var hits: Array = []
+	# Fractions of the viewport, not pixels: the browser scales the canvas to the
+	# window, so the driver converts with `window.innerWidth` and stays correct
+	# on any window size.
+	var size := get_viewport().get_visible_rect().size
+	if size.x <= 0.0 or size.y <= 0.0:
+		return
+	_collect_hits(_options, hits, size)
+	JavaScriptBridge.eval("window.lethebarHits = %s;" % JSON.stringify(hits), true)
+
+
+func _collect_hits(node: Node, hits: Array, size: Vector2) -> void:
+	if node is Button and (node as Button).is_visible_in_tree():
+		var button := node as Button
+		var rect := button.get_global_rect()
+		hits.append({
+			"label": button.text,
+			"fx": (rect.position.x + rect.size.x / 2.0) / size.x,
+			"fy": (rect.position.y + rect.size.y / 2.0) / size.y,
+		})
+	for child in node.get_children():
+		_collect_hits(child, hits, size)
 
 
 func current_view() -> Dictionary:
@@ -275,26 +349,36 @@ func _build_chrome() -> void:
 	for side in ["left", "top", "right", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, 24)
 	add_child(margin)
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	margin.add_child(scroll)
+	_margin = margin
 	var box := VBoxContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", 12)
-	scroll.add_child(box)
+	margin.add_child(box)
+	_box = box
 	_heading = Label.new()
 	_heading.add_theme_font_size_override("font_size", 28)
 	box.add_child(_heading)
-	_sub = Label.new()
-	_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# `Label` with autowrap reports the height of its narrowest column as its
+	# minimum size, which grew the whole column to ~1300 px and pushed every
+	# button below a 484 px viewport (caught by the probe's hit boxes, not by
+	# looking at the screen). `RichTextLabel` with `fit_content` measures against
+	# the width it is actually given, so the column stays the size of the window.
+	_sub = RichTextLabel.new()
+	_sub.bbcode_enabled = false
+	_sub.scroll_active = false
+	_sub.fit_content = true
 	_sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_child(_sub)
 	_options = VBoxContainer.new()
 	_options.add_theme_constant_override("separation", 6)
 	box.add_child(_options)
-	_status = Label.new()
-	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	_status = RichTextLabel.new()
+	_status.bbcode_enabled = false
+	_status.scroll_active = false
+	_status.fit_content = true
+	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_status.add_theme_color_override("default_color", Color(0.7, 0.7, 0.7))
 	box.add_child(_status)
 
 
@@ -305,6 +389,14 @@ func _install_builtins() -> void:
 		var result := loader.import_bytes(bytes, _context())
 		if String(result.get("status", "")) == "installed":
 			builtin_ids.append(String(result["entry"]["id"]))
+	# Packages the player imported come back from storage, so a reload does not
+	# silently drop a pack they installed (TC-OFF-004). Built-ins are shipped in
+	# the pack file and are never stored, so the two lists cannot collide by
+	# accident — the `has` check only guards a pack that ships built in later.
+	for plugin_id in packages.restore_into(loader, _context()):
+		var restored := String(plugin_id)
+		if not builtin_ids.has(restored):
+			builtin_ids.append(restored)
 
 
 func _builtin_packages() -> Array:
