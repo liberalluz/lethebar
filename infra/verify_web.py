@@ -138,7 +138,10 @@ def main() -> int:
     port = free_port()
     debug_port = free_port()
     server = serve(build, port)
-    url = f"http://127.0.0.1:{port}/index.html"
+    # Navigate to the directory, not to index.html: that is the URL a player
+    # opens, and the two are different service-worker cache keys. Navigating to
+    # the file hid an offline failure that only Safari reported.
+    url = f"http://127.0.0.1:{port}/"
     print(f"serving {build} at {url}")
     print(f"driving {chrome}")
 
