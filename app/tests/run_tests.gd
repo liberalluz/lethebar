@@ -293,8 +293,30 @@ func _case_builtin_001() -> void:
 	_check("TC-BUILTIN-001: the end node is reached", view["finished"] == true)
 	_check("TC-BUILTIN-001: the end node shows its text", String(view["text"]) != "")
 	_check("TC-BUILTIN-001: the power supply mechanic ran", view["state"].has("standing"), str(view["state"]))
-	# Step 4 of the case (save to slot 1, reload, resume) needs the save store from
-	# B4; the gap is recorded in the B3 exit record instead of being asserted here.
+	# Step 4 of the case: save the end scene to slot 1, then resume from the stored
+	# bytes. B3 deferred this step to B4, B4 shipped the store and asserted only the
+	# generic save cases, so the step is closed here — the exit line asks for the
+	# resumed session to start at the saved end node, not just for a slot to accept
+	# a write.
+	MemoryBackend.reset()
+	var entry: Dictionary = loader.registry.entry("sanguo")
+	var store := SaveStore.new()
+	var saved_node := session.current
+	var written := store.write(entry, 1, session.snapshot(), "三国")
+	_check("TC-BUILTIN-001: the end scene saves to slot 1", bool(written.get("ok", false)), str(written))
+	var read_back := store.read(entry, 1)
+	var resumed: Session = null
+	if bool(read_back.get("ok", false)):
+		resumed = store.resume(entry, read_back["payload"])
+	_check(
+		"TC-BUILTIN-001: the resumed session starts at the saved end node",
+		resumed != null and resumed.current == saved_node,
+		"resumed %s, saved %s" % [resumed.current if resumed != null else "-", saved_node],
+	)
+	_check(
+		"TC-BUILTIN-001: the resumed session is still at the end",
+		resumed != null and resumed.finished and resumed.current == session.current,
+	)
 
 
 func _case_builtin_002() -> void:
