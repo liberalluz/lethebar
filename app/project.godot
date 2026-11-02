@@ -13,6 +13,13 @@ run/main_scene="res://render/main.tscn"
 
 project/assembly_name="lethebar"
 
+[gui]
+
+; The engine's own default font carries Latin glyphs only, so every Chinese
+; string in a pack rendered as boxes in the browser build. One font, owned by the
+; render layer, is shared by all packs: a pack carries its text, never a font.
+theme/custom_font="res://render/fonts/NotoSansSC-Regular.woff2"
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"

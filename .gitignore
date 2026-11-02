@@ -16,6 +16,7 @@ __pycache__/
 # Godot editor scaffolding
 .godot/
 *.uid
+*.import
 
 # Test fixtures written by app/tests/run_tests.gd
 .test-tmp/
