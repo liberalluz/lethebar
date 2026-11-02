@@ -1,0 +1,32 @@
+key	text
+app.name	Lethebar
+app.tagline	短篇文字故事。你来选，故事往你送的方向走。
+ui.new_game	新游戏
+ui.continue	继续
+ui.continue_hint	从上次离开的地方接着走。
+ui.language	语言
+ui.lang_en	English
+ui.lang_zh	中文
+ui.back	返回
+ui.back_to_packs	返回选包
+ui.saves	存档
+ui.choose_another	换个包
+ui.the_end	结局
+ui.playing	进行中
+ui.all_packs	所有包
+ui.packs_hint	每个包都是一个自带规则的故事。可以从 .zip 文件添加一个，它留在当前浏览器里。
+ui.no_pack_yet	还没有装任何故事。
+ui.no_pack_installed	没有包。先把内置包准备好。
+ui.install	安装插件包（.zip）…
+ui.save_slots	存档位
+ui.slots_hint	存档记住你在这个故事里的位置，读档回到那一刻。
+ui.slot_empty	存档位 %d — 还没有存档
+ui.slot_filled	存档位 %d — %s
+ui.slot_failed	存档位 %d 没存上：%s
+ui.saved_to	已存到存档位 %d。
+ui.nothing_saved	还没有任何存档。
+ui.no_scene	这个包在入口处没有场景。
+ui.failed_heading	没能装成功
+ui.failed_hint	什么都没装。你可以换一个包。
+ui.slot_head	%s · 存档位 %d
+ui.steps	第 %d/%d 步
