@@ -454,6 +454,28 @@ if (interaction.saved) {
 }
 trace(`offline: ${JSON.stringify(offline)}`);
 
+// --- a file URL is not the game -------------------------------------------------
+// The document fallback that makes TC-OFF-001 pass also caught every other top
+// level navigation, so opening a download link (`/lethebar/test-pack.zip`) showed
+// the game instead of the file. The file need not exist here: a 404 proves the
+// request reached the network, which is what a download needs.
+let directFile = { attempted: false, servedGame: null };
+{
+  directFile.attempted = true;
+  const fileUrl = `${url.replace(/index\.html$/, "")}missing-file.zip`;
+  await onSession("Page.navigate", { url: fileUrl });
+  await sleep(1500);
+  const screen = await screenName();
+  directFile.servedGame = screen !== null;
+  if (process.env.PROBE_SHOT) {
+    const shot = await onSession("Page.captureScreenshot", { format: "png" });
+    const target = process.env.PROBE_SHOT.replace(/\.png$/i, "-file.png");
+    writeFileSync(target, Buffer.from(shot.data, "base64"));
+    trace(`shot: ${target}`);
+  }
+}
+trace(`direct file navigation: ${JSON.stringify(directFile)}`);
+
 const storage = await evaluate(`(() => {
   try {
     localStorage.setItem("lethebar-probe", "ok");
@@ -484,6 +506,9 @@ const offlineOk =
   offline.loadsListed &&
   offline.resumed;
 const importOk = importZip ? interaction.imported && offline.importedRestored === true : true;
+// A download link must reach the network. When the document fallback answered
+// every navigation, `/lethebar/test-pack.zip` opened the game instead of the file.
+const directFileOk = directFile.servedGame === false;
 
 const ok =
   loaded &&
@@ -495,7 +520,8 @@ const ok =
   interacted &&
   sessionQuiet &&
   offlineOk &&
-  importOk;
+  importOk &&
+  directFileOk;
 
 console.log(
   JSON.stringify(
@@ -512,6 +538,7 @@ console.log(
       clickToSceneMs,
       interactionRequests,
       offline,
+      directFile,
       console: consoleLines.slice(-25),
       exceptions,
       dialogs,

@@ -267,6 +267,12 @@ def main() -> int:
         report["offlineFailure"] = (
             f"a session made {report.get('interactionRequests')} network request(s), expected 0"
         )
+    direct_file = report.get("directFile") or {}
+    if report.get("ok") and direct_file.get("servedGame") is not False:
+        # The document fallback that makes an offline root work must not answer
+        # every navigation: a download link would open the game instead of the file.
+        report["ok"] = False
+        report["offlineFailure"] = "a navigation to a file URL was answered with the game"
 
     print(json.dumps(report, indent=2))
     if not report.get("ok"):
