@@ -21,6 +21,14 @@
       "cwd": "."
     },
     {
+      "name": "commit-body",
+      "command": [
+        "python",
+        "infra/checks/check_commit_body.py"
+      ],
+      "cwd": "."
+    },
+    {
       "name": "tree",
       "command": [
         "python",
