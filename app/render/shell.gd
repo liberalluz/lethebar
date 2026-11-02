@@ -9,6 +9,11 @@ extends Control
 
 const BUILTIN_DIR := "res://builtin"
 const SLOT_COUNT := 3
+## Save and Load side by side, plus the row's separations, measured once so the
+## slot label can be told what width it may take.
+const SLOT_BUTTONS_WIDTH := 152.0
+## Slot previews are stored with the save, so they are clipped at write time.
+const PREVIEW_CHARS := 24
 
 const SCREEN_LANDING := "landing"
 const SCREEN_PLUGINS := "plugins"
@@ -155,12 +160,20 @@ func open_saves() -> String:
 		var row: Dictionary = rows[index] if index < rows.size() else {}
 		var description := "Slot %d — empty" % slot
 		if not bool(row.get("empty", true)):
-			description = "Slot %d — %s" % [slot, String(row.get("preview", ""))]
+			# Saves written before the preview cap still hold their long text, so
+			# the clip happens on the way out as well as on the way in.
+			description = "Slot %d — %s" % [slot, _clip(String(row.get("preview", "")), PREVIEW_CHARS)]
 		var line := HBoxContainer.new()
 		line.add_theme_constant_override("separation", 8)
 		var text := Label.new()
 		text.text = description
+		# A slot row has to leave room for Save and Load. Without wrapping the
+		# label's minimum width is the whole sentence, which pushes both buttons
+		# past the right edge in a narrow window — and then the player cannot
+		# save or load at all. Wrapping plus a pinned width keeps the row inside.
+		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		text.custom_minimum_size = Vector2(_slot_text_width(), 0.0)
 		line.add_child(text)
 		line.add_child(_button("Save", save_to.bind(slot)))
 		line.add_child(_button("Load", load_from.bind(slot)))
@@ -173,7 +186,7 @@ func open_saves() -> String:
 func save_to(slot: int) -> Dictionary:
 	if session == null:
 		return current_view()
-	var preview := String(current_view().get("text", "")).left(40)
+	var preview := _clip(String(current_view().get("text", "")), PREVIEW_CHARS)
 	var result := saves.write(entry, slot, session.snapshot(), preview)
 	open_saves()
 	if not bool(result.get("ok", false)):
@@ -344,6 +357,27 @@ func _fit_text() -> void:
 	for label in [_sub, _status]:
 		if label != null:
 			(label as Control).custom_minimum_size = Vector2(width, 0.0)
+	# Slot rows hold the same kind of label, but they share the row with two
+	# buttons, so they get what is left rather than the full width.
+	var slot_width := _slot_text_width()
+	for child in _options.get_children():
+		if child is HBoxContainer and child.get_child_count() > 0:
+			var first := child.get_child(0)
+			if first is Label:
+				(first as Control).custom_minimum_size = Vector2(slot_width, 0.0)
+
+
+func _slot_text_width() -> float:
+	## Window width minus the margins minus the two buttons on the right.
+	return maxf(get_viewport_rect().size.x - 48.0 - SLOT_BUTTONS_WIDTH, 96.0)
+
+
+func _clip(text: String, limit: int) -> String:
+	## Previews are stored, so the cap belongs at write time; the ellipsis keeps
+	## it obvious that a longer scene is behind the slot.
+	if text.length() <= limit:
+		return text
+	return text.left(limit) + "…"
 
 
 func _publish_hits() -> void:

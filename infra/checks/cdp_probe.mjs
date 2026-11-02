@@ -338,6 +338,15 @@ if (landingScreen === "landing") {
         interaction.saved = Boolean(
           await waitState((state) => (state.slots || []).some((slot) => slot.length > 0), 30),
         );
+        // The slots screen is where a narrow window used to push Save and Load
+        // off the right edge, so it gets a picture of its own next to the first
+        // scene one: `<shot>-saves.png`.
+        if (process.env.PROBE_SHOT) {
+          const slotsShot = process.env.PROBE_SHOT.replace(/\.png$/i, "-saves.png");
+          const image = await onSession("Page.captureScreenshot", { format: "png" });
+          writeFileSync(slotsShot, Buffer.from(image.data, "base64"));
+          trace(`shot: ${slotsShot}`);
+        }
       }
     }
   }
