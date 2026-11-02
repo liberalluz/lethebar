@@ -375,6 +375,43 @@ if (interaction.saved && importZip) {
 const interactionRequests = requestsSeen - requestsBeforeInteraction;
 trace(`interaction: ${JSON.stringify(interaction)} in ${clickToSceneMs} ms`);
 
+// --- the interface speaks two languages -----------------------------------------
+// The build follows `navigator.language`; the driver pins English so every other
+// label in this file is stable. This stage starts from a fresh page load, clicks
+// the switch, checks the state changed, reloads to prove the choice survived,
+// and switches back so the stages below read English again.
+let language = { attempted: false, switched: false, persisted: false, restored: false };
+{
+  language.attempted = true;
+  const size = await evaluate("[window.innerWidth, window.innerHeight]");
+
+  const pressSwitch = async () => {
+    const hit = (await visibleHits()).find((item) => item.label.includes(": "));
+    if (!hit) return false;
+    await clickAt(Math.round(hit.fx * size[0]), Math.round(hit.fy * size[1]));
+    await sleep(500);
+    return true;
+  };
+
+  await onSession("Page.navigate", { url });
+  await waitState((state) => state.screen === "landing");
+  const before = ((await appState()) || {}).locale;
+
+  if (await pressSwitch()) {
+    const after = ((await appState()) || {}).locale;
+    language.switched = Boolean(after) && after !== before;
+
+    await onSession("Page.navigate", { url });
+    await waitState((state) => state.screen === "landing");
+    language.persisted = ((await appState()) || {}).locale === after;
+
+    if (await pressSwitch()) {
+      language.restored = ((await appState()) || {}).locale === before;
+    }
+  }
+}
+trace(`language: ${JSON.stringify(language)}`);
+
 // --- offline reload ---------------------------------------------------------
 // TC-OFF-001/002: cut the network, reload, and expect the same shell with the
 // packs and the saved slot still there. Everything must come from the service
@@ -521,7 +558,11 @@ const ok =
   sessionQuiet &&
   offlineOk &&
   importOk &&
-  directFileOk;
+  directFileOk &&
+  language.attempted &&
+  language.switched &&
+  language.persisted &&
+  language.restored;
 
 console.log(
   JSON.stringify(
@@ -535,6 +576,7 @@ console.log(
       bootSamples,
       bootMedianMs,
       interaction,
+      language,
       clickToSceneMs,
       interactionRequests,
       offline,

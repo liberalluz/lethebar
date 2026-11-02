@@ -160,6 +160,11 @@ def main() -> int:
                 "--disable-gpu",
                 "--no-first-run",
                 "--no-default-browser-check",
+                # The interface follows `navigator.language`, and the probe
+                # clicks and reads English labels. Pin the browser language so
+                # the run does not depend on the machine it happens to run on;
+                # the Chinese path is checked by the language stage instead.
+                "--lang=en-US",
                 # Chrome only accepts `--flag=value`; a space-separated value
                 # would be parsed as a page to open.
                 f"--remote-debugging-port={debug_port}",

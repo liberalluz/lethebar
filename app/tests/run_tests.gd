@@ -21,6 +21,11 @@ var _checks := 0
 func _initialize() -> void:
 	print("lethebar — package loader assertions")
 	print("engine %s · fixtures in %s" % [ENGINE_VERSION, FIXTURE_DIR])
+	# Every assertion below reads the interface through `Locale`, and `Locale`
+	# remembers the last choice in `user://`. Pin English first so the suite
+	# does not depend on what the previous run left behind; `_case_locale` puts
+	# it back before it finishes.
+	Locale.set_current("en")
 
 	_case_pkg_001()
 	_case_pkg_002()
@@ -46,6 +51,7 @@ func _initialize() -> void:
 	_case_font_coverage()
 	_case_slot_layout()
 	_case_version()
+	_case_locale()
 
 	print("")
 	if _failures.is_empty():
@@ -1106,6 +1112,69 @@ func _case_version() -> void:
 		numeric,
 		shell.version_string()
 	)
+
+
+func _case_locale() -> void:
+	## B8: the interface speaks English and Chinese. The assertion that matters
+	## most is the last one — no Chinese literal survives in the interface code —
+	## because that is what stops the next batch from quietly writing one again.
+	Locale.reload()
+	Locale.set_current("en")
+	_check(
+		"B8: English is the default interface language",
+		Locale.current() == "en",
+		Locale.current()
+	)
+	_check(
+		"B8: English strings come from the catalogue",
+		Locale.text("ui.new_game") == "New game",
+		Locale.text("ui.new_game")
+	)
+	Locale.set_current("zh-CN")
+	_check(
+		"B8: Chinese strings come from the catalogue",
+		Locale.text("ui.new_game") == "新游戏",
+		Locale.text("ui.new_game")
+	)
+	var shell := _shell()
+	shell.show_landing()
+	_check(
+		"B8: the landing screen switches to Chinese",
+		shell.visible_text().contains("新游戏"),
+		shell.visible_text()
+	)
+	Locale.reload()
+	_check(
+		"B8: the chosen language survives a restart",
+		Locale.current() == "zh-CN",
+		Locale.current()
+	)
+	Locale.set_current("en")
+	var offenders := _chinese_in("res://render")
+	_check(
+		"B8: no Chinese literal is left in the interface code",
+		offenders.is_empty(),
+		", ".join(offenders)
+	)
+
+
+func _chinese_in(dir_path: String) -> Array:
+	## Character-level, not word-level: any CJK ideograph in a script under
+	## `res://render` means a sentence was written into the code again.
+	var out: Array = []
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return ["missing " + dir_path]
+	for name in dir.get_files():
+		if not name.ends_with(".gd"):
+			continue
+		var text := FileAccess.get_file_as_string(dir_path.path_join(name))
+		for index in text.length():
+			var code := text.unicode_at(index)
+			if code >= 0x4E00 and code <= 0x9FFF:
+				out.append("%s at %d" % [name, index])
+				break
+	return out
 
 
 func _shipped_font() -> Font:

@@ -76,18 +76,21 @@ func show_landing() -> String:
 	## player left. The list of stories lives one click away in "New game":
 	## putting it here made every visit start with a menu (REQ-017).
 	screen = SCREEN_LANDING
-	_heading.text = "Lethebar"
-	_sub.text = "Short text stories. You choose, and the story goes where you send it. · v%s" % version_string()
+	_heading.text = Locale.text("app.name")
+	_sub.text = "%s · v%s" % [Locale.text("app.tagline"), version_string()]
 	_clear_options()
 	_status.text = ""
-	_options.add_child(_button("New game", open_plugins))
+	_options.add_child(_button(Locale.text("ui.new_game"), open_plugins))
 	if not _saves_index().is_empty():
-		_options.add_child(_button("Continue", show_loads))
+		_options.add_child(_button(Locale.text("ui.continue"), show_loads))
 	if builtin_ids.is_empty():
 		# Nothing to offer yet, so the screen has to contain the way out of that
 		# state rather than a dead end.
-		_status.text = "No story is installed yet."
-		_options.add_child(_button("Install a pack (.zip)…", request_install))
+		_status.text = Locale.text("ui.no_pack_yet")
+		_options.add_child(_button(Locale.text("ui.install"), request_install))
+	# The interface is translated, so the player needs a way to say "not my
+	# language" without changing the browser.
+	_options.add_child(_button(_language_label(), toggle_language))
 	_announce()
 	return screen
 
@@ -98,8 +101,8 @@ func show_loads() -> String:
 	## player stopped. Asking "which pack?" first would make "continue" a
 	## three-click detour (A + names-only decision, 2026-11-02).
 	screen = SCREEN_LOADS
-	_heading.text = "Continue"
-	_sub.text = "Pick up where you left off."
+	_heading.text = Locale.text("ui.continue")
+	_sub.text = Locale.text("ui.continue_hint")
 	_status.text = ""
 	_clear_options()
 	var rows := _saves_index()
@@ -108,8 +111,8 @@ func show_loads() -> String:
 			_button(_save_label(row), resume_slot.bind(String(row["plugin"]), int(row["slot"])))
 		)
 	if rows.is_empty():
-		_status.text = "Nothing is saved yet."
-	_options.add_child(_button("Back", show_landing))
+		_status.text = Locale.text("ui.nothing_saved")
+	_options.add_child(_button(Locale.text("ui.back"), show_landing))
 	_announce()
 	return screen
 
@@ -139,14 +142,14 @@ func resume_slot(plugin_id: String, slot: int) -> Dictionary:
 
 func open_plugins() -> String:
 	screen = SCREEN_PLUGINS
-	_heading.text = "All packs"
-	_sub.text = "Every pack is a story with its own rules. You can add one from a .zip file; it stays in this browser."
-	_status.text = "" if not builtin_ids.is_empty() else "No pack installed. Stage the built-in packs first."
+	_heading.text = Locale.text("ui.all_packs")
+	_sub.text = Locale.text("ui.packs_hint")
+	_status.text = "" if not builtin_ids.is_empty() else Locale.text("ui.no_pack_installed")
 	_clear_options()
 	for plugin_id in builtin_ids:
 		_options.add_child(_button(_pack_title(plugin_id), start_plugin.bind(plugin_id)))
-	_options.add_child(_button("Install a pack (.zip)…", request_install))
-	_options.add_child(_button("Back", show_landing))
+	_options.add_child(_button(Locale.text("ui.install"), request_install))
+	_options.add_child(_button(Locale.text("ui.back"), show_landing))
 	_announce()
 	return screen
 
@@ -176,22 +179,22 @@ func choose(index: int) -> Dictionary:
 
 func enter_session() -> Dictionary:
 	screen = SCREEN_SESSION
-	_heading.text = "Playing"
+	_heading.text = Locale.text("ui.playing")
 	_clear_options()
 	var view: Dictionary = current_view()
 	_sub.text = String(view.get("text", ""))
 	if _sub.text == "":
-		_sub.text = "This pack has no scene at the entry point."
+		_sub.text = Locale.text("ui.no_scene")
 	var choices: Array = view.get("choices", [])
 	for index in choices.size():
 		_options.add_child(_button(String(choices[index].get("label", "")), choose.bind(index)))
 	if bool(view.get("finished", false)):
-		_heading.text = "The end"
-		_options.add_child(_button("Saves", open_saves))
-		_options.add_child(_button("Choose another pack", open_plugins))
+		_heading.text = Locale.text("ui.the_end")
+		_options.add_child(_button(Locale.text("ui.saves"), open_saves))
+		_options.add_child(_button(Locale.text("ui.choose_another"), open_plugins))
 	else:
-		_options.add_child(_button("Saves", open_saves))
-		_options.add_child(_button("Back to packs", open_plugins))
+		_options.add_child(_button(Locale.text("ui.saves"), open_saves))
+		_options.add_child(_button(Locale.text("ui.back_to_packs"), open_plugins))
 	_status.text = _readout(view)
 	_announce()
 	return view
@@ -201,19 +204,19 @@ func open_saves() -> String:
 	if session == null:
 		return show_landing()
 	screen = SCREEN_SAVES
-	_heading.text = "Save slots"
-	_sub.text = "Saving keeps your place in this story. Loading a slot goes back to that moment."
+	_heading.text = Locale.text("ui.save_slots")
+	_sub.text = Locale.text("ui.slots_hint")
 	_status.text = ""
 	_clear_options()
 	var rows: Array = saves.slots(entry)
 	for index in SLOT_COUNT:
 		var slot := index + 1
 		var row: Dictionary = rows[index] if index < rows.size() else {}
-		var description := "Slot %d — nothing saved yet" % slot
+		var description := Locale.text("ui.slot_empty") % slot
 		if not bool(row.get("empty", true)):
 			# Saves written before the preview cap still hold their long text, so
 			# the clip happens on the way out as well as on the way in.
-			description = "Slot %d — %s" % [slot, _clip(String(row.get("preview", "")), PREVIEW_CHARS)]
+			description = Locale.text("ui.slot_filled") % [slot, _clip(String(row.get("preview", "")), PREVIEW_CHARS)]
 		var line := HBoxContainer.new()
 		line.add_theme_constant_override("separation", 8)
 		var text := Label.new()
@@ -229,7 +232,7 @@ func open_saves() -> String:
 		line.add_child(_button("Save", save_to.bind(slot)))
 		line.add_child(_button("Load", load_from.bind(slot)))
 		_options.add_child(line)
-	_options.add_child(_button("Back", enter_session))
+	_options.add_child(_button(Locale.text("ui.back"), enter_session))
 	_announce()
 	return screen
 
@@ -241,9 +244,9 @@ func save_to(slot: int) -> Dictionary:
 	var result := saves.write(entry, slot, session.snapshot(), preview)
 	open_saves()
 	if not bool(result.get("ok", false)):
-		_status.text = "Slot %d was not saved: %s" % [slot, String(result.get("code", ""))]
+		_status.text = Locale.text("ui.slot_failed") % [slot, String(result.get("code", ""))]
 		return current_view()
-	_status.text = "Saved to slot %d." % slot
+	_status.text = Locale.text("ui.saved_to") % slot
 	return current_view()
 
 
@@ -261,11 +264,11 @@ func load_from(slot: int) -> Dictionary:
 func open_notice(code: String, message: String) -> String:
 	screen = SCREEN_NOTICE
 	notice = {"code": code, "message": message}
-	_heading.text = "That did not work"
+	_heading.text = Locale.text("ui.failed_heading")
 	_sub.text = "%s: %s" % [code, message]
-	_status.text = "Nothing was installed. You can pick another pack."
+	_status.text = Locale.text("ui.failed_hint")
 	_clear_options()
-	_options.add_child(_button("Back to packs", open_plugins))
+	_options.add_child(_button(Locale.text("ui.back_to_packs"), open_plugins))
 	_announce()
 	return screen
 
@@ -377,6 +380,31 @@ func version_string() -> String:
 	return raw
 
 
+func _language_label() -> String:
+	## `Language: English` while English is active, so the button names the
+	## language the player is reading rather than the one it switches to.
+	var suffix := "zh" if Locale.current() == "zh-CN" else "en"
+	return "%s: %s" % [Locale.text("ui.language"), Locale.text("ui.lang_" + suffix)]
+
+
+func toggle_language() -> void:
+	## Two languages, so the switch is a toggle. The choice is stored by
+	## `Locale`, which means a reload keeps it (B8).
+	var next := "en" if Locale.current() == "zh-CN" else "zh-CN"
+	Locale.set_current(next)
+	match screen:
+		SCREEN_PLUGINS:
+			open_plugins()
+		SCREEN_SESSION:
+			enter_session()
+		SCREEN_SAVES:
+			open_saves()
+		SCREEN_LOADS:
+			show_loads()
+		_:
+			show_landing()
+
+
 func slot_previews() -> Array:
 	## Three entries, `""` for an empty slot. The probe uses the first one to
 	## tell "the save landed" from "the click missed", and to check after a
@@ -400,6 +428,7 @@ func _announce() -> void:
 		var state := {
 			"screen": screen,
 			"version": version_string(),
+			"locale": Locale.current(),
 			"packs": builtin_ids.duplicate(),
 			"stories": _story_list(),
 			"saves": _saves_index(),
@@ -629,8 +658,9 @@ func _saves_index() -> Array:
 
 
 func _save_label(row: Dictionary) -> String:
-	## `三国 · Slot 1 — 初平元年春，关东诸侯会于酸枣… · 12:46`
-	var label := "%s · Slot %d" % [String(row.get("title", "")), int(row.get("slot", 0))]
+	## `<title> · Slot <n> — <preview> · <hh:mm>`, with the clock in the
+	## player's own time zone (B8 keeps every word here in the catalogue).
+	var label := Locale.text("ui.slot_head") % [String(row.get("title", "")), int(row.get("slot", 0))]
 	var preview := _clip(String(row.get("preview", "")), PREVIEW_CHARS)
 	if preview != "":
 		label += " — " + preview
@@ -675,7 +705,7 @@ func _readout(view: Dictionary) -> String:
 		parts.append("%s %s" % [key, str(state[key])])
 	if view.has("progress"):
 		var progress: Dictionary = view["progress"]
-		parts.append("step %d/%d" % [int(progress.get("steps", 0)), int(progress.get("nodes", 0))])
+		parts.append(Locale.text("ui.steps") % [int(progress.get("steps", 0)), int(progress.get("nodes", 0))])
 	if parts.is_empty():
 		return ""
 	return " · ".join(parts)

@@ -1,0 +1,32 @@
+key	text
+app.name	Lethebar
+app.tagline	Short text stories. You choose, and the story goes where you send it.
+ui.new_game	New game
+ui.continue	Continue
+ui.continue_hint	Pick up where you left off.
+ui.language	Language
+ui.lang_en	English
+ui.lang_zh	Chinese
+ui.back	Back
+ui.back_to_packs	Back to packs
+ui.saves	Saves
+ui.choose_another	Choose another pack
+ui.the_end	The end
+ui.playing	Playing
+ui.all_packs	All packs
+ui.packs_hint	Every pack is a story with its own rules. You can add one from a .zip file; it stays in this browser.
+ui.no_pack_yet	No story is installed yet.
+ui.no_pack_installed	No pack installed. Stage the built-in packs first.
+ui.install	Install a pack (.zip)…
+ui.save_slots	Save slots
+ui.slots_hint	Saving keeps your place in this story. Loading a slot goes back to that moment.
+ui.slot_empty	Slot %d — nothing saved yet
+ui.slot_filled	Slot %d — %s
+ui.slot_failed	Slot %d was not saved: %s
+ui.saved_to	Saved to slot %d.
+ui.nothing_saved	Nothing is saved yet.
+ui.no_scene	This pack has no scene at the entry point.
+ui.failed_heading	That did not work
+ui.failed_hint	Nothing was installed. You can pick another pack.
+ui.slot_head	%s · Slot %d
+ui.steps	step %d/%d
