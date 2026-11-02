@@ -9,11 +9,13 @@ English · [简体中文](README.zh-CN.md)
 
 ## Status
 
-**v0.0.0 is in development and not playable yet.**
+**v0.0.0 is out and playable in a browser.**
 
-- Target date for the first playable version: **2026-12-31**
-- Definition of the first playable version: open it in a browser, pick a built-in pack, play through one scene
-- Current progress: batch `B1` (plugin package loading and validation) has not started
+- Two built-in stories ship with it: `sanguo` (three decision rounds, `turn_based@1`) and `xiuxian` (a five-scene segment, `linear@1`)
+- It also installs a `.zip` pack from your own disk, keeps three save slots per pack, and reopens offline
+- Verified on desktop Chrome and on iOS Safari, online and with the network off
+- Known gaps: no artwork or audio yet — packs may declare assets, the render layer does not draw them
+- Next: `v0.0.1` renders pack assets, `v0.1.0` opens the pack format to more story mechanics
 
 This repository is public now because the plugin spec should be seen and challenged early.
 
@@ -35,7 +37,8 @@ godot --path app --headless --quit              # import assets; creates app/.go
 godot --path app --headless -s res://tests/run_tests.gd   # rule-layer assertions
 ```
 
-All three commands only check things — **there is nothing to play** before v0.0.0.
+All three commands only check things. To play it, open the exported build or
+`https://liberalluz.github.io/lethebar/`.
 
 ## Commands
 
