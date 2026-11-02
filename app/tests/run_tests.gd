@@ -45,6 +45,7 @@ func _initialize() -> void:
 	_case_import_control()
 	_case_font_coverage()
 	_case_slot_layout()
+	_case_version()
 
 	print("")
 	if _failures.is_empty():
@@ -1078,6 +1079,33 @@ func _case_slot_layout() -> void:
 				buttons += 1
 		_check("TC-UX-001: the row keeps both of its buttons", buttons == 2, "%d button(s)" % buttons)
 	_check("TC-UX-001: all three slots are laid out", button_rows == 3, "%d row(s)" % button_rows)
+
+
+func _case_version() -> void:
+	# The product version had no single home: it lived in the tag and in two
+	# READMEs, so a release could ship three numbers that disagreed. The shell
+	# now reads `application/config/version`, and this case pins the two things
+	# that matter: the shell reports what the project sets, and the shape is
+	# three dot-separated numbers, which is what every version string here uses.
+	_section("REQ-017: the shell reports the product version")
+	var shell := _shell()
+	var configured := String(ProjectSettings.get_setting("application/config/version", ""))
+	_check("REQ-017: the project sets application/config/version", configured != "", configured)
+	_check(
+		"REQ-017: the shell reports the configured version",
+		shell.version_string() == configured,
+		"shell says %s, project says %s" % [shell.version_string(), configured]
+	)
+	var parts := shell.version_string().split(".")
+	var numeric := parts.size() == 3
+	for part in parts:
+		if not part.is_valid_int() or part.is_empty():
+			numeric = false
+	_check(
+		"REQ-017: the version is three dot-separated numbers",
+		numeric,
+		shell.version_string()
+	)
 
 
 func _shipped_font() -> Font:
