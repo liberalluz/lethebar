@@ -242,11 +242,14 @@ async function waitState(predicate, limit = 60) {
 }
 
 async function openFirstPack() {
+  // `New game` leads to the story list, and the story is clicked by the name a
+  // player reads — the probe takes it from `lethebarState.stories` rather than
+  // guessing at button order.
+  const stories = ((await appState()) || {}).stories || [];
+  if (stories.length === 0) return false;
   await clickLabel("New game");
   if (!(await waitState((state) => state.screen === "plugins"))) return false;
-  const packs = (await appState()).packs || [];
-  if (packs.length === 0) return false;
-  await clickLabel(String(packs[0]));
+  await clickLabel(String(stories[0].title));
   return Boolean(await waitState((state) => state.screen === "session"));
 }
 
@@ -282,7 +285,7 @@ async function installPack(zipPath) {
   chooserNode = null;
   await onSession("Page.setInterceptFileChooserDialog", { enabled: true });
   const askedBefore = await evaluate("window.lethebarAsked || 0");
-  const clicked = await clickLabel("Install a pack…");
+  const clicked = await clickLabel("Install a pack (.zip)…");
   if (clicked === null) {
     await onSession("Page.setInterceptFileChooserDialog", { enabled: false });
     return null;
@@ -318,10 +321,14 @@ const interaction = {
 };
 
 if (landingScreen === "landing") {
-  interaction.plugins = (await clickLabel("New game")) !== null;
+  const stories = ((await appState()) || {}).stories || [];
+  interaction.plugins = stories.length > 0;
   if (interaction.plugins) {
-    const packs = (await appState()).packs || [];
-    interaction.session = packs.length > 0 && (await clickLabel(String(packs[0]))) !== null;
+    // `New game` → story list → the story itself: the same two clicks a player
+    // takes, so the measured time is the path they actually walk.
+    await clickLabel("New game");
+    const onPlugins = await waitState((state) => state.screen === "plugins");
+    interaction.session = onPlugins && (await clickLabel(String(stories[0].title))) !== null;
     if (interaction.session && (await waitState((state) => state.screen === "session"))) {
       clickToSceneMs = Math.round((await evaluate("performance.now()")) - clickStarted);
       // PROBE_SHOT=path writes the first scene as a PNG. The probe cannot judge
@@ -380,6 +387,9 @@ let offline = {
   importedRestored: null,
   sessions: false,
   slotsRestored: 0,
+  continued: false,
+  loadsListed: false,
+  resumed: false,
 };
 
 if (interaction.saved) {
@@ -411,6 +421,29 @@ if (interaction.saved) {
       const saves = await waitState((state) => state.screen === "saves", 30);
       if (saves) offline.slotsRestored = (saves.slots || []).filter((slot) => slot.length > 0).length;
     }
+    // `Continue` exists only because a slot is saved, and it lists the saves
+    // themselves: one click, then the run is back where it stopped. This walks
+    // the button the player would press after a reload, not just the slot list.
+    await clickLabel("Back");
+    await waitState((state) => state.screen === "session", 30);
+    await clickLabel("Back to packs");
+    await waitState((state) => state.screen === "plugins", 30);
+    await clickLabel("Back");
+    if (await waitState((state) => state.screen === "landing", 30)) {
+      const listed = await waitState((state) => (state.saves || []).length > 0, 30);
+      offline.continued = listed !== null && (await clickLabel("Continue")) !== null;
+      if (offline.continued) {
+        const onLoads = await waitState((state) => state.screen === "loads", 30);
+        offline.loadsListed = Boolean(onLoads && (onLoads.saves || []).length > 0);
+        const first = ((onLoads || {}).saves || [{}])[0];
+        if (offline.loadsListed) {
+          offline.resumed = (await clickLabel(String(first.title || ""))) !== null;
+          if (offline.resumed) {
+            offline.resumed = (await waitState((state) => state.screen === "session", 30)) !== null;
+          }
+        }
+      }
+    }
   }
   await onSession("Network.emulateNetworkConditions", {
     offline: false,
@@ -440,7 +473,16 @@ const interacted = interaction.plugins && interaction.session && interaction.sav
 // Counting `Network.requestWillBeSent` is the real measure; the source scan in
 // the unit tests only proves the engine code has no HTTP API in it.
 const sessionQuiet = interactionRequests === 0;
-const offlineOk = offline.landing && offline.packs >= 2 && offline.sessions && offline.slotsRestored >= 1;
+const offlineOk =
+  offline.landing &&
+  offline.packs >= 2 &&
+  offline.sessions &&
+  offline.slotsRestored >= 1 &&
+  // `Continue` is the returning player's path: it has to be there after a
+  // reload, list the saved runs, and put the session back on the saved scene.
+  offline.continued &&
+  offline.loadsListed &&
+  offline.resumed;
 const importOk = importZip ? interaction.imported && offline.importedRestored === true : true;
 
 const ok =
