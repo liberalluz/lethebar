@@ -160,7 +160,14 @@ NAVIGATION_FALLBACK = (
     "\t\t\t\t\t// navigation misses the cache, goes to the network and fails offline\n"
     "\t\t\t\t\t// (iOS Safari reports it as \"FetchEvent.respondWith received an\n"
     "\t\t\t\t\t// error: TypeError: Load failed\").\n"
-    "\t\t\t\t\tcached = await cache.match(CACHED_FILES[0]);\n"
+    "\t\t\t\t\t//\n"
+    "\t\t\t\t\t// Only a document URL gets the document. Answering any navigation\n"
+    "\t\t\t\t\t// with it turned /lethebar/test-pack.zip into the game instead of a\n"
+    "\t\t\t\t\t// download, because `isNavigate` covers every top level navigation.\n"
+    "\t\t\t\t\tconst target = new URL(event.request.url).pathname;\n"
+    "\t\t\t\t\tif (target.endsWith('/') || target.endsWith('/index.html')) {\n"
+    "\t\t\t\t\t\tcached = await cache.match(CACHED_FILES[0]);\n"
+    "\t\t\t\t\t}\n"
     "\t\t\t\t}\n"
 )
 
