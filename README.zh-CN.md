@@ -48,7 +48,7 @@ godot --path app --headless -s res://tests/run_tests.gd   # 规则层断言
 | `python infra/verify_web.py` | 用无头 Chrome 加载该构建并输出控制台结果，需要 `node` |
 | `godot --path app --headless --quit` | 资源导入与 `app/.godot/` 重建 |
 | `godot --path app --headless -s res://tests/run_tests.gd` | 规则层断言（协议、装配、存档编码） |
-| `python tools/batch/batch.py` | 按批卡生成分支与检查清单 |
+| `python infra/tool/batch/batch.py` | 按批卡生成分支与检查清单 |
 
 目前**没有 CI**。上面这张表就是当前的门禁，本地跑通才算过；等 CI 建起来后，这张表必须与工作流同一个 PR 一起改。
 
@@ -59,8 +59,8 @@ godot --path app --headless -s res://tests/run_tests.gd   # 规则层断言
 | `app/` | Godot 工程根（`project.godot`）与引擎代码：`core/`（规则运行时）、`protocols/`（协议注册表）、`render/`（渲染运行时）、`ui/`、`tests/`（无头断言） |
 | `content/` | 内置插件包与其数据，一个包一个目录 |
 | `infra/` | 构建、导出、部署脚本，含 `stage_builtin.py` |
+| `infra/tool/` | 随仓库携带的 Nebula 工具：批次执行、仓库策略、发布 |
 | `docs/` | 规格、决策、intent（[docs/README.md](docs/README.md)） |
-| `tools/` | 批次执行与仓库策略工具 |
 
 ## 架构
 

@@ -6,7 +6,7 @@ The tool is deliberately stack-agnostic. It owns a small state machine:
 
     plan -> approve -> start -> check -> pr -> merge
 
-Checks and PR provider commands come from ``tools/batch/config.json``. The
+Checks and PR provider commands come from ``infra/tool/batch/config.json``. The
 defaults only do local work; a project can add its own commands without
 changing this file.
 """
@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import secrets
 import shlex
@@ -25,9 +26,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 STATE_DIR = ".batch"
-CONFIG_REL = Path("tools") / "batch" / "config.json"
+CONFIG_REL = Path("infra") / "tool" / "batch" / "config.json"
 DEFAULT_CONFIG: dict[str, Any] = {
     "base": "main",
     "branch_prefix": "batch/",
@@ -36,7 +37,28 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "pr_create": [],
     "merge": [],
 }
-ID_RE = re.compile(r"^[0-9]{8}-[0-9a-f]{6}$")
+ID_RE = re.compile(r"^(?:B[0-9]+|[0-9]{8}-[0-9a-f]{6})$")
+DATED_ID_RE = re.compile(r"^[0-9]{8}-[0-9a-f]{6}$")
+CARD_ID_RE = re.compile(r"^B[0-9]+$")
+CARD_MARKER_RE = re.compile(r"<!--\s*batch-card\s*:\s*v1\s*-->")
+CARD_JSON_RE = re.compile(r"```json[ \t]*\r?\n(.*?)\r?\n```", re.DOTALL)
+CARD_TYPES = {"feat", "fix", "process", "docs"}
+STAGE_SKILLS = {
+    "nebula-project",
+    "nebula-bootstrap",
+    "nebula-requirements",
+    "nebula-design",
+    "nebula-verification",
+    "nebula-planning",
+    "nebula-delivery",
+}
+SKILL_ROOTS = (
+    ".agents/skills",
+    ".claude/skills",
+    ".codex/skills",
+    ".codebuddy/skills",
+    ".workbuddy/skills",
+)
 
 
 def utc_now() -> str:
@@ -194,6 +216,133 @@ def read_card(root: Path, batch_id: str) -> dict[str, Any]:
     return card
 
 
+def source_relative(root: Path, path: Path) -> str:
+    return Path(os.path.relpath(path, root)).as_posix()
+
+
+def file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def card_source_path(root: Path, card: dict[str, Any]) -> Path | None:
+    source = card.get("source")
+    if not source:
+        return None
+    return (root / str(source)).resolve()
+
+
+def source_is_current(root: Path, card: dict[str, Any]) -> tuple[bool, str]:
+    if card.get("legacy"):
+        return False, "legacy card is read-only"
+    path = card_source_path(root, card)
+    if path is None:
+        return True, ""
+    if not path.is_file():
+        return False, f"card source is missing: {card.get('source')}"
+    expected = str(card.get("source_sha256", ""))
+    if file_sha256(path) != expected:
+        return False, "card source changed; re-plan and re-approve"
+    return True, ""
+
+
+def validate_planned_card(card: dict[str, Any], path: Path | None = None) -> None:
+    def fail(message: str) -> None:
+        raise ValueError(message)
+
+    if not isinstance(card, dict):
+        fail("card must be a JSON object")
+    if card.get("legacy"):
+        fail("legacy cards cannot be planned from a card source")
+    required = (
+        "id",
+        "goal",
+        "type",
+        "base",
+        "size_budget",
+        "allowed",
+        "acceptance",
+        "changelog",
+        "skills",
+    )
+    missing = [key for key in required if key not in card]
+    if missing:
+        fail(f"missing field(s): {', '.join(missing)}")
+
+    card_id = card.get("id")
+    if not isinstance(card_id, str) or not CARD_ID_RE.fullmatch(card_id):
+        fail("id must be B followed by digits")
+    if path is not None and path.stem != card_id:
+        fail(f"card id {card_id} does not match file stem {path.stem}")
+
+    if not isinstance(card.get("goal"), str) or not card["goal"].strip():
+        fail("goal must be a non-empty string")
+    if card.get("type") not in CARD_TYPES:
+        fail("type must be feat, fix, process, or docs")
+    base = card.get("base")
+    if not isinstance(base, str) or not base.strip() or any(ch.isspace() for ch in base):
+        fail("base must be a non-empty branch name")
+
+    budget = card.get("size_budget")
+    if type(budget) is not int or budget < 1:
+        fail("size_budget must be an integer greater than zero")
+
+    for key, allow_empty in (("allowed", False), ("forbidden", True)):
+        if key not in card and key == "forbidden":
+            continue
+        value = card.get(key)
+        if not isinstance(value, list) or (not allow_empty and not value):
+            fail(f"{key} must be a non-empty array")
+        if not all(isinstance(item, str) and item.strip() for item in value):
+            fail(f"{key} must contain non-empty strings")
+
+    for key in ("acceptance", "changelog"):
+        value = card.get(key)
+        if not isinstance(value, list) or (key == "acceptance" and not value):
+            fail(f"{key} must be a non-empty array")
+        if not all(isinstance(item, str) and item.strip() for item in value):
+            fail(f"{key} must contain non-empty strings")
+
+    skills = card.get("skills")
+    if not isinstance(skills, list) or len(skills) > 4:
+        fail("skills must be an array with at most four entries")
+    for item in skills:
+        if not isinstance(item, dict):
+            fail("each skill must be an object")
+        skill_id = item.get("id")
+        if not isinstance(skill_id, str) or not re.fullmatch(
+            r"[a-z0-9][a-z0-9-]*", skill_id
+        ):
+            fail("skill id must be lower-case kebab-case")
+        if skill_id == "using-agent-skills":
+            fail("using-agent-skills is never installable")
+        if skill_id in STAGE_SKILLS:
+            fail(f"stage skill {skill_id} is not declared in a batch card")
+        if not isinstance(item.get("required"), bool):
+            fail(f"skill {skill_id}: required must be a boolean")
+        if "reason" in item and not isinstance(item["reason"], str):
+            fail(f"skill {skill_id}: reason must be a string")
+
+
+def read_planned_card(path: Path) -> tuple[dict[str, Any], bytes]:
+    data = path.read_bytes()
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"card is not UTF-8: {exc}") from exc
+    marker = CARD_MARKER_RE.search(text)
+    if marker is None:
+        raise ValueError("missing <!-- batch-card: v1 --> marker")
+    block = CARD_JSON_RE.search(text, marker.end())
+    if block is None:
+        raise ValueError("missing fenced json block after the card marker")
+    try:
+        card = json.loads(block.group(1))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"invalid card JSON: {exc}") from exc
+    validate_planned_card(card, path)
+    return card, data
+
+
 def read_state(root: Path, batch_id: str) -> dict[str, Any]:
     state = load_json(batch_dir(root, batch_id) / "state.json")
     if state is None:
@@ -267,6 +416,123 @@ def check_scope(
         elif not matches(path, allowed):
             violations.append(f"out of scope: {path}")
     return changed, violations
+
+
+def installed_skill(root: Path, skill_id: str) -> Path | None:
+    for relative in SKILL_ROOTS:
+        path = root / relative / skill_id / "SKILL.md"
+        if path.is_file():
+            return path
+    return None
+
+
+def check_skills(root: Path, card: dict[str, Any]) -> tuple[list[str], dict[str, str]]:
+    violations: list[str] = []
+    found: dict[str, str] = {}
+    for item in card.get("skills", []):
+        skill_id = str(item.get("id", ""))
+        path = installed_skill(root, skill_id)
+        if path is None:
+            violations.append(f"skill {skill_id}: not installed in this project")
+        else:
+            found[skill_id] = source_relative(root, path)
+    return violations, found
+
+
+def diff_stats(
+    root: Path, base: str, changed: Sequence[str]
+) -> tuple[int, int, int]:
+    code, out, err = run_git(root, ["diff", "--numstat", "--no-renames", base])
+    if code != 0:
+        raise SystemExit(f"could not count batch diff: {err}")
+    allowed = set(changed)
+    added = 0
+    deleted = 0
+    binary = 0
+    seen: set[str] = set()
+    for line in out.splitlines():
+        parts = line.split("\t", 2)
+        if len(parts) != 3:
+            continue
+        raw_added, raw_deleted, path = parts
+        path = path.replace("\\", "/")
+        if path not in allowed:
+            continue
+        seen.add(path)
+        if raw_added == "-" or raw_deleted == "-":
+            binary += 1
+            continue
+        added += int(raw_added)
+        deleted += int(raw_deleted)
+
+    for path in changed:
+        if path in seen:
+            continue
+        target = root / path
+        if not target.is_file():
+            continue
+        data = target.read_bytes()
+        if b"\0" in data:
+            binary += 1
+            continue
+        added += data.count(b"\n") + (1 if data and not data.endswith(b"\n") else 0)
+    return added, deleted, binary
+
+
+def check_budget(
+    root: Path, card: dict[str, Any], base: str, changed: Sequence[str]
+) -> tuple[int, int, int, str | None]:
+    budget = card.get("size_budget")
+    if type(budget) is not int or budget < 1:
+        return 0, 0, 0, None
+    added, deleted, binary = diff_stats(root, base, changed)
+    total = added + deleted
+    if total > budget:
+        message = f"budget: {total} changed lines exceeds {budget}"
+        if binary:
+            message += f" ({binary} binary file(s) not counted)"
+        return added, deleted, binary, message
+    return added, deleted, binary, None
+
+
+def check_changelog(
+    root: Path, card: dict[str, Any], changed: Sequence[str]
+) -> tuple[list[str], list[str]]:
+    violations: list[str] = []
+    warnings: list[str] = []
+    card_type = str(card.get("type", ""))
+    paths = [str(item) for item in card.get("changelog", [])]
+    uses_changelog = (root / "changelog.d").is_dir()
+    if card_type in {"feat", "fix"} and uses_changelog and not paths:
+        violations.append("changelog: feat/fix must declare at least one fragment")
+    if card_type in {"feat", "fix"} and not uses_changelog:
+        warnings.append("changelog.d is absent; no fragment was required")
+
+    changed_set = set(changed)
+    for raw in paths:
+        path = Path(raw)
+        normalized = path.as_posix()
+        if path.is_absolute() or ".." in path.parts:
+            violations.append(f"changelog: path must stay inside the project: {raw}")
+            continue
+        if not normalized.startswith("changelog.d/"):
+            violations.append(f"changelog: fragment must live under changelog.d/: {raw}")
+            continue
+        target = root / normalized
+        if not target.is_file():
+            violations.append(f"changelog: missing fragment: {raw}")
+            continue
+        if normalized not in changed_set:
+            violations.append(f"changelog: fragment was not changed by this batch: {raw}")
+            continue
+        try:
+            content = target.read_text(encoding="utf-8").strip()
+        except UnicodeDecodeError:
+            violations.append(f"changelog: fragment is not UTF-8: {raw}")
+            continue
+        if not content:
+            violations.append(f"changelog: empty fragment: {raw}")
+    return violations, warnings
 
 
 def append_evidence(root: Path, batch_id: str, line: str) -> None:
@@ -353,27 +619,32 @@ def run_checks(
 def print_status(root: Path, batch_id: str, as_json: bool) -> None:
     card = read_card(root, batch_id)
     state = load_json(batch_dir(root, batch_id) / "state.json") or {}
+    status = state.get("status") or ("legacy" if card.get("legacy") else "planned")
     payload = {
         "id": batch_id,
         "goal": card.get("goal"),
         "card_hash": card_hash(card)[:8],
-        "status": state.get("status", "planned"),
+        "status": status,
         "base": state.get("base"),
         "branch": state.get("branch"),
         "checks": state.get("checks", {}),
         "active": active_id(root) == batch_id,
+        "legacy": bool(card.get("legacy")),
+        "source": card.get("source"),
     }
     if as_json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return
     print(f"batch:  {batch_id}")
-    print(f"goal:   {payload['goal']}")
+    print(f"goal:   {payload['goal'] or ''}")
     print(f"hash:   {payload['card_hash']}")
     print(f"status: {payload['status']}")
     if payload["base"]:
         print(f"base:   {payload['base']}")
     if payload["branch"]:
         print(f"branch: {payload['branch']}")
+    if payload["source"]:
+        print(f"source: {payload['source']}")
     if payload["checks"]:
         for name, result in payload["checks"].items():
             print(f"check:  {name} = {result.get('status')}")
@@ -383,20 +654,70 @@ def print_status(root: Path, batch_id: str, as_json: bool) -> None:
 def cmd_plan(args: argparse.Namespace) -> int:
     root = args.root.resolve()
     git_required(root)
+
+    if args.source:
+        extra = args.goal or args.allowed or args.forbidden or args.exit_criterion
+        if extra:
+            print(
+                "--from cannot be combined with --goal, --allowed, --forbidden, "
+                "or --exit-criterion",
+                file=sys.stderr,
+            )
+            return 2
+        source = Path(args.source)
+        source = source if source.is_absolute() else root / source
+        source = source.resolve()
+        if not source.is_file():
+            print(f"card source not found: {source}", file=sys.stderr)
+            return 2
+        try:
+            card, raw = read_planned_card(source)
+        except ValueError as exc:
+            print(f"invalid card: {exc}", file=sys.stderr)
+            return 2
+        batch_id = card["id"]
+        if args.id and args.id != batch_id:
+            print(f"--id {args.id} does not match card id {batch_id}", file=sys.stderr)
+            return 2
+        target = batch_dir(root, batch_id)
+        if target.exists():
+            print(f"batch already exists: {batch_id}", file=sys.stderr)
+            return 1
+        snapshot = dict(card)
+        snapshot["source"] = source_relative(root, source)
+        snapshot["source_sha256"] = hashlib.sha256(raw).hexdigest()
+        write_json(target / "card.json", snapshot)
+        print(f"planned {batch_id} from {snapshot['source']}")
+        print(f"hash: {card_hash(snapshot)[:8]}")
+        return 0
+
+    if not args.goal:
+        print("plan needs --from or --goal", file=sys.stderr)
+        return 2
+    if args.id and CARD_ID_RE.fullmatch(args.id):
+        print("planned B<n> cards require --from", file=sys.stderr)
+        return 2
     batch_id = args.id or new_id(root)
-    if not ID_RE.fullmatch(batch_id):
-        print("invalid batch id; use YYYYMMDD-<6 hex>", file=sys.stderr)
+    if not DATED_ID_RE.fullmatch(batch_id):
+        print("ad-hoc id must be YYYYMMDD-<6 hex>", file=sys.stderr)
         return 2
     target = batch_dir(root, batch_id)
     if target.exists():
         print(f"batch already exists: {batch_id}", file=sys.stderr)
         return 1
+    config = load_config(root)
     card = {
         "id": batch_id,
         "goal": args.goal,
+        "type": "process",
+        "base": str(config.get("base", "main")),
+        "size_budget": 0,
         "allowed": parse_list(args.allowed, ["**"]),
         "forbidden": parse_list(args.forbidden, []),
-        "exit_criteria": parse_list(args.exit_criterion, []),
+        "acceptance": parse_list(args.exit_criterion, []),
+        "changelog": [],
+        "skills": [],
+        "ad_hoc": True,
         "created_at": utc_now(),
     }
     write_json(target / "card.json", card)
@@ -409,6 +730,13 @@ def cmd_approve(args: argparse.Namespace) -> int:
     root = args.root.resolve()
     batch_id = resolve_id(root, args.id)
     card = read_card(root, batch_id)
+    if card.get("legacy"):
+        print("legacy cards are read-only and cannot be approved", file=sys.stderr)
+        return 1
+    current, message = source_is_current(root, card)
+    if not current:
+        print(message, file=sys.stderr)
+        return 1
     digest = card_hash(card)
     if args.confirm != digest[:8]:
         print(f"confirm mismatch: expected {digest[:8]}", file=sys.stderr)
@@ -416,6 +744,7 @@ def cmd_approve(args: argparse.Namespace) -> int:
     approval = {
         "batch": batch_id,
         "card_hash": digest,
+        "source_sha256": card.get("source_sha256"),
         "approved_by": args.by,
         "approved_at": utc_now(),
     }
@@ -429,9 +758,19 @@ def cmd_start(args: argparse.Namespace) -> int:
     git_required(root)
     batch_id = resolve_id(root, args.id)
     card = read_card(root, batch_id)
+    if card.get("legacy"):
+        print("legacy cards are read-only and cannot be started", file=sys.stderr)
+        return 1
     approval = load_json(batch_dir(root, batch_id) / "approval.json")
     if approval is None or approval.get("card_hash") != card_hash(card):
         print("card is not approved (or approval is stale)", file=sys.stderr)
+        return 1
+    if approval.get("source_sha256") != card.get("source_sha256"):
+        print("card source is not approved (or approval is stale)", file=sys.stderr)
+        return 1
+    current_source, message = source_is_current(root, card)
+    if not current_source:
+        print(message, file=sys.stderr)
         return 1
     current = active_id(root)
     if current:
@@ -439,7 +778,7 @@ def cmd_start(args: argparse.Namespace) -> int:
         return 1
 
     config = load_config(root)
-    base = args.base or str(config.get("base", "main"))
+    base = args.base or str(card.get("base") or config.get("base", "main"))
     branch = args.branch or f"{config.get('branch_prefix', 'batch/')}{batch_id}"
     if not args.no_branch:
         code, _, err = run_git(root, ["switch", "-c", branch])
@@ -452,6 +791,8 @@ def cmd_start(args: argparse.Namespace) -> int:
         "status": "started",
         "base": base,
         "branch": branch,
+        "card_hash": card_hash(card),
+        "source_sha256": card.get("source_sha256"),
         "started_at": utc_now(),
         "checks": {},
     }
@@ -467,9 +808,31 @@ def cmd_check(args: argparse.Namespace) -> int:
     batch_id = resolve_id(root, args.id)
     card = read_card(root, batch_id)
     state = read_state(root, batch_id)
+    if card.get("legacy"):
+        print("legacy cards are read-only and cannot be checked", file=sys.stderr)
+        return 1
+    approval = load_json(batch_dir(root, batch_id) / "approval.json")
+    if approval is None or approval.get("card_hash") != card_hash(card):
+        print("card is not approved (or approval is stale)", file=sys.stderr)
+        return 1
+    current, message = source_is_current(root, card)
+    if not current:
+        state["status"] = "check_failed"
+        state["source_error"] = message
+        state["checked_at"] = utc_now()
+        write_json(batch_dir(root, batch_id) / "state.json", state)
+        append_evidence(root, batch_id, f"source: FAIL ({message})")
+        print(message, file=sys.stderr)
+        return 1
     config = load_config(root)
     base = state.get("base") or str(config.get("base", "main"))
     changed, violations = check_scope(root, card, base, config)
+    added, deleted, binary, budget_error = check_budget(root, card, base, changed)
+    changelog_errors, changelog_warnings = check_changelog(root, card, changed)
+    skill_errors, skill_found = check_skills(root, card)
+    gate_errors = [*violations, *changelog_errors, *skill_errors]
+    if budget_error:
+        gate_errors.append(budget_error)
 
     append_evidence(
         root,
@@ -480,15 +843,47 @@ def cmd_check(args: argparse.Namespace) -> int:
         append_evidence(root, batch_id, f"changed: {path}")
     for violation in violations:
         append_evidence(root, batch_id, f"scope: {violation}")
+    for violation in changelog_errors:
+        append_evidence(root, batch_id, violation)
+    for warning in changelog_warnings:
+        append_evidence(root, batch_id, f"warn: {warning}")
+    for violation in skill_errors:
+        append_evidence(root, batch_id, violation)
+    if budget_error:
+        append_evidence(root, batch_id, budget_error)
+    for violation in gate_errors:
         print(f"[fail] {violation}", file=sys.stderr)
+    for warning in changelog_warnings:
+        print(f"[warn] {warning}", file=sys.stderr)
 
-    results = run_checks(root, batch_id, config) if not violations else {}
-    passed = not violations and all(item.get("status") == "pass" for item in results.values())
+    results = run_checks(root, batch_id, config) if not gate_errors else {}
+    passed = not gate_errors and all(
+        item.get("status") == "pass" for item in results.values()
+    )
     state["status"] = "checked" if passed else "check_failed"
     state["checks"] = results
+    state["scope"] = {
+        "budget": int(card.get("size_budget", 0)),
+        "changed": len(changed),
+        "added": added,
+        "deleted": deleted,
+        "binary": binary,
+        "result": "pass" if not budget_error and not violations else "fail",
+    }
+    state["changelog"] = {
+        "declared": [str(item) for item in card.get("changelog", [])],
+        "warnings": changelog_warnings,
+    }
+    state["skills"] = skill_found
     state["checked_at"] = utc_now()
     write_json(batch_dir(root, batch_id) / "state.json", state)
     print(f"scope: {'PASS' if not violations else 'FAIL'} ({len(changed)} paths)")
+    print(
+        f"budget: {'SKIP' if not card.get('size_budget') else ('FAIL' if budget_error else 'PASS')}"
+        f" ({added + deleted} lines)"
+    )
+    print(f"changelog: {'FAIL' if changelog_errors else 'PASS'}")
+    print(f"skills: {'FAIL' if skill_errors else 'PASS'}")
     print(f"result: {'PASS' if passed else 'FAIL'}")
     return 0 if passed else 1
 
@@ -522,8 +917,8 @@ def pr_body(root: Path, batch_id: str) -> str:
         lines.extend(f"- {name}: {result.get('status')}" for name, result in checks.items())
     else:
         lines.append("- none configured")
-    lines.extend(["", "## Exit criteria", ""])
-    criteria = card.get("exit_criteria", [])
+    lines.extend(["", "## Acceptance", ""])
+    criteria = card.get("acceptance", card.get("exit_criteria", []))
     lines.extend(f"- {item}" for item in criteria) if criteria else lines.append("- none recorded")
     lines.extend(
         [
@@ -543,6 +938,18 @@ def cmd_pr(args: argparse.Namespace) -> int:
     state = read_state(root, batch_id)
     if state.get("status") not in {"checked", "pr_ready"}:
         print("run 'check' successfully before preparing a PR", file=sys.stderr)
+        return 1
+    card = read_card(root, batch_id)
+    if card.get("legacy"):
+        print("legacy cards have no PR flow", file=sys.stderr)
+        return 1
+    approval = load_json(batch_dir(root, batch_id) / "approval.json")
+    if approval is None or approval.get("card_hash") != card_hash(card):
+        print("card is not approved (or approval is stale)", file=sys.stderr)
+        return 1
+    current, message = source_is_current(root, card)
+    if not current:
+        print(message, file=sys.stderr)
         return 1
     body = pr_body(root, batch_id)
     body_path = args.body_file or (batch_dir(root, batch_id) / "pr-body.md")
@@ -565,7 +972,6 @@ def cmd_pr(args: argparse.Namespace) -> int:
     if not command:
         print("config.pr_create is empty; use --prepare only", file=sys.stderr)
         return 2
-    card = read_card(root, batch_id)
     code, out, err = run_hook(
         root,
         command,
@@ -647,6 +1053,34 @@ def cmd_abort(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_adopt(args: argparse.Namespace) -> int:
+    root = args.root.resolve()
+    source = Path(args.source)
+    source = source if source.is_absolute() else root / source
+    source = source.resolve()
+    if not source.is_file():
+        print(f"card source not found: {source}", file=sys.stderr)
+        return 2
+    batch_id = args.id or source.stem
+    if not CARD_ID_RE.fullmatch(batch_id):
+        print("legacy id must be B followed by digits", file=sys.stderr)
+        return 2
+    target = batch_dir(root, batch_id)
+    if target.exists():
+        print(f"batch already exists: {batch_id}", file=sys.stderr)
+        return 1
+    snapshot = {
+        "id": batch_id,
+        "legacy": True,
+        "source": source_relative(root, source),
+        "source_sha256": file_sha256(source),
+    }
+    write_json(target / "card.json", snapshot)
+    print(f"adopted {batch_id} as read-only legacy")
+    print(f"source: {snapshot['source']}")
+    return 0
+
+
 def cmd_list(args: argparse.Namespace) -> int:
     root = args.root.resolve()
     root_dir = state_root(root)
@@ -658,7 +1092,8 @@ def cmd_list(args: argparse.Namespace) -> int:
             continue
         state = load_json(path / "state.json") or {}
         card = load_json(path / "card.json") or {}
-        print(f"{path.name}\t{state.get('status', 'planned')}\t{card.get('goal', '')}")
+        status = state.get("status") or ("legacy" if card.get("legacy") else "planned")
+        print(f"{path.name}\t{status}\t{card.get('goal', '')}")
     return 0
 
 
@@ -680,11 +1115,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     plan = sub.add_parser("plan", help="create a batch card")
     plan.add_argument("id", nargs="?")
-    plan.add_argument("--goal", required=True)
+    plan.add_argument("--from", dest="source", help="plan from an external card")
+    plan.add_argument("--goal")
     plan.add_argument("--allowed", action="append")
     plan.add_argument("--forbidden", action="append")
     plan.add_argument("--exit-criterion", action="append")
     plan.set_defaults(func=cmd_plan)
+
+    adopt = sub.add_parser("adopt", help="adopt a legacy card as read-only")
+    adopt.add_argument("id", nargs="?")
+    adopt.add_argument("--from", dest="source", required=True)
+    adopt.set_defaults(func=cmd_adopt)
 
     approve = sub.add_parser("approve", help="approve a card by hash")
     approve.add_argument("id", nargs="?")

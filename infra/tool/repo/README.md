@@ -1,11 +1,11 @@
 # Repository policy
 
-`tools/repo/apply_policy.py` checks or applies the `repoPolicy` block in
+`infra/tool/repo/apply_policy.py` checks or applies the `repoPolicy` block in
 `.nebula-scaffold.json`.
 
 ```bash
-python tools/repo/apply_policy.py --check
-python tools/repo/apply_policy.py --apply
+python infra/tool/repo/apply_policy.py --check
+python infra/tool/repo/apply_policy.py --apply
 ```
 
 The adapter is GitHub-only. It checks the repository visibility and the default

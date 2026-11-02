@@ -39,21 +39,28 @@
     {
       "name": "import",
       "command": [
-        "godot",
+        "python",
+        "infra/checks/run_godot.py",
         "--headless",
-        "--quit"
+        "--editor",
+        "--quit",
+        "--path",
+        "app"
       ],
-      "cwd": "app"
+      "cwd": "."
     },
     {
       "name": "test",
       "command": [
-        "godot",
+        "python",
+        "infra/checks/run_godot.py",
         "--headless",
+        "--path",
+        "app",
         "-s",
         "res://tests/run_tests.gd"
       ],
-      "cwd": "app"
+      "cwd": "."
     }
   ],
   "pr_create": [],
