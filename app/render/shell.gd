@@ -622,11 +622,25 @@ func _save_label(row: Dictionary) -> String:
 	var preview := _clip(String(row.get("preview", "")), PREVIEW_CHARS)
 	if preview != "":
 		label += " — " + preview
-	var when := String(row.get("savedAt", ""))
-	# `2026-11-02T12:46:58` — the time of day is what tells two saves apart.
-	if when.length() >= 16:
-		label += " · " + when.substr(11, 5)
+	var clock := _local_clock(String(row.get("savedAt", "")))
+	# The time of day is what tells two saves apart, and the player reads their own.
+	if clock != "":
+		label += " · " + clock
 	return label
+
+
+func _local_clock(saved_at: String) -> String:
+	## `savedAt` is recorded in UTC (`Time.get_datetime_string_from_system(true)`),
+	## so printing its time of day told a player in UTC+8 that a 14:20 save happened
+	## at 06:20. Convert to this machine's offset before showing it.
+	if saved_at.length() < 19:
+		return ""
+	var utc_seconds := int(Time.get_unix_time_from_datetime_string(saved_at.substr(0, 19)))
+	if utc_seconds <= 0:
+		return ""
+	var bias_minutes := int(Time.get_time_zone_from_system().get("bias", 0))
+	var local := Time.get_datetime_dict_from_unix_time(utc_seconds + bias_minutes * 60)
+	return "%02d:%02d" % [int(local.get("hour", 0)), int(local.get("minute", 0))]
 
 
 func _clear_options() -> void:

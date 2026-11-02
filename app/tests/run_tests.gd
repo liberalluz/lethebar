@@ -39,6 +39,7 @@ func _initialize() -> void:
 	_case_off_003()
 	_case_no_clock()
 	_case_ux_001()
+	_case_save_clock()
 	_case_landing_without_saves()
 	_case_shell_refusal()
 	_case_import_control()
@@ -877,6 +878,43 @@ func _case_ux_001() -> void:
 		"%s vs %s" % [String(resumed.get("node", "")), saved_node],
 	)
 	_check("TC-UX-001: continue lands on a session screen", shell.screen_name() == "session")
+
+
+func _case_save_clock() -> void:
+	# The payload records UTC. The list used to print that UTC time of day, so a
+	# save made at 14:20 in UTC+8 read `06:20` — the player's own clock is what it
+	# must show. Asserting against the machine clock catches a regression to UTC on
+	# any machine that is not already on UTC.
+	_section("TC-UX-001 the save list shows the player's clock")
+	var shell := _shell()
+	shell.start_plugin("sanguo")
+	shell.save_to(1)
+	var row: Dictionary = {}
+	for candidate in shell._saves_index():
+		if String(candidate.get("plugin", "")) == "sanguo" and int(candidate.get("slot", 0)) == 1:
+			row = candidate
+	_check("TC-UX-001: the saved slot is listed", not row.is_empty())
+	var clock := shell._local_clock(String(row.get("savedAt", "")))
+	_check("TC-UX-001: the listed clock parses", clock != "", String(row.get("savedAt", "")))
+	var now := Time.get_datetime_string_from_system(false).substr(11, 5)
+	var drift: int = absi(_minutes_of(clock) - _minutes_of(now))
+	_check(
+		"TC-UX-001: the listed clock is local time",
+		drift <= 1,
+		"%s (local now %s)" % [clock, now],
+	)
+	_check(
+		"TC-UX-001: the continue row shows that clock",
+		shell._save_label(row).contains(clock),
+		shell._save_label(row),
+	)
+
+
+func _minutes_of(clock: String) -> int:
+	var parts := clock.split(":")
+	if parts.size() != 2:
+		return -1
+	return int(parts[0]) * 60 + int(parts[1])
 
 
 func _case_landing_without_saves() -> void:
