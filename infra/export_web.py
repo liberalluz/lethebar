@@ -152,6 +152,52 @@ def precache_payload(output: Path) -> None:
     worker.write_text(text, encoding="utf-8")
 
 
+NAVIGATION_FALLBACK = (
+    "let cached = await cache.match(event.request);\n"
+    "\t\t\t\tif (cached == null && isNavigate) {\n"
+    "\t\t\t\t\t// A player arrives at the directory URL (/lethebar/), which is a\n"
+    "\t\t\t\t\t// different cache key than index.html. Without this fallback every\n"
+    "\t\t\t\t\t// navigation misses the cache, goes to the network and fails offline\n"
+    "\t\t\t\t\t// (iOS Safari reports it as \"FetchEvent.respondWith received an\n"
+    "\t\t\t\t\t// error: TypeError: Load failed\").\n"
+    "\t\t\t\t\tcached = await cache.match(CACHED_FILES[0]);\n"
+    "\t\t\t\t}\n"
+)
+
+
+def patch_navigation_fallback(output: Path) -> None:
+    """Make an offline navigation to the site root find the cached document.
+
+    `TC-OFF-001` says the page opens offline. The engine's worker caches
+    `index.html`, but a navigation goes to the directory URL (`/lethebar/`),
+    and `cache.match` compares whole URLs, so the lookup missed and the request
+    fell through to the network. Desktop Chrome hid this because the smoke check
+    navigated to `/index.html`; Safari on iOS is the environment the test plan
+    names, and there it fails.
+
+    The worker is generated, so this is a post-export edit; it fails loudly if
+    the shape it edits ever changes.
+    """
+    worker = output / SERVICE_WORKER
+    if not worker.is_file():
+        raise SystemExit(f"{SERVICE_WORKER} is missing; the export did not produce it")
+    text = worker.read_text(encoding="utf-8")
+    anchor = "let cached = await cache.match(event.request);\n"
+    if text.count(anchor) != 1:
+        raise SystemExit(f"{SERVICE_WORKER} no longer has the lookup this script patches")
+    text = text.replace(anchor, NAVIGATION_FALLBACK, 1)
+    offline = "return caches.match(OFFLINE_URL);"
+    if text.count(offline) != 1:
+        raise SystemExit(f"{SERVICE_WORKER} no longer has the offline page fallback")
+    text = text.replace(
+        offline,
+        "const document = await cache.match(CACHED_FILES[0]);\n"
+        "\t\t\t\t\t\t\treturn document != null ? document : caches.match(OFFLINE_URL);",
+        1,
+    )
+    worker.write_text(text, encoding="utf-8")
+
+
 IMPORT_BRIDGE = """
 <input id="lethebar-import" type="file" accept=".zip" style="display:none">
 <script>
@@ -236,6 +282,7 @@ def main() -> int:
     finally:
         PRESET_STAGED.unlink(missing_ok=True)
     precache_payload(args.output)
+    patch_navigation_fallback(args.output)
     inject_import_bridge(args.output)
     return report(args.output)
 
