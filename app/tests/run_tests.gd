@@ -42,6 +42,7 @@ func _initialize() -> void:
 	_case_shell_refusal()
 	_case_import_control()
 	_case_font_coverage()
+	_case_slot_layout()
 
 	print("")
 	if _failures.is_empty():
@@ -906,6 +907,58 @@ func _case_font_coverage() -> void:
 				ui_seen[code] = true
 				ui_missing += char(code)
 	_check("every character the shell shows has a glyph", ui_missing == "", "missing: %s" % ui_missing)
+
+
+func _case_slot_layout() -> void:
+	# A manual run in a narrow window found what no assertion covered: the slot
+	# label asked for the width of the whole sentence, so Save and Load were
+	# pushed past the right edge and the player could not save at all. The
+	# property asserted here is geometry, not text: every slot row has to fit
+	# inside the window, and the stored preview has to stay short enough to fit.
+	_section("TC-UX-001 a slot row fits the window, buttons included")
+	var shell := _shell()
+	shell.start_plugin("sanguo")
+	shell.choose(0)
+	shell.save_to(1)
+	_check("TC-UX-001: the slots screen is up", shell.screen_name() == "saves", shell.screen_name())
+	var rows: Array = shell.saves.slots(shell.entry)
+	var preview := String(rows[0].get("preview", "")) if rows.size() > 0 else ""
+	_check("TC-UX-001: a saved slot carries a preview", preview != "", str(rows))
+	_check(
+		"TC-UX-001: the stored preview is clipped",
+		preview.length() <= shell.PREVIEW_CHARS + 1,
+		"%d characters: %s" % [preview.length(), preview]
+	)
+	var budget := shell._slot_text_width()
+	var button_rows := 0
+	for child in shell._options.get_children():
+		if not child is HBoxContainer:
+			continue
+		button_rows += 1
+		var row := child as HBoxContainer
+		var label := row.get_child(0) as Label
+		_check(
+			"TC-UX-001: the slot label wraps instead of demanding one line",
+			label != null and label.autowrap_mode != TextServer.AUTOWRAP_OFF,
+			"autowrap_mode=%s" % (label.autowrap_mode if label != null else "no label")
+		)
+		var label_width := label.get_combined_minimum_size().x if label != null else -1.0
+		_check(
+			"TC-UX-001: the slot label takes the budgeted width, not the sentence's",
+			label_width <= budget + 1.0,
+			"label asks %s px, budget is %s px" % [label_width, budget]
+		)
+		_check(
+			"TC-UX-001: the slot row fits the budgeted width",
+			row.get_combined_minimum_size().x <= budget + shell.SLOT_BUTTONS_WIDTH + 16.0,
+			"row asks %s px" % row.get_combined_minimum_size().x
+		)
+		var buttons := 0
+		for part in row.get_children():
+			if part is Button:
+				buttons += 1
+		_check("TC-UX-001: the row keeps both of its buttons", buttons == 2, "%d button(s)" % buttons)
+	_check("TC-UX-001: all three slots are laid out", button_rows == 3, "%d row(s)" % button_rows)
 
 
 func _shipped_font() -> Font:
