@@ -39,6 +39,7 @@ func _initialize() -> void:
 	_case_off_003()
 	_case_no_clock()
 	_case_ux_001()
+	_case_landing_without_saves()
 	_case_shell_refusal()
 	_case_import_control()
 	_case_font_coverage()
@@ -811,9 +812,16 @@ func _case_ux_001() -> void:
 	var shell := _shell()
 	_check("TC-UX-001: the app opens on the landing screen", shell.screen_name() == "landing")
 	_check("TC-UX-001: the landing screen names the product", shell.visible_text().contains("Lethebar"))
-	_check("TC-UX-001: the way in is a labelled button", shell.visible_text().contains("New game"))
+	# The way in is `New game`, and the stories it leads to are named the way a
+	# player reads them: five first-time players asked what game this was while
+	# the pack list showed `sanguo — turn_based@1, 0.1.0`.
 	shell.open_plugins()
-	_check("TC-UX-001: the plugin list opens", shell.screen_name() == "plugins")
+	_check("TC-UX-001: new game lists a story by name", shell.visible_text().contains("三国"), shell.visible_text())
+	_check(
+		"TC-UX-001: the pack list hides the protocol name",
+		not shell.visible_text().contains("turn_based"),
+		shell.visible_text(),
+	)
 	_check("TC-UX-001: the shipped pack is listed", shell.builtin_ids.has("sanguo"), str(shell.builtin_ids))
 	var view := shell.start_plugin("sanguo")
 	_check("TC-UX-001: picking a pack starts a session", shell.screen_name() == "session")
@@ -836,6 +844,57 @@ func _case_ux_001() -> void:
 		"%s vs %s" % [String(shell.current_view().get("node", "")), saved_node],
 	)
 	_check("TC-UX-001: the restored scene is a session screen", shell.screen_name() == "session")
+	# The landing screen is a way in, not a menu: one line says what this is and
+	# `New game` leads to the stories. `Continue` appears once something is saved,
+	# and it goes to the saves themselves rather than asking which pack.
+	shell.show_landing()
+	_check(
+		"TC-UX-001: the landing screen says what this is",
+		shell.visible_text().contains("Short text stories"),
+		shell.visible_text(),
+	)
+	_check(
+		"TC-UX-001: the landing screen offers a new game",
+		shell.visible_text().contains("New game"),
+		shell.visible_text(),
+	)
+	_check(
+		"TC-UX-001: the landing screen offers continue when a slot is saved",
+		shell.visible_text().contains("Continue"),
+		shell.visible_text(),
+	)
+	var loads := shell.show_loads()
+	_check("TC-UX-001: continue opens the saves", shell.screen_name() == "loads")
+	_check(
+		"TC-UX-001: a saved slot is named by its story",
+		shell.visible_text().contains("三国"),
+		shell.visible_text(),
+	)
+	var resumed := shell.resume_slot("sanguo", 1)
+	_check(
+		"TC-UX-001: continue resumes at the saved scene",
+		String(resumed.get("node", "")) == saved_node,
+		"%s vs %s" % [String(resumed.get("node", "")), saved_node],
+	)
+	_check("TC-UX-001: continue lands on a session screen", shell.screen_name() == "session")
+
+
+func _case_landing_without_saves() -> void:
+	# The other half of the `Continue` rule: a first visit must not show a button
+	# that leads nowhere.
+	_section("TC-UX-001 the landing screen hides continue when nothing is saved")
+	var shell := _shell()
+	shell.show_landing()
+	_check(
+		"TC-UX-001: a fresh browser has no continue button",
+		not shell.visible_text().contains("Continue"),
+		shell.visible_text(),
+	)
+	_check(
+		"TC-UX-001: a fresh browser still offers a new game",
+		shell.visible_text().contains("New game"),
+		shell.visible_text(),
+	)
 
 
 func _case_shell_refusal() -> void:

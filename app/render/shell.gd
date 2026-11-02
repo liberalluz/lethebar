@@ -19,6 +19,7 @@ const SCREEN_LANDING := "landing"
 const SCREEN_PLUGINS := "plugins"
 const SCREEN_SESSION := "session"
 const SCREEN_SAVES := "saves"
+const SCREEN_LOADS := "loads"
 const SCREEN_NOTICE := "notice"
 
 ## The window title carries the screen name. On the web build Godot maps it to
@@ -69,32 +70,82 @@ func _ready() -> void:
 # --- screens ----------------------------------------------------------------
 
 func show_landing() -> String:
-	## First run starts here. A returning player gets the same screen: the path
-	## to a game is one click either way (REQ-017).
+	## First run starts here, and so does every later one. One line says what
+	## this is — five first-time players asked exactly that while the screen
+	## only described the architecture — then either a new story or the run the
+	## player left. The list of stories lives one click away in "New game":
+	## putting it here made every visit start with a menu (REQ-017).
 	screen = SCREEN_LANDING
 	_heading.text = "Lethebar"
-	_sub.text = "An engine that ships no gameplay. Pick a pack and play."
-	_status.text = ""
+	_sub.text = "Short text stories. You choose, and the story goes where you send it."
 	_clear_options()
+	_status.text = ""
 	_options.add_child(_button("New game", open_plugins))
-	if session != null:
-		_options.add_child(_button("Continue", enter_session))
+	if not _saves_index().is_empty():
+		_options.add_child(_button("Continue", show_loads))
+	if builtin_ids.is_empty():
+		# Nothing to offer yet, so the screen has to contain the way out of that
+		# state rather than a dead end.
+		_status.text = "No story is installed yet."
+		_options.add_child(_button("Install a pack (.zip)…", request_install))
 	_announce()
 	return screen
 
 
+func show_loads() -> String:
+	## `Continue` has no pack in hand, so it lists the saves themselves: one row
+	## per non-empty slot, newest first, each opening that pack exactly where the
+	## player stopped. Asking "which pack?" first would make "continue" a
+	## three-click detour (A + names-only decision, 2026-11-02).
+	screen = SCREEN_LOADS
+	_heading.text = "Continue"
+	_sub.text = "Pick up where you left off."
+	_status.text = ""
+	_clear_options()
+	var rows := _saves_index()
+	for row in rows:
+		_options.add_child(
+			_button(_save_label(row), resume_slot.bind(String(row["plugin"]), int(row["slot"])))
+		)
+	if rows.is_empty():
+		_status.text = "Nothing is saved yet."
+	_options.add_child(_button("Back", show_landing))
+	_announce()
+	return screen
+
+
+func resume_slot(plugin_id: String, slot: int) -> Dictionary:
+	## A save names its own plugin, so this is the only entry point that does not
+	## start from a pack list. A slot that no longer makes sense in this build
+	## (unknown scene, schema drift) is refused with its code, not half-loaded.
+	var record: Dictionary = loader.registry.entry(plugin_id)
+	if record.is_empty():
+		open_notice("E-01", "pack %s is not installed" % plugin_id)
+		return current_view()
+	var result := saves.read(record, slot)
+	if not bool(result.get("ok", false)):
+		open_notice(String(result.get("code", "")), String(result.get("message", "")))
+		return current_view()
+	var restored := saves.resume(record, result["payload"])
+	if restored == null:
+		open_notice(
+			SaveStore.CODE_NODE, "slot %d points at a scene this pack no longer has" % slot
+		)
+		return current_view()
+	entry = record
+	session = restored
+	return enter_session()
+
+
 func open_plugins() -> String:
 	screen = SCREEN_PLUGINS
-	_heading.text = "Choose a pack"
-	_sub.text = "Installed packs. Each one brings its own story and rules. You can install one from a .zip file."
+	_heading.text = "All packs"
+	_sub.text = "Every pack is a story with its own rules. You can add one from a .zip file; it stays in this browser."
 	_status.text = "" if not builtin_ids.is_empty() else "No pack installed. Stage the built-in packs first."
 	_clear_options()
 	for plugin_id in builtin_ids:
-		var record: Dictionary = loader.registry.entry(plugin_id)
-		var manifest: Dictionary = record.get("manifest", {})
-		var label := "%s — %s, %s" % [plugin_id, String(manifest.get("protocol", "")), String(manifest.get("version", ""))]
-		_options.add_child(_button(label, start_plugin.bind(plugin_id)))
-	_options.add_child(_button("Install a pack…", request_install))
+		_options.add_child(_button(_pack_title(plugin_id), start_plugin.bind(plugin_id)))
+	_options.add_child(_button("Install a pack (.zip)…", request_install))
 	_options.add_child(_button("Back", show_landing))
 	_announce()
 	return screen
@@ -151,14 +202,14 @@ func open_saves() -> String:
 		return show_landing()
 	screen = SCREEN_SAVES
 	_heading.text = "Save slots"
-	_sub.text = "Three slots for this pack. Loading a slot replaces the current run."
+	_sub.text = "Saving keeps your place in this story. Loading a slot goes back to that moment."
 	_status.text = ""
 	_clear_options()
 	var rows: Array = saves.slots(entry)
 	for index in SLOT_COUNT:
 		var slot := index + 1
 		var row: Dictionary = rows[index] if index < rows.size() else {}
-		var description := "Slot %d — empty" % slot
+		var description := "Slot %d — nothing saved yet" % slot
 		if not bool(row.get("empty", true)):
 			# Saves written before the preview cap still hold their long text, so
 			# the clip happens on the way out as well as on the way in.
@@ -338,6 +389,8 @@ func _announce() -> void:
 		var state := {
 			"screen": screen,
 			"packs": builtin_ids.duplicate(),
+			"stories": _story_list(),
+			"saves": _saves_index(),
 			"slots": slot_previews(),
 		}
 		JavaScriptBridge.eval("window.lethebarState = %s;" % JSON.stringify(state), true)
@@ -519,6 +572,61 @@ func _builtin_packages() -> Array:
 			found.append("%s/%s" % [BUILTIN_DIR, name])
 	found.sort()
 	return found
+
+
+func _pack_title(plugin_id: String) -> String:
+	## The player sees the pack's own name, never the protocol it happens to
+	## speak: `sanguo — turn_based@1, 0.1.0` looked like a turn-based strategy
+	## game and made a first-time player expect internal affairs and troop
+	## recruitment (TC-UX-001 finding). Protocol and version stay in the
+	## manifest, the log and the error codes, where a developer looks for them.
+	var record: Dictionary = loader.registry.entry(plugin_id)
+	var manifest: Dictionary = record.get("manifest", {})
+	var title := String(manifest.get("name", ""))
+	return title if not title.is_empty() else plugin_id
+
+
+func _story_list() -> Array:
+	## Published through `lethebarState` so a browser driver can click a story by
+	## the name a player reads instead of guessing at button order.
+	var stories: Array = []
+	for plugin_id in builtin_ids:
+		stories.append({"id": plugin_id, "title": _pack_title(plugin_id)})
+	return stories
+
+
+func _saves_index() -> Array:
+	## Every non-empty slot in this browser, newest first. `Continue` needs the
+	## saves themselves rather than a pack, because the player remembers the run
+	## and not which pack it came from.
+	var rows: Array = []
+	for plugin_id in builtin_ids:
+		var record: Dictionary = loader.registry.entry(plugin_id)
+		for row in saves.slots(record):
+			if bool(row.get("empty", true)):
+				continue
+			rows.append({
+				"plugin": plugin_id,
+				"title": _pack_title(plugin_id),
+				"slot": int(row.get("slot", 0)),
+				"preview": String(row.get("preview", "")),
+				"savedAt": String(row.get("savedAt", "")),
+			})
+	rows.sort_custom(func(left, right): return String(left["savedAt"]) > String(right["savedAt"]))
+	return rows
+
+
+func _save_label(row: Dictionary) -> String:
+	## `三国 · Slot 1 — 初平元年春，关东诸侯会于酸枣… · 12:46`
+	var label := "%s · Slot %d" % [String(row.get("title", "")), int(row.get("slot", 0))]
+	var preview := _clip(String(row.get("preview", "")), PREVIEW_CHARS)
+	if preview != "":
+		label += " — " + preview
+	var when := String(row.get("savedAt", ""))
+	# `2026-11-02T12:46:58` — the time of day is what tells two saves apart.
+	if when.length() >= 16:
+		label += " · " + when.substr(11, 5)
+	return label
 
 
 func _clear_options() -> void:
