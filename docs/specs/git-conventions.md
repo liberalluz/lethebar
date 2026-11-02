@@ -39,6 +39,13 @@ Scopes: pick exactly one from the closed list below.
 
 - Subject is imperative and short.
 - Body explains why, not what.
+- The body carries two labelled lines, checked by `infra/checks/check_commit_body.py`:
+  - `Why:` is required: one or more lines saying what problem the commit solves. Without it the
+    reason for a change lives only in the pull request, which is a different document.
+  - `Batch:` is required: `Batch: B8` when the commit implements a batch card, `Batch: none` when
+    it does not. The card is the thing that decides scope, so the link belongs in history.
+- The check reads only the commits a branch adds (`origin/main..HEAD`). It never rewrites or
+  rejects merged history, so commits that predate the rule stay exactly as they are.
 - No secrets, no generated build output.
 
 ## 3. Pull requests

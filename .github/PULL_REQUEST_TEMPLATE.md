@@ -20,3 +20,4 @@
 - [ ] 包含测试或证据
 - [ ] 没有密钥或构建产物
 - [ ] 行为变化时更新了文档
+- [ ] 每条提交的正文都有 `Why:` 与 `Batch:`（无批卡时写 `Batch: none`，`infra/checks/check_commit_body.py` 会检查）
