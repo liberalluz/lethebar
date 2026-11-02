@@ -1,0 +1,238 @@
+# Engine bricks
+
+**Status**: draft for review. Not normative yet. When the B8 batches land this
+becomes the engine's public primitive surface, and the package format v2 refers to
+it. Until then it exists so that the batches implement slices of one settled shape
+instead of inventing fields three times.
+
+Terms used below:
+
+- **brick** — a primitive the engine implements. Packages declare data; they never
+  implement a brick.
+- **package** — a zip carrying a manifest, data files and assets. It carries data only
+  (ADR-0003, ADR-0005).
+- **run** — one play session, from start to end, with its own save slots.
+- **tick** — an engine-internal time unit. It advances when the run advances; it is
+  never read from the wall clock.
+
+A package may use any subset of the bricks. Every brick is optional: a package that
+only declares nodes behaves exactly like today's `linear@1` content.
+
+---
+
+## 1. State ledger
+
+`data/state.json`
+
+```json
+{
+  "resources": [
+    {"id": "grain",   "label": "粮草", "init": 100, "min": 0, "max": 1000},
+    {"id": "pop",     "label": "人口", "init": 50,  "min": 0, "max": 500},
+    {"id": "prestige","label": "声望", "init": 10,  "min": 0, "max": 100}
+  ]
+}
+```
+
+- Every value is a number. There is no string or boolean state.
+- `min` and `max` are inclusive; writes are clamped, not rejected.
+- A rule that names an unknown resource is a validation error (`V-14`), not a
+  silent zero.
+- A resource that exists but was never written reads as `init`.
+- The ledger is part of the save payload; a run restored from a slot reads the same
+  numbers it saved.
+
+## 2. Settlement rules
+
+`data/rules.json`
+
+```json
+{
+  "rules": [
+    {
+      "when": {"key": "pop", "op": "lt", "value": 10},
+      "set":  {"grain": {"add": -5}, "prestige": {"add": -1}}
+    },
+    {
+      "when": [{"key": "grain", "op": "gte", "value": 100},
+               {"key": "prestige", "op": "gte", "value": 50}],
+      "set":  {"pop": {"add": 5}}
+    }
+  ]
+}
+```
+
+- `when` is one condition or an array of conditions, combined with AND.
+- A condition is `{key, op, value}` with `op` in `eq | ne | gt | gte | lt | lte`.
+- `set` maps a resource id to one of: a bare number (assign), `{"value": n}`,
+  `{"add": n}`, `{"clamp": {"min": n, "max": n}}`.
+- Rules run in file order, once per advance, after the action's own effects.
+- A string in `when` is rejected (`M-02` today); there is no expression language
+  and no string interpolation.
+
+## 3. Action menu
+
+`data/actions.json`
+
+```json
+{
+  "actions": [
+    {
+      "id": "recruit",
+      "label": "招兵",
+      "costs":   {"grain": {"add": -20}},
+      "requires":[{"key": "grain", "op": "gte", "value": 20}],
+      "effects": [{"grain": {"add": -20}}, {"pop": {"add": 3}}],
+      "limit":   {"per_turn": 1}
+    }
+  ]
+}
+```
+
+- The engine renders the menu and **disables** an action whose `requires` fail,
+  with the failing condition available to the UI. A disabled action is a state,
+  not an error.
+- Costs and effects apply atomically: if any part would be rejected, nothing is
+  written.
+- `limit` is optional and counts per turn or per run (`{"per_run": 1}`).
+- When no action is available the engine still renders the turn, so a package can
+  be a pure reading experience with no menu at all.
+
+## 4. Phase machine
+
+`data/phases.json`
+
+```json
+{
+  "turns": 24,
+  "ranks": [
+    {"at": 1,  "title": "校尉"},
+    {"at": 6,  "title": "将军"},
+    {"at": 12, "title": "州牧"},
+    {"at": 18, "title": "刺史"},
+    {"at": 24, "title": "丞相"}
+  ],
+  "fail": [
+    {"when": {"key": "grain", "op": "lte", "value": 0}, "reason": "粮尽"},
+    {"when": {"key": "pop",   "op": "lte", "value": 0}, "reason": "无人可用"}
+  ]
+}
+```
+
+- `turns` is the length of one run. Reaching it ends the run as a win.
+- `ranks` are read from the turn number, so a save restored at turn 13 shows the
+  rank for turn 13 without extra bookkeeping.
+- `fail` is evaluated after settlement. The first matching entry ends the run and
+  its `reason` is shown to the player.
+- A run ended by `fail` is still saveable: the player can reload before the turn
+  that killed them.
+
+## 5. Checks
+
+`data/checks.json`
+
+```json
+{
+  "checks": [
+    {
+      "id": "battle",
+      "when": [{"key": "pop", "op": "gte", "value": 20}],
+      "roll": {"dice": 1, "sides": 100},
+      "target": 60,
+      "bonus": {"key": "prestige", "scale": 0.5}
+    }
+  ]
+}
+```
+
+- A check produces a boolean plus the numbers that decided it, both stored under
+  `state.checks.<id>` and shown on request. The player is told why, not just yes.
+- Rolls come from the session RNG, so the same seed and the same choices produce
+  the same outcomes (`TC-DET-001`).
+- There is no free-form probability expression: `roll`, `target` and `bonus` are
+  the whole surface. A genre that needs more becomes a brick proposal.
+
+## 6. Pools
+
+`data/pools.json`
+
+```json
+{
+  "pools": [
+    {"id": "officers", "items": ["cao_cao", "liu_bei", "sun_quan"], "draw": {"n": 1, "replace": false}}
+  ]
+}
+```
+
+- Drawing removes items from the pool unless `replace` is true.
+- The remaining pool is part of the save, so reloading cannot re-roll a draw.
+- Pool order is not shuffled at load time; shuffling happens through the session
+  RNG when the first draw occurs, which keeps a fresh run reproducible.
+
+## 7. Relations
+
+`data/factions.json`
+
+```json
+{
+  "thresholds": {"ally": 60, "hostile": -60},
+  "entities": [
+    {"id": "wei", "label": "魏", "relations": {"shu": -40, "wu": 10}},
+    {"id": "shu", "label": "蜀", "relations": {"wei": -40}},
+    {"id": "wu",  "label": "吴", "relations": {"wei": 10}}
+  ]
+}
+```
+
+- Values are numbers with no engine-imposed range. A package that wants a bound
+  declares a `clamp` in its settlement rules; the engine does not decide what
+  "close" or "far" means.
+- Relations are directed. `wei → shu` and `shu → wei` are two values; the engine
+  never assumes symmetry, and validation (`V-20`) reports an asymmetric pair as a
+  warning rather than rewriting it.
+- `ally` and `hostile` are **declared by the package**, not by the engine. A
+  condition may use `{"relation": "shu", "state": "ally"}` only if `thresholds`
+  declares that state; using it without a declaration is a validation error, so
+  there are no magic numbers in the engine to disagree with a package's intent.
+- A package that uses no relations omits the file entirely.
+
+## 8. Clock
+
+No file. The clock lives in the engine.
+
+- `tick` increments once per advance (a turn, or a node in a linear package).
+- Idle genres read `tick` to compute growth; they never read the wall clock.
+- A package may declare `{"clock": {"per": "turn"}}` to say that its growth is
+  per turn rather than per node; anything else is out of scope for v2.
+
+---
+
+## Validation surface
+
+Each brick gets one validation rule so an author's mistake is a data error, not a
+runtime surprise:
+
+| Rule  | Brick | Rejects |
+|-------|-------|---------|
+| V-14  | ledger | unknown resource in a rule or action; `min > max` |
+| V-15  | rules | unknown `op`; `set` on a resource that is not declared |
+| V-16  | actions | duplicate id; empty `effects`; `limit` on a missing counter |
+| V-17  | phases | `turns < 1`; rank `at` outside `1 … turns`; empty `reason` |
+| V-18  | checks | `sides < 2`; `target` outside the dice range |
+| V-19  | pools | duplicate item; `draw.n` larger than the pool without `replace` |
+| V-20  | relations | unknown entity id; `ally`/`hostile` used without a declared threshold |
+| V-21  | clock | a package that declares a clock but no growth rule that reads it |
+
+## Minimal example
+
+A package that uses all eight bricks but stays under 60 lines of data: three turns,
+two resources, one action, one check, one pool, two factions. It exists to prove
+the bricks compose before any real content is written, and it is the fixture for
+the B8a/B8b/B8c acceptance lines.
+
+## What is deliberately missing
+
+- No loops, no user-defined functions, no string expressions.
+- No network, no file system, no wall clock.
+- No per-node scripting. A genre that cannot be expressed is a brick proposal, and
+  a brick is an engine change (ADR-0005).
