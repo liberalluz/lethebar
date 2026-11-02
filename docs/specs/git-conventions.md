@@ -46,8 +46,15 @@ Scopes: pick exactly one from the closed list below.
 - One PR = one behavior.
 - Fill the PR template.
 - Link the issue or record if one exists.
+- Reference another pull request as `#24`: the reference is the link. Do not spell it as the other pull
+  request's title, and do not replace it with plain text.
 - Required checks must be green.
 - Do not rewrite history after review unless asked.
+- When text renders wrongly, ask the renderer before editing the text:
+  `gh api -X POST /markdown -f mode=gfm -f context=liberalluz/lethebar -f text='…'`. A link renders as
+  a link with a hover card over it; the card is not part of the body and is not a formatting defect.
+- Fix the syntax, never the meaning. Deleting a reference or a sentence to make a page look right is
+  not a fix.
 
 ## 4. Merge
 
