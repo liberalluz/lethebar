@@ -77,7 +77,7 @@ func show_landing() -> String:
 	## putting it here made every visit start with a menu (REQ-017).
 	screen = SCREEN_LANDING
 	_heading.text = "Lethebar"
-	_sub.text = "Short text stories. You choose, and the story goes where you send it."
+	_sub.text = "Short text stories. You choose, and the story goes where you send it. · v%s" % version_string()
 	_clear_options()
 	_status.text = ""
 	_options.add_child(_button("New game", open_plugins))
@@ -366,6 +366,17 @@ func screen_title() -> String:
 	return TITLE_PREFIX + screen
 
 
+func version_string() -> String:
+	## The product version, in one place: `app/project.godot` sets it and this
+	## reads it back. A build that somehow lost the setting still reports the
+	## three-part shape rather than an empty string, so the assertion below and
+	## the browser probe both have something to compare against.
+	var raw := String(ProjectSettings.get_setting("application/config/version", "0.0.0"))
+	if raw.is_empty():
+		return "0.0.0"
+	return raw
+
+
 func slot_previews() -> Array:
 	## Three entries, `""` for an empty slot. The probe uses the first one to
 	## tell "the save landed" from "the click missed", and to check after a
@@ -388,6 +399,7 @@ func _announce() -> void:
 		# change it reports was still caused by a real click.
 		var state := {
 			"screen": screen,
+			"version": version_string(),
 			"packs": builtin_ids.duplicate(),
 			"stories": _story_list(),
 			"saves": _saves_index(),
