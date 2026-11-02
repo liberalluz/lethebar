@@ -1,5 +1,3 @@
-# B6 — offline
-
 ### Added
 
 - The web build installs a service worker that caches the whole payload on first

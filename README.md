@@ -48,7 +48,7 @@ All three commands only check things — **there is nothing to play** before v0.
 | `python infra/verify_web.py` | Load that build in headless Chrome and report console output; needs `node` |
 | `godot --path app --headless --quit` | Import assets, rebuild `app/.godot/` |
 | `godot --path app --headless -s res://tests/run_tests.gd` | Rule-layer assertions (protocol, assembly, save encoding) |
-| `python tools/batch/batch.py` | Create the branch and checklist from a batch card |
+| `python infra/tool/batch/batch.py` | Create the branch and checklist from a batch card |
 
 There is **no CI yet**. The table above is the current gate: a local pass is the only pass. Once CI exists, this table must change in the same PR as the workflow.
 
@@ -59,8 +59,8 @@ There is **no CI yet**. The table above is the current gate: a local pass is the
 | `app/` | The Godot project root (`project.godot`) and the engine: `core/` (rules runtime), `protocols/` (protocol registry), `render/` (render runtime), `ui/`, `tests/` (headless assertions) |
 | `content/` | Built-in plugin packs and their data, one directory per pack |
 | `infra/` | Build, export and deployment scripts, including `stage_builtin.py` |
+| `infra/tool/` | Vendored Nebula tooling: batch execution, repository policy, release |
 | `docs/` | Specs, decisions, intent ([docs/README.md](docs/README.md)) |
-| `tools/` | Batch execution and repository policy tools |
 
 ## Architecture
 

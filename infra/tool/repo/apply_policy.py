@@ -126,9 +126,13 @@ def diff_policy(policy: dict, visibility: str, protection: dict | None) -> list[
         ),
     }
     for key, value in comparisons.items():
-        current = bool((protection.get(key) or {}).get("enabled", False))
-        if current != value:
-            diffs.append(f"{key}: {current} -> {value}")
+        # GitHub returns these four as {"enabled": false}, not as a bare boolean,
+        # so bool(protection.get(key)) is always True and every check reads as drift.
+        recorded = protection.get(key)
+        if isinstance(recorded, dict):
+            recorded = recorded.get("enabled", False)
+        if bool(recorded) != value:
+            diffs.append(f"{key}: {bool(recorded)} -> {value}")
     return diffs
 
 
