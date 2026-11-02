@@ -18,6 +18,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 SOURCE = REPO / "content" / "builtin"
 TARGET = REPO / "app" / "builtin"
+CHARS = TARGET / "chars.txt"
 
 
 def pack(plugin_dir: Path) -> Path:
@@ -28,6 +29,20 @@ def pack(plugin_dir: Path) -> Path:
             if path.is_file():
                 package.write(path, path.relative_to(plugin_dir).as_posix())
     return target
+
+
+def collect_characters(plugins: list[Path]) -> str:
+    """Every character a built-in pack can show, as one line for the font check.
+
+    The headless suite cannot read `content/` (the project root is `app/`), so
+    the characters are carried over as a generated file. The glyph-coverage
+    assertion reads it and fails when the shipped font would draw a box.
+    """
+    characters: set[str] = set()
+    for plugin in plugins:
+        for path in sorted(plugin.rglob("*.json")):
+            characters.update(path.read_text(encoding="utf-8"))
+    return "".join(sorted(character for character in characters if ord(character) > 0x1F))
 
 
 def main() -> int:
@@ -43,6 +58,9 @@ def main() -> int:
         target = pack(plugin)
         size = target.stat().st_size
         print(f"[stage] {plugin.name} -> {target.relative_to(REPO).as_posix()} ({size} bytes)")
+    characters = collect_characters(plugins)
+    CHARS.write_text(characters, encoding="utf-8")
+    print(f"[stage] {len(characters)} character(s) -> {CHARS.relative_to(REPO).as_posix()}")
     print(f"[stage] staged {len(plugins)} package(s)")
     return 0
 

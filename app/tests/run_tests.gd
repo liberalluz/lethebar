@@ -41,6 +41,7 @@ func _initialize() -> void:
 	_case_ux_001()
 	_case_shell_refusal()
 	_case_import_control()
+	_case_font_coverage()
 
 	print("")
 	if _failures.is_empty():
@@ -855,4 +856,63 @@ func _case_import_control() -> void:
 		shell.builtin_ids.has("imported-pack") and shell.builtin_ids.has("sanguo"),
 		str(shell.builtin_ids),
 	)
+
+
+func _case_font_coverage() -> void:
+	# A font without the glyph draws a box. Nothing in the suite looks at pixels,
+	# so the coverage is asserted on characters instead: every character a shipped
+	# pack can show, and every character the shell puts on screen, has to exist in
+	# the font the project ships. Without this, the browser build rendered every
+	# Chinese string as "no glyph" boxes while all the string assertions passed.
+	_section("TC-BUILTIN-001 every character on screen has a glyph")
+	var font := _shipped_font()
+	_check("the project ships a font for pack text", font != null, "no gui/theme/custom_font")
+	if font == null:
+		return
+	var list_path := "res://builtin/chars.txt"
+	_check("the staged packs carry their character list", FileAccess.file_exists(list_path), list_path)
+	if not FileAccess.file_exists(list_path):
+		return
+	var characters := FileAccess.get_file_as_string(list_path)
+	var missing := ""
+	var seen := {}
+	for index in characters.length():
+		var code := characters.unicode_at(index)
+		if code <= 0x20:
+			continue
+		if not font.has_char(code) and not seen.has(code):
+			seen[code] = true
+			missing += char(code)
+	_check("every staged pack character has a glyph", missing == "", "missing: %s" % missing)
+	var shell := _shell()
+	var screens := [shell.visible_text()]
+	shell.open_plugins()
+	screens.append(shell.visible_text())
+	shell.start_plugin("sanguo")
+	screens.append(shell.visible_text())
+	shell.choose(0)
+	screens.append(shell.visible_text())
+	shell.open_saves()
+	screens.append(shell.visible_text())
+	var ui_missing := ""
+	var ui_seen := {}
+	for screen in screens:
+		var text := String(screen)
+		for index in text.length():
+			var code := text.unicode_at(index)
+			if code <= 0x20:
+				continue
+			if not font.has_char(code) and not ui_seen.has(code):
+				ui_seen[code] = true
+				ui_missing += char(code)
+	_check("every character the shell shows has a glyph", ui_missing == "", "missing: %s" % ui_missing)
+
+
+func _shipped_font() -> Font:
+	## The font the built build actually renders with: the project setting, not a
+	## hard-coded path, so removing it fails the check instead of silently passing.
+	var path := String(ProjectSettings.get_setting("gui/theme/custom_font", ""))
+	if path.is_empty() or not ResourceLoader.exists(path):
+		return null
+	return load(path) as Font
 

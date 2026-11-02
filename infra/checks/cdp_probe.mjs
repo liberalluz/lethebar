@@ -16,7 +16,7 @@
 // not click → first scene. The gap is recorded in the batch exit record.
 
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 const [endpoint, url, reloadsArg, importZip] = process.argv.slice(2);
 const reloads = Math.max(1, Number(reloadsArg ?? 1));
@@ -324,6 +324,13 @@ if (landingScreen === "landing") {
     interaction.session = packs.length > 0 && (await clickLabel(String(packs[0]))) !== null;
     if (interaction.session && (await waitState((state) => state.screen === "session"))) {
       clickToSceneMs = Math.round((await evaluate("performance.now()")) - clickStarted);
+      // PROBE_SHOT=path writes the first scene as a PNG. The probe cannot judge
+      // whether glyphs drew, so the picture is the evidence a person reads.
+      if (process.env.PROBE_SHOT) {
+        const shot = await onSession("Page.captureScreenshot", { format: "png" });
+        writeFileSync(process.env.PROBE_SHOT, Buffer.from(shot.data, "base64"));
+        trace(`shot: ${process.env.PROBE_SHOT}`);
+      }
       // Save a slot so the offline reload has something to prove came back.
       await clickLabel("Saves");
       if (await waitState((state) => state.screen === "saves")) {
@@ -368,6 +375,12 @@ let offline = {
 
 if (interaction.saved) {
   offline.attempted = true;
+  // The engine persists `user://` to IndexedDB in a scheduled background sync, so
+  // a reload fired in the same tick as an import aborts that transaction and the
+  // pack is lost. Wait long enough for the write to land before cutting the
+  // network; a player who reloads inside that window loses the import too, which
+  // is recorded as a known limitation rather than papered over here.
+  await sleep(2000);
   await onSession("Network.emulateNetworkConditions", {
     offline: true,
     latency: 0,
