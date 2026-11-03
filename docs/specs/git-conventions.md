@@ -53,8 +53,11 @@ Scopes: pick exactly one from the closed list below.
 - One PR = one behavior.
 - Fill the PR template.
 - Link the issue or record if one exists.
-- Reference another pull request as `#24`: the reference is the link. Do not spell it as the other pull
-  request's title, and do not replace it with plain text.
+- Reference another pull request as a written link: `[#24](https://github.com/liberalluz/lethebar/pull/24)`.
+  A bare `#24` is expanded by the renderer into that pull request's title, and plain text loses the
+  link; the written link is the only form that stays a link and stays a reference.
+- The three forms were compared side by side in a body and only the written link rendered as a plain
+  link: `（#35）` became `PR (title) #35`, `（PR 35）` stayed plain text, `（[#35](…)）` stayed a link.
 - Required checks must be green.
 - Do not rewrite history after review unless asked.
 - When text renders wrongly, ask the renderer before editing the text:
