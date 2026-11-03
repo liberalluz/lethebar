@@ -130,6 +130,8 @@ def compose(notes: dict[str, list[str]], version: str, day: str) -> str:
     validate_date(day)
     lines = [f"## {version} - {day}", ""]
     for section in SECTIONS:
+        if not notes[section]:
+            continue
         lines.append(f"### {section}")
         lines.extend(f"- {item}" for item in notes[section])
         lines.append("")
