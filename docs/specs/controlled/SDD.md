@@ -239,6 +239,23 @@ Missing or unknown assets produce one warning each, are rendered as a placeholde
 (text type renders the asset path), and never abort the session. Warnings are
 aggregated per session and shown on request, not as a modal per asset.
 
+### 8.3 Placement
+
+A picture is drawn in a band above the scene text. The band takes the smaller of
+30% of the window height and the height left over after the text and every button
+have taken their share, so a wrapped line can never push a control off screen.
+The band collapses to zero when a scene declares no picture. Portrait assets take
+a fixed narrow column beside the text; `portrait` is supported by the layout but
+no shipped package uses it yet. Audio starts when the reader enters a scene that
+references it and stops when the scene is left.
+
+### 8.4 Accepted formats
+
+Pictures are PNG or JPEG and sounds are WAV; those are the only decoders the
+engine calls. Anything else fails to decode and takes the degradation path in
+§8.2 — placeholder plus one warning — rather than aborting.
+
+
 ## 9. Offline strategy
 
 - The app shell (html, engine code, built-in packages) is cached by a service
@@ -271,6 +288,37 @@ Landing → plugin list (built-in plugins preinstalled) → select 三国 → en
 No account, no network, no dialog chain longer than one step. The path is designed
 so a first-time player reaches a scene without importing anything.
 
+The landing screen names each installed story and offers `New game` plus, when a
+save exists, `Continue`, which lists every non-empty slot across plugins and
+resumes it directly.
+
+### 11.1 Interface language
+
+The interface strings are data, not literals in the render code. `en.tsv` and
+`zh_CN.tsv` under `app/i18n/` hold `key<TAB>text` rows; the render layer asks a
+`Locale` helper for a key and never embeds a sentence.
+
+Resolution order: a saved choice in `user://locale.txt`, else the browser's
+`navigator.language` (`zh*` → `zh-CN`, otherwise `en`). A missing key falls back
+to English, then to the key itself. The landing screen offers a switch; switching
+redraws the current screen and persists the choice. A test asserts that no
+Chinese literal remains in `app/render`.
+
+### 11.2 Package language
+
+A package may carry translations instead of duplicating scenes. The manifest
+declares `defaultLocale`, the extra `locales` it ships, and `names` (display name
+per locale); `data/i18n/<locale>.json` maps node id to `{text, choices}`.
+
+Resolution order for every string: the reader's locale table → the package's
+default text → the engine's English. Validation refuses a package that declares
+a table it does not ship, a locale outside `en`/`zh-CN`, or a table that leaves a
+scene text or a choice label empty (`V-22`), because half a translation reads
+worse than none. Scenes and choices absent from a table keep the package's own
+text, so a partial table is only allowed for a locale the manifest does not
+declare.
+
+
 ## 12. Requirement mapping
 
 | REQ | Design |
@@ -292,6 +340,9 @@ so a first-time player reaches a scene without importing anything.
 | `REQ-015` | §10.2 修仙 |
 | `REQ-016` | §6.3 determinism |
 | `REQ-017` | §11 first-run path |
+| `REQ-018` | §11.1 interface language |
+| `REQ-019` | §8.3 placement, §8.4 accepted formats |
+| `REQ-020` | §11.2 package language, §4.2 validation (`V-22`) |
 
 ## 13. Decisions and open questions
 

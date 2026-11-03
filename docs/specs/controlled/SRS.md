@@ -34,6 +34,9 @@ second.
 | `REQ-015` | A built-in 修仙 plugin ships with at least one playable segment, delivered after 三国. | From a fresh install, selecting 修仙 reaches the end of its first segment, saves, and resumes from that save. |
 | `REQ-016` | The same input sequence reproduces the same result. | Replaying the same choices from a fresh session yields an identical sequence of scenes and values. |
 | `REQ-017` | A first-time player reaches a playable session within 10 minutes, and the author plays three sessions in a row. | In an unmoderated test, a first-time player reaches the first scene within 10 minutes of opening the link. |
+| `REQ-018` | The interface speaks the language the browser asks for, and the player can switch it. | A browser set to English shows English controls; a browser set to Chinese shows Chinese controls; the switch on the landing screen survives a reload. |
+| `REQ-019` | A plugin's declared pictures and sounds are drawn and played. | A plugin that declares a scene image shows it above the text at a non-zero size; a plugin that declares none shows no empty picture area. |
+| `REQ-020` | A plugin carries its text in more than one language, and a partly translated package is refused. | With the browser asking for English, a plugin that ships an English table shows English text; a package whose declared table leaves a scene or a choice empty is refused at install with `V-22`. |
 
 ## 3. Out of scope for v0.0.0
 
@@ -43,7 +46,11 @@ second.
 - Multiplayer, accounts, cloud saves.
 - iOS build, Windows build, Android.
 - Automatic save migration across schema versions.
-- Art and audio beyond placeholders.
+- An art or audio pipeline: a package may ship its own pictures and sounds, but
+  there is no built-in art, no editing, no asset catalogue and no importing of
+  formats beyond PNG, JPEG and WAV.
+- Interface languages beyond English and Simplified Chinese, and right-to-left
+  layout.
 
 ## 4. Cut order when the date is at risk
 

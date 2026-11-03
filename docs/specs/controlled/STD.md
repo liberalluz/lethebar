@@ -233,3 +233,55 @@ path, so the case survives fixture renames.
   3. Stop when the participant performs an in-game action without asking anything.
 - Exit: at least four of five reach that point in ≤ 10 minutes; each participant's
   time and any help requested are recorded.
+### `TC-LANG-001`
+
+- Covers: `REQ-018`
+- Preconditions: headless run of `app/tests/run_tests.gd`; the exported build with
+  the probe pinned to `--lang=en-US`.
+- Steps:
+  1. In the headless run, ask `Locale` for a key before any choice: it answers in
+     English and the string is the catalogue's, not the key name.
+  2. Switch to `zh-CN`, read the same key, then reload the catalogue: the Chinese
+     string survives the reload.
+  3. Scan every file under `app/render` for a character in the CJK range; the scan
+     must find none.
+  4. In the browser, click the language button on the landing screen, confirm the
+     reported locale changed, reload, and confirm it persisted, then switch back.
+- Exit: steps 1–3 pass in the headless run and step 4 reports `switched`,
+  `persisted` and `restored` all true.
+
+### `TC-ASSET-001`
+
+- Covers: `REQ-019`
+- Preconditions: headless run; a package fixture whose manifest declares one
+  picture slot and one audio asset, a fixture that declares none, and a fixture
+  whose declared file is absent from the archive.
+- Steps:
+  1. Import the fixture with a picture and open its first scene: the picture band
+     is visible, the picture texture is not null, and the filled slot is reported.
+  2. Import the fixture that declares no assets: the band stays hidden and no slot
+     is reported.
+  3. Import the fixture whose file is missing: the session still starts, the
+     texture is a placeholder, and exactly one `R-01` warning is recorded.
+  4. Open the same scene in the exported build and confirm the picture is drawn
+     and every button stays inside the window.
+- Exit: steps 1–3 pass in the headless run; step 4 reports the picture slot filled,
+  no button outside the window, and zero extra requests.
+
+### `TC-I18N-001`
+
+- Covers: `REQ-020`
+- Preconditions: headless run; a package fixture carrying `data/i18n/en.json`
+  with full coverage, a fixture with one scene or one choice missing, and the
+  built-in Sanguo package with its English table.
+- Steps:
+  1. Create a session in `en` for the fully translated fixture: the scene text and
+     every choice label come from the table, not from the package's own text.
+  2. Create a session in `zh-CN` for the same fixture: the package's own text is
+     shown, and the English table is not consulted.
+  3. Ask for a locale the package does not declare: the package's own text is
+     shown instead of an empty string.
+  4. Install the partial fixture: validation reports `V-22` and the package is not
+     installed.
+- Exit: steps 1–4 pass, and the built-in package shows English text when the
+  reader's language is English.
