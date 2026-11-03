@@ -51,7 +51,7 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 
 	var manifest: Dictionary = manifest_variant
 	var node_ids: Array = []
-	var data := {"nodes": [], "mechanics": {}, "assets": {}}
+	var data := {"nodes": [], "mechanics": {}, "assets": {}, "i18n": {}}
 
 	if files.has(NODES_PATH):
 		var nodes_variant: Variant = JSON.parse_string(reader.read_file(NODES_PATH).get_string_from_utf8())
@@ -70,6 +70,16 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 	for asset_path in _referenced_assets(manifest, data["nodes"]):
 		if files.has(asset_path):
 			data["assets"][asset_path] = reader.read_file(asset_path)
+	# A declared locale is carried as one table of text per language. A table
+	# that is absent stays absent here; V-22 refuses the package by name, so the
+	# player never meets a scene that switches language halfway.
+	for locale in _declared_locales(manifest):
+		var locale_path := "data/i18n/%s.json" % locale
+		if not files.has(locale_path):
+			continue
+		var table_variant: Variant = JSON.parse_string(reader.read_file(locale_path).get_string_from_utf8())
+		if table_variant is Dictionary:
+			data["i18n"][locale] = table_variant
 	reader.close()
 	_discard(scratch)
 
@@ -77,6 +87,8 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 	check_context.erase("work_dir")
 	check_context["package_files"] = files
 	check_context["node_ids"] = node_ids
+	check_context["nodes"] = data["nodes"]
+	check_context["i18n"] = data["i18n"]
 	check_context["installed"] = registry.versions()
 	if not check_context.has("protocols"):
 		check_context["protocols"] = ProtocolRegistry.known_ids()
@@ -125,6 +137,18 @@ func _referenced_assets(manifest: Dictionary, nodes: Array) -> Array:
 				if path != "" and not paths.has(path):
 					paths.append(path)
 	return paths
+
+
+func _declared_locales(manifest: Dictionary) -> Array:
+	## The extra languages the package claims, in declaration order. The default
+	## locale is not listed here: its text is the text in `data/nodes.json`.
+	var locales: Array = []
+	var declared: Variant = manifest.get("locales", [])
+	if declared is Array:
+		for raw in declared:
+			if raw is String and not locales.has(String(raw)):
+				locales.append(String(raw))
+	return locales
 
 
 func _rejected(code: String, field: String, message: String, issues: Array) -> Dictionary:	return {

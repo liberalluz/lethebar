@@ -22,6 +22,14 @@ const REQUIRED_FIELDS := [
 const LIST_FIELDS := ["capabilities", "mechanics", "assets"]
 const STRING_FIELDS := ["id", "version", "specVersion", "engine", "name", "protocol", "entry"]
 
+## Optional fields a package may add. The default locale names the language the
+## text in `data/nodes.json` is already written in; `locales` lists the extra
+## languages the package carries under `data/i18n/<locale>.json`; `names` gives
+## the pack's own title per locale.
+const OPTIONAL_STRING_FIELDS := ["defaultLocale"]
+const OPTIONAL_LIST_FIELDS := ["locales"]
+const OPTIONAL_MAP_FIELDS := ["names"]
+
 const ID_PATTERN := "^[a-z0-9-]+$"
 const SEMVER_PATTERN := "^(\\d+)\\.(\\d+)\\.(\\d+)$"
 const ENGINE_RANGE_PATTERN := "^>=(\\d+\\.\\d+\\.\\d+) <(\\d+\\.\\d+\\.\\d+)$"
@@ -100,4 +108,21 @@ static func field_shape_issues(manifest: Dictionary) -> Array:
 			issues.append({"field": field, "message": "expected an integer"})
 		elif field in LIST_FIELDS and not value is Array:
 			issues.append({"field": field, "message": "expected an array"})
+	for field in OPTIONAL_STRING_FIELDS:
+		if manifest.has(field) and not manifest[field] is String:
+			issues.append({"field": field, "message": "expected a string"})
+	for field in OPTIONAL_LIST_FIELDS:
+		if not manifest.has(field):
+			continue
+		var listed: Variant = manifest[field]
+		if not listed is Array:
+			issues.append({"field": field, "message": "expected an array"})
+			continue
+		for entry in listed:
+			if not entry is String:
+				issues.append({"field": field, "message": "expected an array of locale codes"})
+				break
+	for field in OPTIONAL_MAP_FIELDS:
+		if manifest.has(field) and not manifest[field] is Dictionary:
+			issues.append({"field": field, "message": "expected an object keyed by locale"})
 	return issues

@@ -248,7 +248,8 @@ def main() -> int:
         # has to name this defect instead of disappearing behind a bare false.
         report["ok"] = False
         report["assetFailure"] = (
-            "a button sits outside the window once a picture is drawn"
+            "a button sits outside the window once a picture is drawn: "
+            f"{interaction.get('hitsOutside')}"
         )
     if report.get("ok") and (click_to_scene is None or click_to_scene > PERF_BUDGET_MS):
         report["ok"] = False

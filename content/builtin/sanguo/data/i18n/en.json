@@ -1,0 +1,30 @@
+{
+  "n1": {
+    "text": "In the sixth year of Zhongping, Dong Zhuo entered Luoyang and deposed the young emperor. You spent your fortune in Chenliu and raised three thousand men; your officers are waiting for you to speak.",
+    "choices": [
+      "Ride to Yuan Shao and borrow the road through Henei",
+      "Seize the granaries of Chenliu and feed the army first",
+      "March light and fast, straight for Suanzao"
+    ]
+  },
+  "n2": {
+    "text": "Spring of the first year of Chuping. The lords east of the pass meet at Suanzao and name Yuan Shao their leader. The camps are running out of grain and every commander is waiting for someone else to move.",
+    "choices": [
+      "Propose cutting Dong Zhuo's supply line",
+      "Ask to lead the vanguard across the river",
+      "Hold position and keep your strength"
+    ]
+  },
+  "n3": {
+    "text": "Below Hulao Pass, Lu Bu rides out with the horsemen of Bingzhou and calls for a challenger. No one in the allied camps answers; the tent is silent.",
+    "choices": [
+      "Lead your own men against Lu Bu",
+      "Set an ambush in the woods before the pass",
+      "Fall back to camp and wait for reinforcements"
+    ]
+  },
+  "n4": {
+    "text": "You held your ground before Hulao Pass. When the histories record this, they will not ask how many men you brought, only whether you stepped forward.",
+    "choices": []
+  }
+}

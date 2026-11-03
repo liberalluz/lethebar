@@ -15,6 +15,11 @@ const SPEC_MAX := "2.0.0"
 
 const SUPPORTED_ASSET_TYPES := ManifestSchema.ASSET_TYPES
 
+## Locales the engine can pick between right now. A package may only declare
+## these; anything else is refused rather than silently played in the wrong
+## language (V-22).
+const SUPPORTED_LOCALES := ["en", "zh-CN"]
+
 
 static func _issue(code: String, field: String, message: String, fatal: bool) -> Dictionary:
 	return {"code": code, "field": field, "message": message, "fatal": fatal}
@@ -99,4 +104,75 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 		elif not SUPPORTED_ASSET_TYPES.has(asset_type):
 			issues.append(_issue("V-08", "assets", "unknown asset type skipped: %s" % asset_type, false))
 
+	# V-22 — a declared locale is complete or the package is refused. Half a
+	# translation is worse than none: the player would meet a language switch in
+	# the middle of a scene.
+	var package_nodes: Array = context.get("nodes", [])
+	var tables: Dictionary = context.get("i18n", {})
+	if manifest.has("defaultLocale"):
+		var default_locale := String(manifest["defaultLocale"])
+		if not SUPPORTED_LOCALES.has(default_locale):
+			issues.append(_issue(
+				"V-22", "defaultLocale",
+				"unsupported locale %s; supported: %s" % [default_locale, ", ".join(SUPPORTED_LOCALES)],
+				true,
+			))
+	var locales: Array = manifest.get("locales", [])
+	for raw_locale in locales:
+		var locale := String(raw_locale)
+		if not SUPPORTED_LOCALES.has(locale):
+			issues.append(_issue(
+				"V-22", "locales",
+				"unsupported locale %s; supported: %s" % [locale, ", ".join(SUPPORTED_LOCALES)],
+				true,
+			))
+			continue
+		if manifest.has("defaultLocale") and locale == String(manifest["defaultLocale"]):
+			issues.append(_issue(
+				"V-22", "locales",
+				"%s is the default locale; its text lives in data/nodes.json" % locale,
+				true,
+			))
+			continue
+		var locale_path := "data/i18n/%s.json" % locale
+		if not package_files.has(locale_path):
+			issues.append(_issue(
+				"V-22", "locales",
+				"declared locale %s has no %s" % [locale, locale_path],
+				true,
+			))
+			continue
+		var gap := locale_gaps(locale, package_nodes, tables.get(locale, null))
+		if gap != "":
+			issues.append(_issue("V-22", "locales", gap, true))
+
 	return issues
+
+
+static func locale_gaps(locale: String, nodes: Array, table: Variant) -> String:
+	## Returns the first place a declared locale falls short, or "" when every
+	## node and every choice it offers has a label in that language.
+	if not table is Dictionary:
+		return "data/i18n/%s.json is not a JSON object" % locale
+	for node in nodes:
+		if not node is Dictionary:
+			continue
+		var node_id := String(node.get("id", ""))
+		var entry_variant: Variant = table.get(node_id, null)
+		if not entry_variant is Dictionary:
+			return "data/i18n/%s.json has no entry for node %s" % [locale, node_id]
+		var text := String(entry_variant.get("text", ""))
+		if text.strip_edges() == "":
+			return "data/i18n/%s.json leaves node %s without text" % [locale, node_id]
+		var choices: Array = node.get("choices", []) if node.get("choices", null) is Array else []
+		var labels: Variant = entry_variant.get("choices", null)
+		if not labels is Array:
+			return "data/i18n/%s.json gives node %s no choice labels" % [locale, node_id]
+		if labels.size() != choices.size():
+			return "data/i18n/%s.json gives node %s %d labels for %d choices" % [
+				locale, node_id, labels.size(), choices.size(),
+			]
+		for label in labels:
+			if not label is String or String(label).strip_edges() == "":
+				return "data/i18n/%s.json has an empty label in node %s" % [locale, node_id]
+	return ""

@@ -349,6 +349,18 @@ if (landingScreen === "landing") {
       // Every published hit box has to be wholly inside the viewport for the
       // scene to count as reachable.
       const hits = await evaluate("window.lethebarHits || []");
+      interaction.hitsOutside = hits
+        .filter((hit) => {
+          const halfW = (hit.fw ?? 0) / 2;
+          const halfH = (hit.fh ?? 0) / 2;
+          return (
+            hit.fx - halfW < -0.001 ||
+            hit.fx + halfW > 1.001 ||
+            hit.fy - halfH < -0.001 ||
+            hit.fy + halfH > 1.001
+          );
+        })
+        .map((hit) => hit.label);
       interaction.hitsInside =
         hits.length > 0 &&
         hits.every(

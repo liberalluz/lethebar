@@ -52,6 +52,7 @@ func _initialize() -> void:
 	_case_slot_layout()
 	_case_version()
 	_case_locale()
+	_case_i18n()
 	_case_assets()
 
 	print("")
@@ -830,7 +831,11 @@ func _case_ux_001() -> void:
 	# player reads them: five first-time players asked what game this was while
 	# the pack list showed `sanguo — turn_based@1, 0.1.0`.
 	shell.open_plugins()
-	_check("TC-UX-001: new game lists a story by name", shell.visible_text().contains("三国"), shell.visible_text())
+	# The title now follows the interface language: the pack carries `三国` and
+	# `Three Kingdoms` in its manifest, and the player reads whichever one matches
+	# the language the rest of the screen is in.
+	var sanguo_title := "三国" if Locale.current() == "zh-CN" else "Three Kingdoms"
+	_check("TC-UX-001: new game lists a story by name", shell.visible_text().contains(sanguo_title), shell.visible_text())
 	_check(
 		"TC-UX-001: the pack list hides the protocol name",
 		not shell.visible_text().contains("turn_based"),
@@ -879,9 +884,10 @@ func _case_ux_001() -> void:
 	)
 	var loads := shell.show_loads()
 	_check("TC-UX-001: continue opens the saves", shell.screen_name() == "loads")
+	var saved_title := "三国" if Locale.current() == "zh-CN" else "Three Kingdoms"
 	_check(
 		"TC-UX-001: a saved slot is named by its story",
-		shell.visible_text().contains("三国"),
+		shell.visible_text().contains(saved_title),
 		shell.visible_text(),
 	)
 	var resumed := shell.resume_slot("sanguo", 1)
@@ -1161,6 +1167,114 @@ func _case_locale() -> void:
 		"B8: no Chinese literal is left in the interface code",
 		offenders.is_empty(),
 		", ".join(offenders)
+	)
+
+
+func _case_i18n() -> void:
+	## B10. The package decides what it says; the engine decides which language it
+	## says it in. Every step of the fallback chain is asserted, because a silent
+	## fallback is what a player would meet as a language switch mid-scene.
+	_section("TC-BUILTIN-001 a package carries its text in two languages")
+	var nodes := {
+		"nodes": [
+			{"id": "n1", "text": "一个中文节点。", "choices": [{"label": "向左", "next": "n1"}]},
+		]
+	}
+	var english := JSON.stringify({
+		"n1": {"text": "An English node.", "choices": ["Go left"]},
+	}, "\t").to_utf8_buffer()
+	var bilingual := _package(
+		"i18n-ok",
+		{
+			"id": "bilingual",
+			"defaultLocale": "zh-CN",
+			"locales": ["en"],
+			"names": {"zh-CN": "双语", "en": "Bilingual"},
+		},
+		[],
+		[],
+		nodes,
+		{},
+		{"data/i18n/en.json": english}
+	)
+	var installed := PackageLoader.new().import_bytes(bilingual, _context())
+	_check(
+		"TC-PKG-001: a package that declares a locale installs",
+		installed["status"] == "installed",
+		String(installed.get("message", ""))
+	)
+	var entry: Dictionary = installed.get("entry", {})
+	var english_view := Session.create(entry, {"locale": "en"}).start()
+	_check(
+		"TC-BUILTIN-001: the scene reads in English",
+		String(english_view.get("text", "")) == "An English node.",
+		String(english_view.get("text", ""))
+	)
+	_check(
+		"TC-BUILTIN-001: the choices read in English",
+		String(english_view["choices"][0]["label"]) == "Go left",
+		String(english_view["choices"][0]["label"])
+	)
+	_check(
+		"TC-BUILTIN-001: the default locale reads as written",
+		String(Session.create(entry, {"locale": "zh-CN"}).start()["text"]) == "一个中文节点。",
+		String(Session.create(entry, {"locale": "zh-CN"}).start()["text"])
+	)
+	var unlisted: Dictionary = Session.create(entry, {"locale": "fr"}).start()
+	_check(
+		"TC-BUILTIN-001: an unlisted locale falls back to the package text",
+		String(unlisted.get("text", "")) == "一个中文节点。",
+		String(unlisted.get("text", ""))
+	)
+
+	_section("TC-PKG-001 a declared language that is only half there is refused")
+	var partial := JSON.stringify({
+		"n1": {"text": "An English node.", "choices": []},
+	}, "\t").to_utf8_buffer()
+	var half := PackageLoader.new().import_bytes(
+		_package(
+			"i18n-partial",
+			{"id": "half", "defaultLocale": "zh-CN", "locales": ["en"]},
+			[], [], nodes, {}, {"data/i18n/en.json": partial}
+		),
+		_context()
+	)
+	_check(
+		"V-22 partial cover",
+		half["status"] == "rejected" and half["code"] == "V-22",
+		"got %s/%s" % [half["status"], half.get("code", "-")]
+	)
+	var absent := PackageLoader.new().import_bytes(
+		_package(
+			"i18n-missing",
+			{"id": "absent", "defaultLocale": "zh-CN", "locales": ["en"]},
+			[], [], nodes
+		),
+		_context()
+	)
+	_check(
+		"V-22 declared but missing",
+		absent["status"] == "rejected" and absent["code"] == "V-22",
+		"got %s/%s" % [absent["status"], absent.get("code", "-")]
+	)
+	var unsupported := PackageLoader.new().import_bytes(
+		_package("i18n-fr", {"id": "french", "defaultLocale": "fr"}), _context()
+	)
+	_check(
+		"V-22 unsupported locale",
+		unsupported["status"] == "rejected" and unsupported["code"] == "V-22",
+		"got %s/%s" % [unsupported["status"], unsupported.get("code", "-")]
+	)
+	var solo: Dictionary = Session.create(
+		PackageLoader.new().import_bytes(
+			_package("i18n-none", {"id": "mono"}), _context()
+		).get("entry", {}),
+		{"locale": "en"}
+	).start()
+	_check(
+		"TC-PKG-001: a package with one language still plays in it",
+		String(solo.get("text", "")) == "A node.",
+		String(solo.get("text", ""))
 	)
 
 
