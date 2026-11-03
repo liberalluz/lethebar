@@ -222,7 +222,29 @@ runtime surprise:
 | V-19  | pools | duplicate item; `draw.n` larger than the pool without `replace` |
 | V-20  | relations | unknown entity id; `ally`/`hostile` used without a declared threshold |
 | V-21  | clock | a package that declares a clock but no growth rule that reads it |
+| V-22  | locales | a declared locale the engine does not support; a declared locale with no `data/i18n/<locale>.json`; a table that leaves a node, a choice label or the text empty |
 
+
+## Package locales
+
+A package may carry its text in more than one language. The text in
+`data/nodes.json` is written in `defaultLocale`; every other language is a
+table at `data/i18n/<locale>.json`, keyed by node id:
+
+```json
+{"n1": {"text": "…", "choices": ["…", "…"]}}
+```
+
+Three optional manifest fields declare this: `defaultLocale` (a string),
+`locales` (an array of the extra languages) and `names` (the pack title per
+locale, so the list on the landing screen reads in the same language as the
+rest of the screen).
+
+The engine picks the table matching the locale the browser asks for and falls
+back to `defaultLocale` when the package carries no table for it. `V-22`
+refuses a package whose declared table leaves any node text or any choice
+label empty: half a translation is worse than none, because the player would
+meet a language switch in the middle of a scene.
 ## Minimal example
 
 A package that uses all eight bricks but stays under 60 lines of data: three turns,

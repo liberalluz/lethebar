@@ -171,7 +171,7 @@ func start_plugin(plugin_id: String) -> Dictionary:
 		open_notice("E-01", "pack %s is not installed" % plugin_id)
 		return current_view()
 	entry = record
-	session = Session.create(entry, {"start_counter": 1})
+	session = Session.create(entry, {"start_counter": 1, "locale": Locale.current()})
 	if session == null:
 		open_notice("E-02", "pack %s has no usable protocol" % plugin_id)
 		return current_view()
@@ -296,7 +296,7 @@ func try_import(bytes: PackedByteArray) -> Dictionary:
 		builtin_ids.append(plugin_id)
 	packages.persist(record)
 	entry = record
-	session = Session.create(entry, {"start_counter": 1})
+	session = Session.create(entry, {"start_counter": 1, "locale": Locale.current()})
 	session.start()
 	return enter_session()
 
@@ -463,7 +463,22 @@ func _fit_text() -> void:
 	# 484 px that fixed height pushed the last button below the fold (the probe's
 	# screenshot caught it). A share keeps the picture and every button on screen.
 	var height := get_viewport_rect().size.y
-	_band.custom_minimum_size = Vector2(0.0, clampf(height * 0.30, 96.0, 260.0))
+	# The picture band takes a share of the window, capped by what the text and
+	# the buttons leave over. A plain share was enough while the text was Chinese;
+	# English wraps to more lines and pushed the last button below the fold (the
+	# probe named it: "Back to packs"). Sizing against the other rows keeps every
+	# button on screen in both languages.
+	var band_share := clampf(height * 0.30, 96.0, 260.0)
+	var others := 0.0
+	if _box != null:
+		for child in _box.get_children():
+			var row := child as Control
+			if row == null or row == _band or not row.visible:
+				continue
+			others += row.get_combined_minimum_size().y
+		others += float(_box.get_child_count() - 1) * _box.get_theme_constant("separation")
+	var room := height - others - 8.0
+	_band.custom_minimum_size = Vector2(0.0, clampf(minf(band_share, room), 0.0, 260.0))
 	for label in [_sub, _status]:
 		if label != null:
 			(label as Control).custom_minimum_size = Vector2(width, 0.0)
@@ -663,6 +678,11 @@ func _pack_title(plugin_id: String) -> String:
 	## manifest, the log and the error codes, where a developer looks for them.
 	var record: Dictionary = loader.registry.entry(plugin_id)
 	var manifest: Dictionary = record.get("manifest", {})
+	var names: Variant = manifest.get("names", null)
+	if names is Dictionary:
+		var localized := String(names.get(Locale.current(), ""))
+		if not localized.is_empty():
+			return localized
 	var title := String(manifest.get("name", ""))
 	return title if not title.is_empty() else plugin_id
 

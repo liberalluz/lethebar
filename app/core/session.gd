@@ -24,6 +24,8 @@ var visited: Array
 var warnings: Array
 var rng: int
 var finished: bool
+var locale: String
+var i18n: Dictionary
 
 
 static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
@@ -52,6 +54,8 @@ static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
 			session.nodes[String(node["id"])] = node
 	if data.get("mechanics", null) is Dictionary:
 		session.mechanics = data["mechanics"]
+	session.i18n = data.get("i18n", {}) if data.get("i18n", null) is Dictionary else {}
+	session.locale = String(options.get("locale", ""))
 	var counter := int(options.get("start_counter", DEFAULT_START_COUNTER))
 	session.rng = ((session.plugin_id.hash() ^ (counter * 2654435761)) & 0x7FFFFFFF) | 1
 	session.protocol = ProtocolRegistry.implementation(session.protocol_id)
@@ -120,12 +124,14 @@ func reject(code: String, message: String) -> void:
 
 func view() -> Dictionary:
 	var node: Dictionary = nodes.get(current, {})
+	var labels := choice_labels(node)
 	var offered: Array = []
-	for choice in choices_of(node):
-		offered.append({"label": String(choice.get("label", "")), "next": String(choice.get("next", ""))})
+	var choices := choices_of(node)
+	for i in choices.size():
+		offered.append({"label": String(labels[i]), "next": String(choices[i].get("next", ""))})
 	var out := {
 		"node": current,
-		"text": String(node.get("text", "")),
+		"text": node_text(node),
 		"assets": node.get("assets", []),
 		"choices": offered,
 		"state": state.duplicate(true),
@@ -157,6 +163,49 @@ func declares(mechanic_id: String) -> bool:
 	if manifest.get("mechanics", null) is Array:
 		return manifest["mechanics"].has(mechanic_id)
 	return false
+
+
+func locale_text() -> Dictionary:
+	## The table for the locale this session plays in, or an empty one when the
+	## package carries no translation for it. An empty table means "read the
+	## package's own text", which is the default locale.
+	if locale == "" or not i18n.has(locale):
+		return {}
+	var table: Variant = i18n[locale]
+	return table if table is Dictionary else {}
+
+
+func node_text(node: Dictionary) -> String:
+	var entry: Dictionary = _locale_entry(node)
+	var translated := String(entry.get("text", ""))
+	return translated if translated != "" else String(node.get("text", ""))
+
+
+func choice_labels(node: Dictionary) -> Array:
+	## One label per choice, in the same order. A label the translation leaves
+	## out falls back to the package's own text: V-22 refuses a partly covered
+	## locale before a session can start, so this is a safety net, not the rule.
+	var out: Array = []
+	var entry: Dictionary = _locale_entry(node)
+	var translated: Variant = entry.get("choices", null)
+	var index := 0
+	for choice in choices_of(node):
+		var label := ""
+		if translated is Array and index < translated.size():
+			label = String(translated[index])
+		if label == "":
+			label = String(choice.get("label", ""))
+		out.append(label)
+		index += 1
+	return out
+
+
+func _locale_entry(node: Dictionary) -> Dictionary:
+	var table := locale_text()
+	if table.is_empty():
+		return {}
+	var entry: Variant = table.get(String(node.get("id", "")), null)
+	return entry if entry is Dictionary else {}
 
 
 func _step_rng() -> void:
