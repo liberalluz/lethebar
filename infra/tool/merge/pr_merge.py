@@ -1,0 +1,371 @@
+"""Check, and build, the message a squash merge leaves on the default branch.
+
+`gh pr merge --squash` already does the merging. What nothing covers is the two
+ends around it:
+
+* The message. With more than one commit GitHub either takes the pull request
+  title (Chinese, by convention) or concatenates every commit body, so the
+  English subject and the `Why:` / `Batch:` lines get lost. Passing `--subject`
+  and `--body-file` fixes that, but the text has to be assembled by hand.
+* The result. `infra/checks/check_commit_body.py` reads `origin/main..HEAD` on a
+  branch, which means a squashed commit on the default branch is never read by
+  anything. A missing `Why:` therefore stays invisible.
+
+This tool covers both ends and nothing in between: it builds the message for a
+pull request, and it checks the commit a merge produced.
+
+    python infra/tool/merge/pr_merge.py --self-test
+    python infra/tool/merge/pr_merge.py --show --pr 35
+    python infra/tool/merge/pr_merge.py --verify-only
+
+Exit codes: 0 no problems, 1 problems found, 2 bad usage.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+from typing import Any
+
+TYPES = ("feat", "fix", "docs", "test", "refactor", "chore", "ci")
+
+SUBJECT = re.compile(r"^(feat|fix|docs|test|refactor|chore|ci)\([a-z0-9-]+\): \S")
+BATCH_VALUE = re.compile(r"^(B\d+[a-z]?|none)$")
+KEY_LINE = re.compile(r"^[A-Z][A-Za-z]*:")
+
+
+class MessageError(Exception):
+    """The message cannot be built, or the built one does not follow the rules."""
+
+
+def _lines(text: str) -> list[str]:
+    return [line.rstrip() for line in text.replace("\r\n", "\n").split("\n")]
+
+
+def split_message(text: str) -> tuple[str, str]:
+    """Split a full commit message into its subject line and everything below it."""
+    lines = _lines(text)
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    if not lines:
+        return "", ""
+    subject = lines[0].strip()
+    body = "\n".join(lines[1:]).strip("\n")
+    return subject, body
+
+
+def _field(body: str, name: str, multiline: bool = True) -> str | None:
+    """Return everything after `<name>:`, including the lines that follow it.
+
+    A reason is often longer than one line, and the existing commit-body gate
+    already reads it that way: the text runs until the next `Key:` line. Values
+    that are a single word, such as `Batch:`, stop at the end of their line so a
+    paragraph after them is not swallowed.
+    """
+    lines = _lines(body)
+    for index, line in enumerate(lines):
+        if not line.startswith(name + ":"):
+            continue
+        value = [line[len(name) + 1 :].strip()]
+        if multiline:
+            for follow in lines[index + 1 :]:
+                if KEY_LINE.match(follow):
+                    break
+                value.append(follow.strip())
+        return "\n".join(part for part in value if part).strip()
+    return None
+
+
+def message_problems(subject: str, body: str, pr_number: int | None = None) -> list[str]:
+    """Every rule this repository puts on a squashed commit, in one place."""
+    problems: list[str] = []
+    if not subject:
+        problems.append("the subject line is empty")
+    elif not SUBJECT.match(subject):
+        problems.append(
+            f"the subject must read 'type(scope): summary', got {subject!r}; "
+            f"types are {', '.join(TYPES)}"
+        )
+    if pr_number is not None and not subject.endswith(f"(#{pr_number})"):
+        problems.append(f"the subject must end with '(#{pr_number})'")
+
+    why = _field(body, "Why")
+    if why is None:
+        problems.append("the body has no 'Why:' line")
+    elif not why:
+        problems.append("the 'Why:' line is empty")
+
+    batch = _field(body, "Batch", multiline=False)
+    if batch is None:
+        problems.append("the body has no 'Batch:' line")
+    elif not batch:
+        problems.append("the 'Batch:' line is empty")
+    elif not BATCH_VALUE.match(batch):
+        problems.append(f"'Batch:' must read 'B<number>' or 'none', got {batch!r}")
+
+    return problems
+
+
+def build_message(
+    pr_number: int,
+    commits: list[dict[str, str]],
+    why: str | None = None,
+    batch: str | None = None,
+    note: str | None = None,
+    subject: str | None = None,
+) -> str:
+    """Assemble the message for a squash merge.
+
+    One commit keeps the logic the repository already used: the commit's own
+    subject, the pull request number appended, and the commit's own body, so a
+    single-commit pull request needs no arguments at all. More than one commit
+    carries no single reason, so `why` and `batch` are required there and the
+    body is built from them; the subject falls back to the first commit's own
+    subject, which the rule already keeps in English.
+    """
+    if not commits:
+        raise MessageError("the pull request has no commits")
+    if pr_number <= 0:
+        raise MessageError("--pr must be a positive number")
+
+    if len(commits) == 1:
+        subject_line, body = split_message(commits[0].get("message", ""))
+        if not subject_line:
+            raise MessageError("the commit has no subject line")
+        subject = f"{subject_line} (#{pr_number})"
+    else:
+        if not subject:
+            raise MessageError(
+                f"this pull request holds {len(commits)} commits, so --subject is required: "
+                "neither the first nor the last commit describes the whole change"
+            )
+        chosen = subject.strip()
+        if not chosen:
+            raise MessageError("--subject is empty")
+        subject = f"{chosen} (#{pr_number})"
+        if not why:
+            raise MessageError(
+                f"this pull request holds {len(commits)} commits, so --why is required: "
+                "there is no single reason to take from them"
+            )
+        if not batch:
+            raise MessageError(
+                f"this pull request holds {len(commits)} commits, so --batch is required "
+                "(B<number> for a batch card, none otherwise)"
+            )
+        body = f"Why: {why.strip()}\nBatch: {batch.strip()}"
+
+    if note:
+        body = f"{body}\n\n{note.strip()}" if body else note.strip()
+
+    problems = message_problems(subject, body, pr_number)
+    if problems:
+        raise MessageError("; ".join(problems))
+    return f"{subject}\n\n{body}\n"
+
+
+def _git(*args: str) -> str:
+    result = subprocess.run(
+        ["git", *args], capture_output=True, text=True, encoding="utf-8", errors="replace"
+    )
+    if result.returncode != 0:
+        raise MessageError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
+    return result.stdout
+
+
+def read_commit(ref: str) -> tuple[str, str]:
+    subject, body = split_message(_git("log", "-1", "--format=%B", ref))
+    return subject, body
+
+
+def commits_from_payload(items: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Turn what `gh pr view --json commits` returns into full commit messages.
+
+    gh splits a commit into `messageHeadline` and `messageBody`; this tool wants
+    the message whole, the same shape `git log --format=%B` produces.
+    """
+    commits: list[dict[str, str]] = []
+    for item in items:
+        headline = str(item.get("messageHeadline", "") or "").strip()
+        body = str(item.get("messageBody", "") or "").strip()
+        commits.append({"message": f"{headline}\n\n{body}" if body else headline})
+    return commits
+
+
+def _gh_commits(pr_number: int) -> list[dict[str, str]]:
+    result = subprocess.run(
+        ["gh", "pr", "view", str(pr_number), "--json", "commits"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if result.returncode != 0:
+        raise MessageError(f"gh pr view {pr_number} failed: {result.stderr.strip()}")
+    payload: dict[str, Any] = json.loads(result.stdout or "{}")
+    return commits_from_payload(payload.get("commits", []))
+
+
+def _self_test() -> int:
+    failures = 0
+
+    def check(name: str, got: Any, want: Any) -> None:
+        nonlocal failures
+        if got != want:
+            failures += 1
+            print(f"FAIL {name}: got {got!r}, want {want!r}")
+        else:
+            print(f"ok   {name}")
+
+    def error_of(call) -> str:
+        try:
+            call()
+        except MessageError as exc:
+            return str(exc)
+        return ""
+
+    one = [
+        {
+            "message": "feat(app): draw the picture\n\n"
+            "Why: assets were validated and then ignored.\nBatch: B9\n"
+        }
+    ]
+    built = build_message(35, one)
+    check("one commit keeps its subject", built.splitlines()[0], "feat(app): draw the picture (#35)")
+    check("one commit keeps its body", "Why: assets were validated" in built, True)
+    check("one commit keeps Batch", "Batch: B9" in built, True)
+
+    two = [{"message": "feat(app): a\n\nWhy: a\nBatch: B9"}, {"message": "chore(infra): b"}]
+    check("two commits need --subject", error_of(lambda: build_message(35, two)).startswith(
+        "this pull request holds 2 commits, so --subject is required"
+    ), True)
+    check("two commits need --why", "--why is required" in error_of(
+        lambda: build_message(35, two, subject="feat(app): both")
+    ), True)
+    check("two commits need --batch", "--batch is required" in error_of(
+        lambda: build_message(35, two, subject="feat(app): both", why="one reason")
+    ), True)
+
+    built_two = build_message(
+        35, two, subject="feat(app): both halves", why="one reason", batch="B9",
+        note="Also changed the tool.",
+    )
+    check("two commits build Why", "Why: one reason" in built_two, True)
+    check("two commits build Batch", "Batch: B9" in built_two, True)
+    check("two commits append the note", built_two.rstrip().endswith("Also changed the tool."), True)
+    check("two commits use the given subject", built_two.splitlines()[0], "feat(app): both halves (#35)")
+
+    chosen = build_message(35, two, why="r", batch="B9", subject="feat(merge): check the message")
+    check("an explicit subject wins", chosen.splitlines()[0], "feat(merge): check the message (#35)")
+
+    check("a split batch id is accepted",
+          message_problems("feat(app): x (#35)", "Why: y\nBatch: B5a", 35), [])
+    check("a longer Why is accepted",
+          message_problems("feat(app): x (#35)", "Why: first line\nsecond line\nBatch: none", 35), [])
+
+    check("bad type is reported", any(
+        "must read 'type(scope)" in problem
+        for problem in message_problems("Add stuff (#35)", "Why: x\nBatch: none", 35)
+    ), True)
+    check("missing Why is reported", message_problems("feat(app): x (#35)", "Batch: none", 35),
+          ["the body has no 'Why:' line"])
+    check("empty Why is reported", message_problems("feat(app): x (#35)", "Why:\nBatch: none", 35),
+          ["the 'Why:' line is empty"])
+    check("Batch must be B<n> or none", message_problems("feat(app): x (#35)", "Why: y\nBatch: 9", 35),
+          ["'Batch:' must read 'B<number>' or 'none', got '9'"])
+    check("a wrong pull request number is reported", any(
+        "(#34)" in problem
+        for problem in message_problems("feat(app): x (#35)", "Why: y\nBatch: none", 34)
+    ), True)
+    check("a good message has no problems",
+          message_problems("feat(app): x (#35)", "Why: y\nBatch: none", 35), [])
+
+    singular = build_message(7, [{"message": "fix(infra): read .enabled\n\nWhy: drift\nBatch: none"}])
+    check("a pull request number is appended once", singular.splitlines()[0], "fix(infra): read .enabled (#7)")
+
+    payload = commits_from_payload(
+        [
+            {"messageHeadline": "feat(app): a", "messageBody": "Why: a\nBatch: B9"},
+            {"messageHeadline": "chore(infra): b", "messageBody": ""},
+        ]
+    )
+    check("gh headlines become messages", payload[0]["message"], "feat(app): a\n\nWhy: a\nBatch: B9")
+    check("an empty gh body leaves the headline", payload[1]["message"], "chore(infra): b")
+    check("the adapter feeds build_message",
+          build_message(1, payload, subject="feat(app): both", why="r", batch="B9").splitlines()[0],
+          "feat(app): both (#1)")
+
+    print(f"\n{failures} failure(s)")
+    return 1 if failures else 0
+
+
+def _show(
+    pr_number: int,
+    why: str | None,
+    batch: str | None,
+    note: str | None,
+    subject: str | None,
+) -> int:
+    commits = _gh_commits(pr_number)
+    try:
+        message = build_message(
+            pr_number, commits, why=why, batch=batch, note=note, subject=subject
+        )
+    except MessageError as exc:
+        print(f"cannot build a message: {exc}", file=sys.stderr)
+        return 1
+    print(f"--- message for #{pr_number} ({len(commits)} commit(s)) ---")
+    print(message, end="")
+    return 0
+
+
+def _verify(ref: str) -> int:
+    subject, body = read_commit(ref)
+    problems = message_problems(subject, body)
+    print(f"commit: {subject}")
+    if not problems:
+        print("message: ok")
+        return 0
+    for problem in problems:
+        print(f"problem: {problem}")
+    print(f"body was:\n{body}")
+    return 1
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Build and check the message a squash merge leaves behind."
+    )
+    parser.add_argument("--self-test", action="store_true", help="run the message rules")
+    parser.add_argument("--show", action="store_true", help="print the message for a pull request")
+    parser.add_argument("--pr", type=int, help="pull request number, with --show")
+    parser.add_argument("--verify-only", action="store_true", help="check a merged commit")
+    parser.add_argument("--ref", default="origin/main", help="commit to check, default origin/main")
+    parser.add_argument("--why", help="one line saying what the pull request solves")
+    parser.add_argument("--batch", help="B<number> when a batch card drove it, none otherwise")
+    parser.add_argument("--note", help="an extra paragraph, usually 'Also changed'")
+    parser.add_argument("--subject", help="subject for a multi-commit pull request")
+    args = parser.parse_args(argv)
+
+    if args.self_test:
+        return _self_test()
+    if args.verify_only:
+        return _verify(args.ref)
+    if args.show:
+        if args.pr is None:
+            print("--show needs --pr", file=sys.stderr)
+            return 2
+        return _show(args.pr, args.why, args.batch, args.note, args.subject)
+
+    print(
+        "nothing to do: pass --self-test, --show --pr <n>, or --verify-only",
+        file=sys.stderr,
+    )
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
