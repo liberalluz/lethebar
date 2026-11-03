@@ -1046,6 +1046,14 @@ func _case_font_coverage() -> void:
 				ui_seen[code] = true
 				ui_missing += char(code)
 	_check("every character the shell shows has a glyph", ui_missing == "", "missing: %s" % ui_missing)
+	var samples := {"BMP": 0x4E00, "extension A": 0x3400, "extension A upper": 0x3FFF}
+	for label in samples:
+		var code: int = samples[label]
+		_check(
+			"the font has a glyph for U+%04X (%s)" % [code, label],
+			font.has_char(code),
+			"U+%04X is missing from the shipped font" % code
+		)
 
 
 func _case_slot_layout() -> void:
