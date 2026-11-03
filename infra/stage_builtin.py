@@ -21,13 +21,25 @@ TARGET = REPO / "app" / "builtin"
 CHARS = TARGET / "chars.txt"
 
 
+FIXED_TIME = (1980, 1, 1, 0, 0, 0)
+
+
 def pack(plugin_dir: Path) -> Path:
-    """Pack one source-form plugin directory into a package zip."""
+    """Pack one source-form plugin directory into a package zip.
+
+    The entries carry a fixed timestamp and mode, so packing the same sources
+    twice gives the same bytes. The exported build names its cache after the
+    bytes it holds; without this, every run would change the package file and
+    the player would download a payload that did not change.
+    """
     target = TARGET / f"{plugin_dir.name}.zip"
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as package:
         for path in sorted(plugin_dir.rglob("*")):
             if path.is_file():
-                package.write(path, path.relative_to(plugin_dir).as_posix())
+                entry = zipfile.ZipInfo(path.relative_to(plugin_dir).as_posix(), FIXED_TIME)
+                entry.compress_type = zipfile.ZIP_DEFLATED
+                entry.external_attr = 0o644 << 16
+                package.writestr(entry, path.read_bytes())
     return target
 
 
