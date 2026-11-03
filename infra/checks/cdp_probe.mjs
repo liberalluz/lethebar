@@ -121,7 +121,13 @@ await onSession("Network.enable");
 let requestsSeen = 0;
 socket.addEventListener("message", (event) => {
   const message = JSON.parse(event.data);
-  if (message.method === "Network.requestWillBeSent") requestsSeen += 1;
+  if (message.method === "Network.requestWillBeSent") {
+    const url = message.params?.request?.url || "";
+    // Reading the chosen .zip goes through FileReader and Chrome reports the
+    // read as a `blob:` request. It never leaves the page, so counting it would
+    // make TC-OFF-003 ("no request during a session") depend on timing.
+    if (!url.startsWith("blob:") && !url.startsWith("data:")) requestsSeen += 1;
+  }
 });
 
 let loaded = false;
@@ -318,6 +324,8 @@ const interaction = {
   asked: false,
   installed: null,
   offline: false,
+  pictures: [],
+  hitsInside: false,
 };
 
 if (landingScreen === "landing") {
@@ -331,6 +339,25 @@ if (landingScreen === "landing") {
     interaction.session = onPlugins && (await clickLabel(String(stories[0].title))) !== null;
     if (interaction.session && (await waitState((state) => state.screen === "session"))) {
       clickToSceneMs = Math.round((await evaluate("performance.now()")) - clickStarted);
+      // The desktop suite decodes a PNG in a headless renderer; the browser is a
+      // separate decoder. Reporting the filled slots here is what makes "the
+      // picture really reached the screen" a check instead of a screenshot.
+      interaction.pictures = await evaluate(
+        "(window.lethebarState && window.lethebarState.pictures) || []"
+      );
+      // A picture band that is too tall pushes the last button below the fold.
+      // Every published hit box has to be wholly inside the viewport for the
+      // scene to count as reachable.
+      const hits = await evaluate("window.lethebarHits || []");
+      interaction.hitsInside =
+        hits.length > 0 &&
+        hits.every(
+          (hit) =>
+            hit.fx - hit.fw / 2 >= -0.001 &&
+            hit.fx + hit.fw / 2 <= 1.001 &&
+            hit.fy - hit.fh / 2 >= -0.001 &&
+            hit.fy + hit.fh / 2 <= 1.001
+        );
       // PROBE_SHOT=path writes the first scene as a PNG. The probe cannot judge
       // whether glyphs drew, so the picture is the evidence a person reads.
       if (process.env.PROBE_SHOT) {
@@ -422,6 +449,8 @@ let offline = {
   packs: 0,
   packIds: [],
   importedRestored: null,
+  persisted: false,
+  persistTries: 0,
   sessions: false,
   slotsRestored: 0,
   continued: false,
@@ -437,6 +466,21 @@ if (interaction.saved) {
   // network; a player who reloads inside that window loses the import too, which
   // is recorded as a known limitation rather than papered over here.
   await sleep(2000);
+  // Prove the write landed before blaming the cache for losing it: reload while
+  // still online and wait until the imported pack is back. A fixed sleep was a
+  // guess — the pack came and went between runs because the sync is scheduled.
+  offline.persistTries = 0;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    offline.persistTries = attempt + 1;
+    await onSession("Page.navigate", { url });
+    const back = await waitState((state) => state.screen === "landing", 100);
+    trace(`persist try ${attempt + 1}: ${JSON.stringify(back && back.packs)}`);
+    if (back && interaction.installed && (back.packs || []).includes(interaction.installed)) {
+      offline.persisted = true;
+      break;
+    }
+    await sleep(500);
+  }
   await onSession("Network.emulateNetworkConditions", {
     offline: true,
     latency: 0,

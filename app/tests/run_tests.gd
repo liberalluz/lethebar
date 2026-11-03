@@ -52,6 +52,7 @@ func _initialize() -> void:
 	_case_slot_layout()
 	_case_version()
 	_case_locale()
+	_case_assets()
 
 	print("")
 	if _failures.is_empty():
@@ -622,9 +623,12 @@ func _package(
 	extra_files: Array = [],
 	nodes_override: Dictionary = {},
 	mechanics_override: Dictionary = {},
+	binary_files: Dictionary = {},
 ) -> PackedByteArray:
 	## Builds a fixture zip in res:// and returns its bytes. `extra_files` are
-	## paths that exist in the zip with dummy content.
+	## paths that exist in the zip with dummy content; `binary_files` maps a path
+	## to the exact bytes it should carry (a picture or a sound needs real bytes,
+	## a placeholder string would only test the failure path).
 	var manifest := _manifest_defaults()
 	for key in overrides:
 		manifest[key] = overrides[key]
@@ -653,6 +657,8 @@ func _package(
 	_write_entry(packer, "data/mechanics.json", JSON.stringify(mechanics, "\t").to_utf8_buffer())
 	for extra in extra_files:
 		_write_entry(packer, extra, "placeholder".to_utf8_buffer())
+	for extra_path in binary_files:
+		_write_entry(packer, String(extra_path), binary_files[extra_path])
 	packer.close()
 
 	return FileAccess.get_file_as_bytes(path)
@@ -1184,4 +1190,136 @@ func _shipped_font() -> Font:
 	if path.is_empty() or not ResourceLoader.exists(path):
 		return null
 	return load(path) as Font
+
+
+func _case_assets() -> void:
+	# B9. The spec already said how a picture is read and what happens when it is
+	# missing (SDD §8.1 read from memory, §8.2 degrade to a placeholder); nothing
+	# drew one, so "shows the text" was the whole promise. These checks are on the
+	# scene tree: a texture with a real size, a placeholder when the bytes are
+	# absent, and no picture band at all for a pack that ships none.
+	_section("TC-ASSET-001 a declared picture reaches a slot")
+	var png := _png_bytes(64, 32)
+	var wav := _wav_bytes()
+	var declared := [
+		{"type": "texture", "path": "assets/scene.png", "slot": "scene"},
+		{"type": "texture", "path": "assets/face.png", "slot": "portrait"},
+		{"type": "audio", "path": "assets/theme.wav", "slot": "audio"},
+	]
+	var nodes := {
+		"nodes": [
+			{"id": "n1", "text": "A painted node.", "assets": declared, "choices": []},
+		]
+	}
+	var bytes := _package(
+		"assets-ok",
+		{"id": "painted", "assets": declared},
+		[],
+		[],
+		nodes,
+		{},
+		{
+			"assets/scene.png": png,
+			"assets/face.png": png,
+			"assets/theme.wav": wav,
+		}
+	)
+	var shell := _shell()
+	shell.try_import(bytes)
+	_check(
+		"TC-ASSET-001: the package installs and opens its first scene",
+		shell.screen_name() == "session",
+		shell.screen_name()
+	)
+	_check("TC-ASSET-001: the picture band is shown", shell._band.visible)
+	_check("TC-ASSET-001: the scene slot holds a texture", shell._picture.texture != null)
+	_check(
+		"TC-ASSET-001: the texture has the size of the file",
+		shell._picture.texture != null and shell._picture.texture.get_width() == 64,
+		"%d px" % shell._picture.texture.get_width() if shell._picture.texture != null else "none"
+	)
+	_check("TC-ASSET-001: the portrait slot holds a texture", shell._portrait.texture != null)
+	_check(
+		"TC-ASSET-001: both slots are reported",
+		shell._picture_slots.has("scene") and shell._picture_slots.has("portrait"),
+		str(shell._picture_slots)
+	)
+	_check("TC-ASSET-001: the sound is loaded", shell._audio.stream != null)
+	_check(
+		"TC-ASSET-001: the sounds are not reported as pictures",
+		not shell._picture_slots.has("audio"),
+		str(shell._picture_slots)
+	)
+
+	# A pack that ships no picture keeps the old layout: the band takes no space,
+	# so adding assets to the format did not change text-only books.
+	var plain := _package("assets-none", {"id": "plain"}, [], [], {"nodes": [{"id": "n1", "text": "Plain.", "choices": []}]}, {}, {})
+	var quiet := _shell()
+	quiet.try_import(plain)
+	quiet.start_plugin("plain")
+	_check("TC-ASSET-001: a pack without pictures hides the band", not quiet._band.visible)
+	_check("TC-ASSET-001: a pack without pictures reports no slot", quiet._picture_slots.is_empty(), str(quiet._picture_slots))
+
+	# The degraded path: declared, missing from the zip. Import already warns
+	# (V-08); the scene still has to open and show a placeholder rather than
+	# dying, and the warning has to reach the session record.
+	var missing := _package(
+		"assets-missing",
+		{"id": "missing", "assets": [{"type": "texture", "path": "assets/absent.png", "slot": "scene"}]},
+		[],
+		[],
+		{"nodes": [{"id": "n1", "text": "Missing.", "assets": [{"type": "texture", "path": "assets/absent.png", "slot": "scene"}], "choices": []}]},
+		{},
+		{}
+	)
+	var broken := _shell()
+	broken.try_import(missing)
+	broken.start_plugin("missing")
+	_check("TC-ASSET-001: a missing picture still opens the scene", broken.screen_name() == "session", broken.screen_name())
+	_check(
+		"TC-ASSET-001: a missing picture becomes a placeholder",
+		broken._picture.texture is PlaceholderTexture2D,
+		str(broken._picture.texture)
+	)
+	var warnings: Array = broken.session.warnings if broken.session != null else []
+	var placeholder_warning := false
+	for warning in warnings:
+		if String(warning.get("code", "")) == "R-01":
+			placeholder_warning = true
+	_check("TC-ASSET-001: the placeholder is reported once", placeholder_warning, str(warnings))
+
+
+func _png_bytes(width: int, height: int) -> PackedByteArray:
+	## A real PNG, not a placeholder string: the point is to exercise the decoder.
+	var image := Image.create(width, height, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0.2, 0.4, 0.8))
+	return image.save_png_to_buffer()
+
+
+func _wav_bytes() -> PackedByteArray:
+	## A tenth of a second of 440 Hz, written by hand: the engine's decoder has to
+	## accept real WAV bytes, and generating them here keeps the fixture readable.
+	var rate := 22050
+	var samples := 2205
+	var data := PackedByteArray()
+	data.resize(samples * 2)
+	for index in samples:
+		var value := int(sin(TAU * 440.0 * float(index) / float(rate)) * 8000.0)
+		data.encode_s16(index * 2, value)
+	var header := PackedByteArray()
+	header.resize(44)
+	header.encode_u32(0, 0x46464952)  # RIFF
+	header.encode_u32(4, 36 + data.size())
+	header.encode_u32(8, 0x45564157)  # WAVE
+	header.encode_u32(12, 0x20746D66)  # "fmt "
+	header.encode_u32(16, 16)
+	header.encode_u16(20, 1)  # PCM
+	header.encode_u16(22, 1)  # mono
+	header.encode_u32(24, rate)
+	header.encode_u32(28, rate * 2)
+	header.encode_u16(32, 2)
+	header.encode_u16(34, 16)
+	header.encode_u32(36, 0x61746164)  # data
+	header.encode_u32(40, data.size())
+	return header + data
 

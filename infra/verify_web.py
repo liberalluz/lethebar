@@ -233,6 +233,23 @@ def main() -> int:
     if report.get("ok") and not interaction.get("saved"):
         report["ok"] = False
         report["interactionFailure"] = "the save screen did not answer a click on Save"
+    # TC-ASSET-001: the browser decodes the picture itself. The desktop suite can
+    # only say that a texture exists; this says the first scene filled a slot.
+    if report.get("ok") and "scene" not in (interaction.get("pictures") or []):
+        report["ok"] = False
+        report["assetFailure"] = (
+            f"the first scene filled no picture slot: {interaction.get('pictures')}"
+        )
+    # TC-UX-001: a picture band tall enough to push the last button past the
+    # bottom edge makes the scene unusable even though every assertion above
+    # still passes. The probe reports whether every button box is in view.
+    if not interaction.get("hitsInside"):
+        # Not guarded on `ok`: when the probe already failed, the reason still
+        # has to name this defect instead of disappearing behind a bare false.
+        report["ok"] = False
+        report["assetFailure"] = (
+            "a button sits outside the window once a picture is drawn"
+        )
     if report.get("ok") and (click_to_scene is None or click_to_scene > PERF_BUDGET_MS):
         report["ok"] = False
         report["perfFailure"] = f"pack choice reached a scene in {click_to_scene} ms, budget {PERF_BUDGET_MS} ms"
