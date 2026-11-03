@@ -22,6 +22,7 @@ exist in the output directory.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import re
 import shutil
@@ -139,6 +140,11 @@ def precache_payload(output: Path) -> None:
     missing = [name for name in PAYLOAD_FILES if name not in names]
     if missing:
         raise SystemExit(f"the worker does not know about {', '.join(missing)}")
+    # The payload gets its own content-addressed caches (see
+    # `layer_payload_caches`), so it must not also sit in the timestamped shell
+    # cache: that cache is dropped on every publish, which is the waste this
+    # batch removes.
+    names = [name for name in names if name not in PAYLOAD_FILES]
     replacement = "const CACHED_FILES = [" + ", ".join(f'"{n}"' for n in names) + "];"
     # Replace the later span first: the earlier text is longer than what it was,
     # so applying the first edit first would shift the second span's offsets and
@@ -203,6 +209,140 @@ def patch_navigation_fallback(output: Path) -> None:
         1,
     )
     worker.write_text(text, encoding="utf-8")
+
+
+PAYLOAD_PREFIX = "Lethebar-payload-"
+
+INSTALL_ANCHOR = (
+    "event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(CACHED_FILES)));"
+)
+ACTIVATE_ANCHOR = (
+    "return Promise.all(keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)"
+    ".map((key) => caches.delete(key)));"
+)
+MISSING_ANCHOR = "const missing = fullCache.some((v) => v === undefined);"
+CACHE_OPEN_ANCHOR = "const cache = await caches.open(CACHE_NAME);"
+
+
+def payload_digest(path: Path) -> str:
+    """First twelve hex digits of the file's sha256, which names its cache."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()[:12]
+
+
+def payload_cache_names(output: Path) -> dict[str, str]:
+    """Cache name per payload file, derived from the bytes rather than the clock."""
+    names: dict[str, str] = {}
+    for name in PAYLOAD_FILES:
+        path = output / name
+        if not path.is_file():
+            raise SystemExit(f"{name} is missing; the export did not produce it")
+        stem = "wasm" if name.endswith(".wasm") else "pck"
+        names[name] = f"{PAYLOAD_PREFIX}{stem}-{payload_digest(path)}"
+    return names
+
+
+def layer_payload_caches(output: Path) -> dict[str, str]:
+    """Give each large file its own cache, named after its bytes.
+
+    The engine's worker keeps everything in one cache whose name comes from the
+    export timestamp, so publishing a build invalidates the whole cache and the
+    39.5 MB `index.wasm` is downloaded again even when it did not change. Splitting
+    the payload into content-addressed caches means a story-only build keeps the
+    wasm cache, and a build that changes the engine replaces it.
+
+    `activate` deletes payload caches that no longer appear in `PAYLOAD`, so the
+    split does not accumulate one cache per publish.
+    """
+    worker = output / SERVICE_WORKER
+    if not worker.is_file():
+        raise SystemExit(f"{SERVICE_WORKER} is missing; the export did not produce it")
+    names = payload_cache_names(output)
+    text = worker.read_text(encoding="utf-8")
+
+    for anchor in (INSTALL_ANCHOR, ACTIVATE_ANCHOR, MISSING_ANCHOR, CACHE_OPEN_ANCHOR):
+        if text.count(anchor) != 1:
+            raise SystemExit(f"{SERVICE_WORKER} no longer has {anchor[:40]}...")
+
+    declarations = ",\n".join(
+        f'\t"{name}": "{cache}"' for name, cache in names.items()
+    )
+    declaration_block = (
+        f"\n\n// Each payload file sits in its own cache, named after its bytes.\n"
+        f'const PAYLOAD_PREFIX = "{PAYLOAD_PREFIX}";\n'
+        f"const PAYLOAD = {{\n{declarations}\n}};"
+    )
+    marker = "const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;"
+    text = text.replace(marker, marker + declaration_block, 1)
+
+    # The payload is not prefetched at install time on purpose. Installing a new
+    # worker while the page is running already competes with the engine's
+    # background write of `user://` to IndexedDB; add a 39.5 MB download to that
+    # and a player's import can be lost before it lands. The game itself requests
+    # both files on the first load, and the fetch branch below stores them, so
+    # the payload caches fill from the player's own traffic.
+    install = (
+        "event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(CACHED_FILES)));"
+    )
+    text = text.replace(INSTALL_ANCHOR, install, 1)
+
+    activate = (
+        "const keep = Object.values(PAYLOAD);\n"
+        "\t\t\treturn Promise.all(keys\n"
+        "\t\t\t\t.filter((key) =>\n"
+        "\t\t\t\t\t(key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME) ||\n"
+        "\t\t\t\t\t(key.startsWith(PAYLOAD_PREFIX) && !keep.includes(key)))\n"
+        "\t\t\t\t.map((key) => caches.delete(key)));"
+    )
+    text = text.replace(ACTIVATE_ANCHOR, activate, 1)
+
+    missing = (
+        "const missing = fullCache.some((v) => v === undefined);\n"
+        "\t\t\t\t// The payload is not in this cache; a navigation is only safe when\n"
+        "\t\t\t\t// every payload file is already stored in its own cache.\n"
+        "\t\t\t\tconst payloadMissing = (\n"
+        "\t\t\t\t\tawait Promise.all(\n"
+        "\t\t\t\t\t\tObject.keys(PAYLOAD).map(async (name) =>\n"
+        "\t\t\t\t\t\t\t(await (await caches.open(PAYLOAD[name])).match(name)) === undefined)\n"
+        "\t\t\t\t\t)\n"
+        "\t\t\t\t).some(Boolean);"
+    )
+    text = text.replace(MISSING_ANCHOR, missing, 1)
+    text = text.replace(
+        "if (missing) {",
+        "if (missing || payloadMissing) {",
+        1,
+    )
+
+    lookup = (
+        CACHE_OPEN_ANCHOR
+        + "\n\t\t\t\tconst payloadCache = PAYLOAD[local];\n"
+        "\t\t\t\tif (payloadCache !== undefined) {\n"
+        "\t\t\t\t\tconst store = await caches.open(payloadCache);\n"
+        "\t\t\t\t\tconst hit = await store.match(event.request);\n"
+        "\t\t\t\t\tif (hit != null) {\n"
+        "\t\t\t\t\t\treturn hit;\n"
+        "\t\t\t\t\t}\n"
+        "\t\t\t\t\tconst fetched = await fetch(event.request);\n"
+        "\t\t\t\t\tif (fetched.ok) {\n"
+        "\t\t\t\t\t\tstore.put(event.request, fetched.clone());\n"
+        "\t\t\t\t\t}\n"
+        "\t\t\t\t\treturn fetched;\n"
+        "\t\t\t\t}"
+    )
+    text = text.replace(CACHE_OPEN_ANCHOR, lookup, 1)
+
+    text = text.replace(
+        "const isCacheable = FULL_CACHE.some((v) => v === local) || (base === referrer && base.endsWith(CACHED_FILES[0]));",
+        "const isCacheable = FULL_CACHE.some((v) => v === local) || PAYLOAD[local] !== undefined"
+        " || (base === referrer && base.endsWith(CACHED_FILES[0]));",
+        1,
+    )
+    worker.write_text(text, encoding="utf-8")
+    return names
 
 
 IMPORT_BRIDGE = """
@@ -289,8 +429,11 @@ def main() -> int:
     finally:
         PRESET_STAGED.unlink(missing_ok=True)
     precache_payload(args.output)
+    payload = layer_payload_caches(args.output)
     patch_navigation_fallback(args.output)
     inject_import_bridge(args.output)
+    for name, cache in payload.items():
+        print(f"  {name:32} cached as {cache}")
     return report(args.output)
 
 
