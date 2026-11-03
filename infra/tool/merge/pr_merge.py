@@ -33,6 +33,7 @@ from typing import Any
 TYPES = ("feat", "fix", "docs", "test", "refactor", "chore", "ci")
 
 SUBJECT = re.compile(r"^(feat|fix|docs|test|refactor|chore|ci)\([a-z0-9-]+\): \S")
+NUMBERED = re.compile(r"\(#\d+\)$")
 BATCH_VALUE = re.compile(r"^(B\d+[a-z]?|none)$")
 KEY_LINE = re.compile(r"^[A-Z][A-Za-z]*:")
 
@@ -79,8 +80,15 @@ def _field(body: str, name: str, multiline: bool = True) -> str | None:
     return None
 
 
-def message_problems(subject: str, body: str, pr_number: int | None = None) -> list[str]:
-    """Every rule this repository puts on a squashed commit, in one place."""
+def message_problems(
+    subject: str, body: str, pr_number: int | None = None, merged: bool = False
+) -> list[str]:
+    """Every rule this repository puts on a squashed commit, in one place.
+
+    `merged` says the commit already sits on the default branch. Those commits
+    always carry the pull request they came from, so the number is required even
+    when the caller does not know which pull request it was.
+    """
     problems: list[str] = []
     if not subject:
         problems.append("the subject line is empty")
@@ -89,8 +97,14 @@ def message_problems(subject: str, body: str, pr_number: int | None = None) -> l
             f"the subject must read 'type(scope): summary', got {subject!r}; "
             f"types are {', '.join(TYPES)}"
         )
-    if pr_number is not None and not subject.endswith(f"(#{pr_number})"):
-        problems.append(f"the subject must end with '(#{pr_number})'")
+    if pr_number is not None:
+        if not subject.endswith(f"(#{pr_number})"):
+            problems.append(f"the subject must end with '(#{pr_number})'")
+    elif merged and not NUMBERED.search(subject):
+        problems.append(
+            "the subject must end with '(#<number>)'; a commit on the default branch "
+            f"always carries its pull request, got {subject!r}"
+        )
 
     why = _field(body, "Why")
     if why is None:
@@ -107,6 +121,18 @@ def message_problems(subject: str, body: str, pr_number: int | None = None) -> l
         problems.append(f"'Batch:' must read 'B<number>' or 'none', got {batch!r}")
 
     return problems
+
+
+def _numbered(subject: str, pr_number: int) -> str:
+    """Append `(#n)` unless the caller already wrote it.
+
+    The number belongs to the rule, not to the sentence, so a subject that was
+    pasted in finished must not come out with the number twice.
+    """
+    suffix = f"(#{pr_number})"
+    if subject.endswith(suffix):
+        return subject
+    return f"{subject} {suffix}"
 
 
 def build_message(
@@ -135,7 +161,7 @@ def build_message(
         subject_line, body = split_message(commits[0].get("message", ""))
         if not subject_line:
             raise MessageError("the commit has no subject line")
-        subject = f"{subject_line} (#{pr_number})"
+        subject = _numbered(subject_line, pr_number)
     else:
         if not subject:
             raise MessageError(
@@ -145,7 +171,7 @@ def build_message(
         chosen = subject.strip()
         if not chosen:
             raise MessageError("--subject is empty")
-        subject = f"{chosen} (#{pr_number})"
+        subject = _numbered(chosen, pr_number)
         if not why:
             raise MessageError(
                 f"this pull request holds {len(commits)} commits, so --why is required: "
@@ -282,9 +308,35 @@ def _self_test() -> int:
     ), True)
     check("a good message has no problems",
           message_problems("feat(app): x (#35)", "Why: y\nBatch: none", 35), [])
+    check("a merged commit without a number is reported", any(
+        "(#<number>)" in problem
+        for problem in message_problems(
+            "feat(app): x", "Why: y\nBatch: none", merged=True
+        )
+    ), True)
+    check("a merged commit with a number is fine",
+          message_problems("feat(app): x (#35)", "Why: y\nBatch: none", merged=True), [])
+    check("a branch commit needs no number",
+          message_problems("feat(app): x", "Why: y\nBatch: none"), [])
 
     singular = build_message(7, [{"message": "fix(infra): read .enabled\n\nWhy: drift\nBatch: none"}])
     check("a pull request number is appended once", singular.splitlines()[0], "fix(infra): read .enabled (#7)")
+    already = build_message(
+        37,
+        [{"messageHeadline": "feat(app): a", "messageBody": ""},
+         {"messageHeadline": "chore(infra): b", "messageBody": ""}],
+        subject="fix(infra): catch a merged subject without its number (#37)",
+        why="r",
+        batch="none",
+    )
+    check("a subject that already carries the number keeps one",
+          already.splitlines()[0], "fix(infra): catch a merged subject without its number (#37)")
+    check("another pull request's number is not mistaken for this one",
+          build_message(37, [{"messageHeadline": "feat(app): a", "messageBody": ""},
+                             {"messageHeadline": "chore(infra): b", "messageBody": ""}],
+                        subject="fix(infra): x (#36)", why="r",
+                        batch="none").splitlines()[0],
+          "fix(infra): x (#36) (#37)")
 
     payload = commits_from_payload(
         [
@@ -322,9 +374,23 @@ def _show(
     return 0
 
 
+def _on_default_branch(ref: str) -> bool:
+    """Say whether the commit is already an ancestor of the default branch."""
+    for base in ("origin/main", "main"):
+        done = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", ref, base],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        if done.returncode == 0:
+            return True
+    return False
+
+
 def _verify(ref: str) -> int:
     subject, body = read_commit(ref)
-    problems = message_problems(subject, body)
+    problems = message_problems(subject, body, merged=_on_default_branch(ref))
     print(f"commit: {subject}")
     if not problems:
         print("message: ok")
