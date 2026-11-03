@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.0.1 - 2026-11-03
+
+### Added
+- A package may declare `defaultLocale`, `locales` and `names`, and carry one table of text per language under `data/i18n/<locale>.json`. The Sanguo pack now ships English text for every node and choice.
+- `V-22` refuses a package whose declared locale is unsupported, has no table, or leaves a node text or a choice label empty.
+- `app/i18n/en.tsv` and `app/i18n/zh_CN.tsv`, the two interface catalogues.
+- a language switch on the landing screen; the choice is stored and survives a reload.
+- A pack can declare pictures and sound, and a scene now draws them: one wide slot for a scene (or its background fallback) and one narrow slot for a portrait. The bytes are read out of the package once, at import, and decoded only when a scene asks for them.
+- `sanguo` ships a painted scene and a short theme, so the first story is no longer text only.
+- `infra/tool/merge/pr_merge.py`: builds the message for a squash merge and checks the commit one leaves behind. One commit keeps its own subject and body, so a single-commit pull request needs no arguments; more than one needs `--why` and `--batch`, because there is no single reason to take from them.
+- `python infra/tool/merge/pr_merge.py --verify-only` reads the top commit of the default branch. Nothing read that commit before: the commit-body gate only looks at `origin/main..HEAD` on a branch, so a missing `Why:` on `main` stayed invisible.
+
+### Changed
+- A new session plays in the language the interface is in, and falls back to the package's own text when the package carries no table for it.
+- The pack list shows the pack's title in the current language when the manifest supplies one.
+- The picture band now takes what the text and buttons leave over instead of a fixed share of the window, so a longer English scene keeps every button on screen.
+- A published build no longer re-downloads the 39.5 MB engine payload when it did not change: `index.wasm` and `index.pck` now sit in their own caches, named after a digest of their bytes, while the page and its scripts keep the timestamped cache.
+- Staging the built-in packages writes fixed timestamps into the zip entries, so packing the same sources twice produces the same bytes and a story build can keep its package cache.
+- every interface sentence now comes from `Locale.text()`, so `app/render` holds no user-visible text of its own.
+- The picture band collapses to zero height when a pack declares no asset, so text-only books keep exactly the layout they had before pictures existed.
+- The browser check now fails when a picture band pushes a button out of the window, and it proves an imported pack was written to storage before it blames the cache for losing it.
+- `CONTRIBUTING.md` and `CONTRIBUTING.zh-CN.md`: the merge step says to run that check after merging, and says what a multi-commit pull request has to pass to `gh pr merge`.
+
+### Fixed
+- The worker declared `PAYLOAD` without `PAYLOAD_PREFIX`, so the first update that had old payload caches to clear would have thrown inside `activate` and left the player on the previous worker.
+- Installing a new worker no longer prefetches the payload: that download competed with the engine's background write of the player's own `user://` data, which is how an imported pack could disappear before it reached IndexedDB.
+- `pr_merge.py --verify-only` now reports a commit that sits on the default branch without its `(#<number>)` suffix. It used to pass any commit whose pull request was not named, which is how a merged subject lost `(#36)` for a few minutes.
+- `pr_merge.py --show` appends the number only once. A subject that already ended in `(#<number>)` came out as `(#36) (#36)`.
+
 ## v0.0.0 - 2026-11-02
 
 ### Added
