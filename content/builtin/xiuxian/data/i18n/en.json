@@ -1,0 +1,34 @@
+{
+	"x1": {
+		"text": "You have split firewood for three years in the servant quarters of the Qingyun Mountains. Today the steward handed you a thin jade slip: your spirit root tested high grade, and at dawn tomorrow you are to wait for assignment in the front hall of the Sword-Testing Peak.",
+		"choices": [
+			"Put the slip away and copy out the Qi-Guiding Manual overnight",
+			"Sell three years of cut firewood behind the mountain first, for travelling money"
+		]
+	},
+	"x2": {
+		"text": "In the front hall of the Sword-Testing Peak, thirty-six new disciples kneel across the floor. The steward orders you by jade slip, and you are last. Beyond the hall the sea of clouds churns; someone whispers that only twelve will be kept this year.",
+		"choices": [
+			"Kneel in your place and do not look up",
+			"Step forward and ask the steward to test your spirit root first"
+		]
+	},
+	"x3": {
+		"text": "The trial is in the cold pool. A third-rank beast is pinned at the bottom, and the water rises an inch every quarter hour. All you hold is a wooden sword that has never been sharpened.",
+		"choices": [
+			"Draw qi through the wooden sword and take the beast's left claw first",
+			"Circle to the pool mouth and lead the water into the side channel"
+		]
+	},
+	"x4": {
+		"text": "The beast has withdrawn, but the steward does not let you go. He asks what a disciple should learn first. Someone is listening behind the hall; you can hear them breathe.",
+		"choices": [
+			"Answer: how to stay alive",
+			"Answer: how not to do harm"
+		]
+	},
+	"x5": {
+		"text": "The one behind the hall steps out: an elder in a worn robe. He says that in three hundred years this is the first time someone answered wrongly in the trial and was kept anyway. He tells you to go back to splitting wood, only this time you will split sword blanks.",
+		"choices": []
+	}
+}

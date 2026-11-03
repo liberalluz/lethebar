@@ -53,6 +53,7 @@ func _initialize() -> void:
 	_case_version()
 	_case_locale()
 	_case_i18n()
+	_case_i18n_shipped()
 	_case_assets()
 
 	print("")
@@ -1276,6 +1277,65 @@ func _case_i18n() -> void:
 		String(solo.get("text", "")) == "A node.",
 		String(solo.get("text", ""))
 	)
+
+
+func _case_i18n_shipped() -> void:
+	## B13. The mechanism was proved with fixtures; this proves the pack a player
+	## actually meets also speaks English. A translation that misses one node or
+	## one label is refused by V-22 at install time, so "it installs" is the first
+	## assertion, not a formality.
+	_section("TC-I18N-001 the shipped Xiuxian pack speaks English")
+	var package := FileAccess.get_file_as_bytes(BUILTIN_XIUXIAN)
+	if package.is_empty():
+		_failures.append("staged package missing at %s; run infra/stage_builtin.py" % BUILTIN_XIUXIAN)
+		return
+	var loader := PackageLoader.new()
+	var result := loader.import_bytes(package, _context())
+	_check(
+		"TC-I18N-001: the shipped pack passes the locale rule",
+		result["status"] == "installed",
+		"%s %s" % [String(result.get("code", "-")), String(result.get("message", ""))],
+	)
+	if result["status"] != "installed":
+		return
+	var entry: Dictionary = loader.registry.entry("xiuxian")
+	var english := Session.create(entry, {"locale": "en"}).start()
+	var english_text := String(english.get("text", ""))
+	_check(
+		"TC-I18N-001: the entry scene reads in English",
+		not english_text.is_empty() and _chinese_chars(english_text).is_empty(),
+		english_text,
+	)
+	var labels: Array = []
+	for choice in english.get("choices", []):
+		labels.append(String(choice.get("label", "")))
+	var chinese_labels := []
+	for label in labels:
+		if not _chinese_chars(String(label)).is_empty():
+			chinese_labels.append(label)
+	_check(
+		"TC-I18N-001: every entry choice reads in English",
+		not labels.is_empty() and chinese_labels.is_empty(),
+		"labels %s, still Chinese %s" % [str(labels), str(chinese_labels)],
+	)
+	var chinese := Session.create(entry, {"locale": "zh-CN"}).start()
+	_check(
+		"TC-I18N-001: a Chinese reader still meets the shipped text",
+		not _chinese_chars(String(chinese.get("text", ""))).is_empty(),
+		String(chinese.get("text", "")),
+	)
+
+
+func _chinese_chars(text: String) -> Array:
+	## The shipped-text check needs "does this string contain an ideograph", not
+	## "does this file contain one"; the file scanner below answers the other
+	## question and returns offsets.
+	var found := []
+	for index in text.length():
+		var code := text.unicode_at(index)
+		if code >= 0x4E00 and code <= 0x9FFF:
+			found.append(text.substr(index, 1))
+	return found
 
 
 func _chinese_in(dir_path: String) -> Array:
