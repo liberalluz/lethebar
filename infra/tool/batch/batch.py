@@ -105,6 +105,12 @@ def git_required(root: Path) -> None:
         raise SystemExit(f"not a git repository: {root} ({err})")
 
 
+def resolve_commit(root: Path, ref: str) -> str:
+    """Resolve a branch or tag to the commit it points at, or return ""."""
+    code, out, _ = run_git(root, ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"])
+    return out if code == 0 else ""
+
+
 def config_path(root: Path) -> Path:
     return root / CONFIG_REL
 
@@ -793,7 +799,11 @@ def cmd_start(args: argparse.Namespace) -> int:
             return 1
 
     config = load_config(root)
-    base = args.base or str(card.get("base") or config.get("base", "main"))
+    base_ref = args.base or str(card.get("base") or config.get("base", "main"))
+    base = resolve_commit(root, base_ref)
+    if not base:
+        print(f"base does not resolve to a commit: {base_ref}", file=sys.stderr)
+        return 1
     branch = args.branch or f"{config.get('branch_prefix', 'batch/')}{batch_id}"
     if not args.no_branch:
         code, _, err = run_git(root, ["switch", "-c", branch])
@@ -805,6 +815,7 @@ def cmd_start(args: argparse.Namespace) -> int:
         "batch": batch_id,
         "status": "started",
         "base": base,
+        "base_ref": base_ref,
         "branch": branch,
         "card_hash": card_hash(card),
         "source_sha256": card.get("source_sha256"),
@@ -840,7 +851,18 @@ def cmd_check(args: argparse.Namespace) -> int:
         print(message, file=sys.stderr)
         return 1
     config = load_config(root)
-    base = state.get("base") or str(config.get("base", "main"))
+    base_ref = state.get("base") or str(config.get("base", "main"))
+    base = resolve_commit(root, base_ref)
+    if not base:
+        state["status"] = "check_failed"
+        state["base_error"] = f"base does not resolve to a commit: {base_ref}"
+        state["checked_at"] = utc_now()
+        write_json(batch_dir(root, batch_id) / "state.json", state)
+        append_evidence(root, batch_id, f"base: FAIL ({state['base_error']})")
+        print(state["base_error"], file=sys.stderr)
+        return 1
+    state["base"] = base
+    state["base_ref"] = state.get("base_ref") or base_ref
     changed, violations = check_scope(root, card, base, config)
     added, deleted, binary, budget_error = check_budget(root, card, base, changed)
     changelog_errors, changelog_warnings = check_changelog(root, card, changed)
@@ -1019,9 +1041,23 @@ def cmd_merge(args: argparse.Namespace) -> int:
         print("merge requires --yes", file=sys.stderr)
         return 2
     status = state.get("status")
+    if args.force and not args.external:
+        print("--force is only valid with --external", file=sys.stderr)
+        return 2
     if status not in {"checked", "pr_ready", "pr_created"}:
-        print("batch is not checked or PR-ready", file=sys.stderr)
-        return 1
+        if not (args.external and status == "check_failed" and args.force):
+            if args.external and status == "check_failed":
+                print(
+                    "batch check failed; an external merge needs "
+                    "--force --reason <why the failure is accepted>",
+                    file=sys.stderr,
+                )
+            else:
+                print("batch is not checked or PR-ready", file=sys.stderr)
+            return 1
+        if not args.reason.strip():
+            print("--force requires --reason", file=sys.stderr)
+            return 2
     config = load_config(root)
     command = config.get("merge")
     if not command:
@@ -1032,13 +1068,23 @@ def cmd_merge(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return 2
+        override = None
+        if status == "check_failed":
+            override = {
+                "from": status,
+                "reason": args.reason.strip(),
+                "at": utc_now(),
+            }
         state["status"] = "merged"
         state["merged_at"] = utc_now()
         state["merge_mode"] = "external"
         state["pr"] = args.pr
+        if override is not None:
+            state["check_override"] = override
         write_json(batch_dir(root, batch_id) / "state.json", state)
         clear_active(root)
-        print(f"merged {batch_id} externally (PR {args.pr})")
+        suffix = " after a forced check failure" if override is not None else ""
+        print(f"merged {batch_id} externally (PR {args.pr}){suffix}")
         return 0
     if args.external:
         print(
@@ -1198,6 +1244,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--external",
         action="store_true",
         help="record a manually merged PR; only when config.merge is empty",
+    )
+    merge.add_argument(
+        "--force",
+        action="store_true",
+        help="with --external, accept a check_failed batch; requires --reason",
+    )
+    merge.add_argument(
+        "--reason",
+        default="",
+        help="why a check_failed batch is accepted (recorded in state.json)",
     )
     merge.set_defaults(func=cmd_merge)
 

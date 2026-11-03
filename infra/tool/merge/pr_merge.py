@@ -117,8 +117,16 @@ def message_problems(
         problems.append("the body has no 'Batch:' line")
     elif not batch:
         problems.append("the 'Batch:' line is empty")
-    elif not BATCH_VALUE.match(batch):
-        problems.append(f"'Batch:' must read 'B<number>' or 'none', got {batch!r}")
+    else:
+        token, _, rest = batch.partition(" ")
+        rest = rest.strip()
+        if not BATCH_VALUE.match(token) or (
+            rest and not (rest.startswith("(") and rest.endswith(")"))
+        ):
+            problems.append(
+                "'Batch:' must read 'B<number>', 'B<number><letter>' or 'none', "
+                f"optionally followed by a parenthetical note; got {batch!r}"
+            )
 
     return problems
 
@@ -301,7 +309,16 @@ def _self_test() -> int:
     check("empty Why is reported", message_problems("feat(app): x (#35)", "Why:\nBatch: none", 35),
           ["the 'Why:' line is empty"])
     check("Batch must be B<n> or none", message_problems("feat(app): x (#35)", "Why: y\nBatch: 9", 35),
-          ["'Batch:' must read 'B<number>' or 'none', got '9'"])
+          ["'Batch:' must read 'B<number>', 'B<number><letter>' or 'none', "
+           "optionally followed by a parenthetical note; got '9'"])
+    check("a parenthetical after the batch id is accepted",
+          message_problems("feat(app): x (#35)", "Why: y\nBatch: B12 (budget accepted)", 35), [])
+    check("a split batch id keeps its parenthetical",
+          message_problems("feat(app): x (#35)", "Why: y\nBatch: B5a (merged early)", 35), [])
+    check("an unparenthesized trailing word is reported", any(
+        "parenthetical note" in problem
+        for problem in message_problems("feat(app): x (#35)", "Why: y\nBatch: B12 over budget", 35)
+    ), True)
     check("a wrong pull request number is reported", any(
         "(#34)" in problem
         for problem in message_problems("feat(app): x (#35)", "Why: y\nBatch: none", 34)

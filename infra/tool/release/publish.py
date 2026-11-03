@@ -24,6 +24,7 @@ import sys
 import tempfile
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 SCAFFOLD = ".nebula-scaffold.json"
@@ -73,6 +74,8 @@ def run(root: Path, command: list[str]) -> str:
             command,
             cwd=root,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             capture_output=True,
         )
     except OSError as exc:
@@ -92,6 +95,25 @@ def remote_url(root: Path) -> str:
         return git(root, "config", "--get", "remote.origin.url").strip()
     except PublishError:
         return ""
+
+
+def repo_slug(remote: str) -> str:
+    value = remote.strip()
+    if not value:
+        return ""
+    if "://" in value:
+        path = urlparse(value).path
+    elif ":" in value:
+        path = value.split(":", 1)[1]
+    else:
+        path = value
+    path = path.strip("/")
+    if path.endswith(".git"):
+        path = path[:-4]
+    parts = [part for part in path.split("/") if part]
+    if len(parts) < 2:
+        return ""
+    return "/".join(parts)
 
 
 def current_commit(root: Path) -> str:
@@ -317,6 +339,11 @@ def build_plan(
         raise PublishError(
             f"provider {provider} requires a git remote named origin"
         )
+    repository = repo or repo_slug(remote)
+    if provider != "none" and not repository:
+        raise PublishError(
+            "cannot derive repository from origin; pass --repo OWNER/NAME"
+        )
 
     body, body_source = read_body(root, version, body_file)
 
@@ -330,7 +357,8 @@ def build_plan(
         "bodySource": body_source,
         "evidence": evidence_path(docs_root, version, day),
         "remote": remote,
-        "repo": repo,
+        "repo": repository,
+        "repository": repository,
         "title": tag,
         "date": day,
         "options": options,
@@ -482,6 +510,7 @@ def apply_release(plan: dict, root: Path, *, repo: str) -> str:
 
 def print_plan(plan: dict) -> None:
     print(f"provider: {plan['provider']}")
+    print(f"repository: {plan['repo'] or 'none'}")
     print(f"tag: {plan['tag']} -> {plan['tagCommit']}")
     print(f"body: {plan['bodySource']} ({len(plan['body'].splitlines())} lines)")
     print(f"evidence: {plan['evidence']}")
