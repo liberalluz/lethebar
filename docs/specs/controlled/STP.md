@@ -4,7 +4,7 @@ English · [简体中文](STP.zh-CN.md)
 
 ## Scope
 
-Covers the seventeen P1 requirements of `SRS.md` (v0.0.0) against the design in
+Covers the twenty P1 requirements of `SRS.md` (v0.0.0) against the design in
 `SDD.md`. Does not cover the plugin market, the plugin editor, 3D, multiplayer,
 accounts, cloud saves, or the native iOS build; those are out of scope for
 v0.0.0 and have no tests here by design.
@@ -74,11 +74,14 @@ claims: if they fail, the architecture claim fails, not just a feature.
 | `TC-PROTO-002` | `REQ-010` | A plugin declaring a power-supply and a progress mechanic shows both effects in the session readout; a plugin declaring none shows neither. |
 | `TC-SAVE-001` | `REQ-012` | Three slots are writable and independently readable; saving to slot 2 then loading slot 1 returns slot 1's node, and vice versa. |
 | `TC-SAVE-002` | `REQ-013` | A save payload with `schema: 2.0.0` is refused with a visible message; the slot is not overwritten and the game stays playable. |
-| `TC-BUILTIN-001` | `REQ-014` | The built-in Sanguo plugin starts, completes all three decision turns, reaches its end node, and can be saved and resumed at the recorded node. |
+| `TC-BUILTIN-001` | `REQ-014` | The built-in Sanguo plugin starts, completes all three decision turns, reaches its end node, and can be saved and resumed at the recorded node. Every Chinese string it renders is drawn as glyphs, not boxes, and the font covers every character the package uses. |
 | `TC-BUILTIN-002` | `REQ-015` | The built-in Xiuxian plugin starts, reaches its end node, and can be saved and resumed; if cut per `SRS.md` §4 this row records "not delivered", not "failed". |
 | `TC-DET-001` | `REQ-016` | The same choice sequence with the same seed produces a byte-identical session snapshot on two runs, and a different seed produces a different one. |
 | `TC-PERF-001` | `REQ-008` | From plugin selection to the first interactive scene is ≤ 5 s on E2 with a warm cache, measured as the median of three runs. |
-| `TC-UX-001` | `REQ-017` | Five first-time participants with no instructions each reach an interactive first session in ≤ 10 minutes without help from the author; at least four succeed. |
+| `TC-UX-001` | `REQ-017` | Five first-time participants with no instructions each reach an interactive first session in ≤ 10 minutes without help from the author; at least four succeed. With the window narrowed to 640 px the save-slot rows keep both `Save` and `Load` on screen, and with a picture drawn the last button stays inside the window. |
+| `TC-LANG-001` | `REQ-018` | With the browser pinned to each language the interface strings come from that language's catalogue, the landing switch changes the language and keeps it across a reload, and no Chinese literal is left in `app/render`. |
+| `TC-ASSET-001` | `REQ-019` | A package declaring a picture and a sound shows the picture in a band above the text at a non-zero size and plays the sound on entry; a package declaring no picture leaves no empty band; a declared-but-missing file leaves a placeholder and one `R-01` warning without aborting. |
+| `TC-I18N-001` | `REQ-020` | A package with an English table shows English text and English choice labels when the reader's language is English, keeps its own text in the undeclared language, and a package whose table drops a scene or a choice is refused by `V-22`. |
 
 ## Gaps
 
