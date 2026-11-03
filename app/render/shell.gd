@@ -51,6 +51,15 @@ var _options: VBoxContainer
 var _status: RichTextLabel
 var _margin: MarginContainer
 var _box: VBoxContainer
+## One picture band sits between the heading and the prose: a wide slot for the
+## scene (or its background fallback) and a narrow one on the right for a
+## portrait. Both are hidden when empty, so a text-only pack keeps the layout it
+## had before pictures existed (SDD §8.2 — an empty slot takes no space).
+var _band: HBoxContainer
+var _picture: TextureRect
+var _portrait: TextureRect
+var _audio: AudioStreamPlayer
+var _picture_slots: Array = []
 ## Set while a desktop picker is open, so a second click does not stack dialogs.
 var _picker: FileDialog = null
 ## The JS callback must stay referenced from here: assigning it to `window` alone
@@ -196,6 +205,7 @@ func enter_session() -> Dictionary:
 		_options.add_child(_button(Locale.text("ui.saves"), open_saves))
 		_options.add_child(_button(Locale.text("ui.back_to_packs"), open_plugins))
 	_status.text = _readout(view)
+	_show_assets(view)
 	_announce()
 	return view
 
@@ -433,6 +443,7 @@ func _announce() -> void:
 			"stories": _story_list(),
 			"saves": _saves_index(),
 			"slots": slot_previews(),
+			"pictures": _picture_slots.duplicate(),
 		}
 		JavaScriptBridge.eval("window.lethebarState = %s;" % JSON.stringify(state), true)
 	# Layout is only settled after the frame that added the buttons, so the hit
@@ -448,6 +459,11 @@ func _fit_text() -> void:
 	## sitting below the fold). Pinning the minimum width to the window solves it:
 	## the labels then measure their height against the width they really have.
 	var width := maxf(get_viewport_rect().size.x - 48.0, 120.0)
+	# The picture band takes a share of the window instead of a fixed 180 px: at
+	# 484 px that fixed height pushed the last button below the fold (the probe's
+	# screenshot caught it). A share keeps the picture and every button on screen.
+	var height := get_viewport_rect().size.y
+	_band.custom_minimum_size = Vector2(0.0, clampf(height * 0.30, 96.0, 260.0))
 	for label in [_sub, _status]:
 		if label != null:
 			(label as Control).custom_minimum_size = Vector2(width, 0.0)
@@ -501,6 +517,11 @@ func _collect_hits(node: Node, hits: Array, size: Vector2) -> void:
 			"label": button.text,
 			"fx": (rect.position.x + rect.size.x / 2.0) / size.x,
 			"fy": (rect.position.y + rect.size.y / 2.0) / size.y,
+			# Extents too: a button half below the fold still has its centre on
+			# screen, so the centre alone cannot tell a reachable button from a
+			# clipped one. The probe checks that the whole box is inside.
+			"fw": rect.size.x / size.x,
+			"fh": rect.size.y / size.y,
 		})
 	for child in node.get_children():
 		_collect_hits(child, hits, size)
@@ -560,6 +581,25 @@ func _build_chrome() -> void:
 	_heading = Label.new()
 	_heading.add_theme_font_size_override("font_size", 28)
 	box.add_child(_heading)
+	# The picture band is built once and then filled per scene; an empty band
+	# collapses to zero height so text-only packs look exactly as they did.
+	_band = HBoxContainer.new()
+	_band.add_theme_constant_override("separation", 12)
+	_band.visible = false
+	box.add_child(_band)
+	_picture = TextureRect.new()
+	_picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_picture.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_picture.custom_minimum_size = Vector2(0.0, 0.0)
+	_band.add_child(_picture)
+	_portrait = TextureRect.new()
+	_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_portrait.custom_minimum_size = Vector2(160.0, 0.0)
+	_band.add_child(_portrait)
+	_audio = AudioStreamPlayer.new()
+	box.add_child(_audio)
 	# `Label` with autowrap reports the height of its narrowest column as its
 	# minimum size, which grew the whole column to ~1300 px and pushed every
 	# button below a 484 px viewport (caught by the probe's hit boxes, not by
@@ -689,6 +729,95 @@ func _clear_options() -> void:
 	for child in _options.get_children():
 		_options.remove_child(child)
 		child.queue_free()
+	_hide_pictures()
+
+
+func _hide_pictures() -> void:
+	## Called by every screen rebuild: a picture belongs to one scene, so leaving
+	## the scene takes it away. The band itself only shows when a slot is filled.
+	_picture_slots.clear()
+	if _band == null:
+		return
+	_picture.texture = null
+	_portrait.texture = null
+	_picture.visible = false
+	_portrait.visible = false
+	_band.visible = false
+	if _audio != null:
+		_audio.stop()
+
+
+func _show_assets(view: Dictionary) -> void:
+	## Fills the picture slots a scene declares. A slot with no bytes, an unknown
+	## slot name, or bytes that do not decode all end the same way: the slot keeps
+	## a placeholder, one warning is recorded, and the story goes on (SDD §8.2).
+	var data: Dictionary = entry.get("data", {})
+	var stored: Dictionary = data.get("assets", {}) if data.get("assets", {}) is Dictionary else {}
+	var declared: Variant = view.get("assets", [])
+	if not declared is Array:
+		return
+	for asset in declared:
+		if not asset is Dictionary:
+			continue
+		var asset_type := String(asset.get("type", ""))
+		var slot := String(asset.get("slot", _default_slot(asset_type)))
+		var path := String(asset.get("path", ""))
+		if slot == "scene" or slot == "background":
+			_set_slot(_picture, stored, path, slot, view)
+		elif slot == "portrait":
+			_set_slot(_portrait, stored, path, slot, view)
+		elif slot == "audio":
+			_set_audio(stored, path, view)
+		else:
+			_warn(view, "R-01", "unknown asset slot skipped: %s" % slot)
+
+
+func _default_slot(asset_type: String) -> String:
+	## A pack that names no slot still gets sensible placement: pictures become
+	## the scene slot, sound becomes audio, and text is drawn as prose already.
+	if asset_type == "audio":
+		return "audio"
+	if asset_type == "text":
+		return "text"
+	return "scene"
+
+
+func _set_slot(
+	control: TextureRect, stored: Dictionary, path: String, slot: String, view: Dictionary
+) -> void:
+	var bytes: Variant = stored.get(path, null)
+	var texture: Texture2D = null
+	if bytes is PackedByteArray and not bytes.is_empty():
+		var image := Image.new()
+		if image.load_png_from_buffer(bytes) == OK or image.load_jpg_from_buffer(bytes) == OK:
+			texture = ImageTexture.create_from_image(image)
+	if texture == null:
+		var placeholder := PlaceholderTexture2D.new()
+		placeholder.size = Vector2(320.0, 180.0)
+		texture = placeholder
+		_warn(view, "R-01", "asset missing or unreadable, placeholder shown: %s" % path)
+	control.texture = texture
+	control.visible = true
+	_band.visible = true
+	if not _picture_slots.has(slot):
+		_picture_slots.append(slot)
+
+
+func _set_audio(stored: Dictionary, path: String, view: Dictionary) -> void:
+	var bytes: Variant = stored.get(path, null)
+	if bytes is PackedByteArray and not bytes.is_empty():
+		var stream := AudioStreamWAV.load_from_buffer(bytes)
+		if stream != null:
+			_audio.stream = stream
+			_audio.play()
+			return
+	_warn(view, "R-01", "sound missing or unreadable, skipped: %s" % path)
+
+
+func _warn(view: Dictionary, code: String, message: String) -> void:
+	if session == null:
+		return
+	session.warnings.append({"code": code, "message": message, "fatal": false})
 
 
 func _button(label: String, handler: Callable) -> Button:

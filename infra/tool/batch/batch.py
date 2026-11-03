@@ -37,9 +37,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "pr_create": [],
     "merge": [],
 }
-ID_RE = re.compile(r"^(?:B[0-9]+|[0-9]{8}-[0-9a-f]{6})$")
+ID_RE = re.compile(r"^(?:B[0-9]+[a-z]?|[0-9]{8}-[0-9a-f]{6})$")
 DATED_ID_RE = re.compile(r"^[0-9]{8}-[0-9a-f]{6}$")
-CARD_ID_RE = re.compile(r"^B[0-9]+$")
+CARD_ID_RE = re.compile(r"^B[0-9]+[a-z]?$")
 CARD_MARKER_RE = re.compile(r"<!--\s*batch-card\s*:\s*v1\s*-->")
 CARD_JSON_RE = re.compile(r"```json[ \t]*\r?\n(.*?)\r?\n```", re.DOTALL)
 CARD_TYPES = {"feat", "fix", "process", "docs"}
@@ -183,6 +183,13 @@ def resolve_id(root: Path, value: str | None) -> str:
     if not candidates:
         raise SystemExit("no batch found; run 'plan' first")
     return candidates[-1]
+
+
+def batch_sort_key(value: str) -> tuple[int, int, str]:
+    match = re.fullmatch(r"B([0-9]+)([a-z]?)", value)
+    if match:
+        return (0, int(match.group(1)), match.group(2))
+    return (1, 0, value)
 
 
 def new_id(root: Path) -> str:
@@ -774,8 +781,16 @@ def cmd_start(args: argparse.Namespace) -> int:
         return 1
     current = active_id(root)
     if current:
-        print(f"another batch is active: {current}", file=sys.stderr)
-        return 1
+        current_state = read_state(root, current)
+        if current_state.get("status") in {"merged", "aborted"}:
+            clear_active(root)
+            print(
+                f"cleared stale active batch {current} "
+                f"({current_state.get('status')})"
+            )
+        else:
+            print(f"another batch is active: {current}", file=sys.stderr)
+            return 1
 
     config = load_config(root)
     base = args.base or str(card.get("base") or config.get("base", "main"))
@@ -1003,14 +1018,37 @@ def cmd_merge(args: argparse.Namespace) -> int:
     if not args.yes:
         print("merge requires --yes", file=sys.stderr)
         return 2
-    if state.get("status") != "pr_created":
-        print("batch has no created PR", file=sys.stderr)
+    status = state.get("status")
+    if status not in {"checked", "pr_ready", "pr_created"}:
+        print("batch is not checked or PR-ready", file=sys.stderr)
         return 1
     config = load_config(root)
     command = config.get("merge")
     if not command:
-        print("config.merge is empty; merge externally", file=sys.stderr)
+        if not args.external:
+            print(
+                "config.merge is empty; merge the PR externally, then rerun "
+                "'merge --external --pr <number> --yes'",
+                file=sys.stderr,
+            )
+            return 2
+        state["status"] = "merged"
+        state["merged_at"] = utc_now()
+        state["merge_mode"] = "external"
+        state["pr"] = args.pr
+        write_json(batch_dir(root, batch_id) / "state.json", state)
+        clear_active(root)
+        print(f"merged {batch_id} externally (PR {args.pr})")
+        return 0
+    if args.external:
+        print(
+            "--external is only valid when config.merge is empty",
+            file=sys.stderr,
+        )
         return 2
+    if status != "pr_created":
+        print("batch has no created PR", file=sys.stderr)
+        return 1
     code, out, err = run_hook(
         root,
         command,
@@ -1087,7 +1125,7 @@ def cmd_list(args: argparse.Namespace) -> int:
     if not root_dir.is_dir():
         print("no batches")
         return 0
-    for path in sorted(root_dir.iterdir()):
+    for path in sorted(root_dir.iterdir(), key=lambda item: batch_sort_key(item.name)):
         if not path.is_dir():
             continue
         state = load_json(path / "state.json") or {}
@@ -1156,6 +1194,11 @@ def build_parser() -> argparse.ArgumentParser:
     merge.add_argument("id", nargs="?")
     merge.add_argument("--pr", required=True)
     merge.add_argument("--yes", action="store_true")
+    merge.add_argument(
+        "--external",
+        action="store_true",
+        help="record a manually merged PR; only when config.merge is empty",
+    )
     merge.set_defaults(func=cmd_merge)
 
     abort = sub.add_parser("abort", help="abort an unmerged batch")

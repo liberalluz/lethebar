@@ -51,7 +51,7 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 
 	var manifest: Dictionary = manifest_variant
 	var node_ids: Array = []
-	var data := {"nodes": [], "mechanics": {}}
+	var data := {"nodes": [], "mechanics": {}, "assets": {}}
 
 	if files.has(NODES_PATH):
 		var nodes_variant: Variant = JSON.parse_string(reader.read_file(NODES_PATH).get_string_from_utf8())
@@ -64,6 +64,12 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 		var mechanics_variant: Variant = JSON.parse_string(reader.read_file(MECHANICS_PATH).get_string_from_utf8())
 		if mechanics_variant is Dictionary:
 			data["mechanics"] = mechanics_variant
+	# Only the bytes a declared asset actually points at are read, and they stay
+	# undecoded: the render layer turns them into a texture or a stream when a
+	# scene asks for one (SDD §8.1 — read from memory, never from disk mid-run).
+	for asset_path in _referenced_assets(manifest, data["nodes"]):
+		if files.has(asset_path):
+			data["assets"][asset_path] = reader.read_file(asset_path)
 	reader.close()
 	_discard(scratch)
 
@@ -95,8 +101,33 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 	}
 
 
-func _rejected(code: String, field: String, message: String, issues: Array) -> Dictionary:
-	return {
+func _referenced_assets(manifest: Dictionary, nodes: Array) -> Array:
+	## Every asset path the package points at, declared on the manifest or on a
+	## node. Paths are read as written; a path that is not in the zip is left to
+	## V-08, which degrades the slot to a placeholder instead of failing.
+	var paths: Array = []
+	var declared: Variant = manifest.get("assets", [])
+	if declared is Array:
+		for asset in declared:
+			if asset is Dictionary:
+				var path := String(asset.get("path", ""))
+				if path != "" and not paths.has(path):
+					paths.append(path)
+	for node in nodes:
+		if not node is Dictionary:
+			continue
+		var node_assets: Variant = node.get("assets", [])
+		if not node_assets is Array:
+			continue
+		for asset in node_assets:
+			if asset is Dictionary:
+				var path := String(asset.get("path", ""))
+				if path != "" and not paths.has(path):
+					paths.append(path)
+	return paths
+
+
+func _rejected(code: String, field: String, message: String, issues: Array) -> Dictionary:	return {
 		"status": "rejected",
 		"code": code,
 		"field": field,

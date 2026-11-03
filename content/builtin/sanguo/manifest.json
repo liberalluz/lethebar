@@ -9,5 +9,5 @@
   "mechanics": ["power"],
   "entry": "n1",
   "saveSchema": 1,
-  "assets": []
+  "assets": [{"type": "texture", "path": "assets/scene.png", "slot": "scene"}, {"type": "audio", "path": "assets/theme.wav", "slot": "audio"}]
 }
