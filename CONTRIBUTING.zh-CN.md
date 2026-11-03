@@ -33,3 +33,10 @@
 - 作者不能自审；作者是 AI 时，由人签字。
 - 评审 diff、测试和证据。
 - 豁免要记录，不能只口头同意。
+
+## 合并
+
+- 用 `gh pr merge --squash` 合并，不要直接推 `main`。
+- 只有一笔提交的 PR 不用额外传参。多笔提交时要传 `--subject` 与 `--body-file`，否则 GitHub 会取中文的 PR 标题、或把每笔提交的正文拼在一起——用 `python infra/tool/merge/pr_merge.py --show --pr <n> --why "<理由>" --batch <Bn|none>` 生成这两段。
+- 合并之后跑 `python infra/tool/merge/pr_merge.py --verify-only`。它读 `origin/main` 顶上那条提交，标题或 `Why:` / `Batch:` 缺了就会失败；这条提交没有别的检查覆盖。
+
