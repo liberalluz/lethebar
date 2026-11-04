@@ -269,3 +269,22 @@
   5. 装 `fmt-ok`，要求 `fmt-layer` 在 `>=1.0.0 <2.0.0`：装得上。
   6. 装 `fmt-legacy`（`specVersion: 1.0.0`）：装得上，且警告列表恰好一条 `W-01`。
 - 出口：步骤 1–6 全过；解析不到依赖的 `2.0.0` 包永远到不了游戏画面。
+
+### `TC-LEDGER-001`
+
+- Covers: `REQ-022`
+- 前置：无头运行；四个由同一模板生成的夹具包：`ledger-basic`（资源 `power`
+  `init 3`、`min 0`、`max 5`；唯一选项的效果加 10）、`ledger-undeclared`（同样的
+  账本，一条规则读 `gold`）、`ledger-ordered`（`power` 与 `standing`，一条规则读
+  `power` 写 `standing`；选项把 `power` 置 0），以及一个可用的存档位。
+- 步骤：
+  1. 安装 `ledger-basic` 并打开首场景：会话状态里 `power` 为 3，即声明的 `init`。
+  2. 选唯一选项（效果加 10）：`power` 读到 5，即声明的 `max`，而不是 13，也不是
+     该选项被拒。
+  3. 安装 `ledger-undeclared`：被 `V-14` 拒绝，消息点名 `gold`。
+  4. 安装 `ledger-ordered`，打开首场景并做出选择：同一步里 `power` 变 0、`standing`
+     变 0，因为规则在效果之后运行。
+  5. 在该局打开存档位并保存；读回载荷并恢复：恢复后的状态里 `power` 为 0、
+     `standing` 为 0。
+- 出口：步骤 1–5 通过；没有数值离开声明的边界，也没有规则在点名账本未声明的资源
+  时还能安装成功。

@@ -38,6 +38,7 @@ second.
 | `REQ-019` | A plugin's declared pictures and sounds are drawn and played. | A plugin that declares a scene image shows it above the text at a non-zero size; a plugin that declares none shows no empty picture area. |
 | `REQ-020` | A plugin carries its text in more than one language, and a partly translated package is refused. | With the browser asking for English, a plugin that ships an English table shows English text; a package whose declared table leaves a scene or a choice empty is refused at install with `V-22`. |
 | `REQ-021` | A package declares which format version it speaks and what it needs. | A package that says `2.0.0` with no requirements installs and plays as before; one whose `kind`/`layer`/`requires` are malformed is refused with `V-23`; one whose requirement is missing or out of range is refused with `V-24`; a `1.0.0` package still installs and carries one `W-01` warning. |
+| `REQ-022` | A package declares its numbers and their bounds; the rules that move them run after the action's own effects. | A declared resource starts at its `init` value; an effect that would push it past `max` stops at `max` instead of refusing the choice; a rule that names an undeclared resource is refused with `V-14`; a rule that reads a value the same choice just changed sees the new value; a resource with `labels` shows its label in the scene, and the number is unchanged. |
 
 ## 3. Out of scope for v0.0.0
 

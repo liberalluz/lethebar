@@ -23,8 +23,7 @@ const SUPPORTED_ASSET_TYPES := ManifestSchema.ASSET_TYPES
 const SUPPORTED_LOCALES := ["en", "zh-CN"]
 
 
-static func _issue(code: String, field: String, message: String, fatal: bool) -> Dictionary:
-	return {"code": code, "field": field, "message": message, "fatal": fatal}
+static func _issue(code: String, field: String, message: String, fatal: bool) -> Dictionary:	return {"code": code, "field": field, "message": message, "fatal": fatal}
 
 
 static func first_fatal(issues: Array) -> Dictionary:
@@ -136,6 +135,25 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 	if not ManifestSchema.is_integer(save_schema) or float(save_schema) <= 0.0:
 		issues.append(_issue("V-09", "saveSchema", "must be a positive integer", true))
 
+	# V-14 — the ledger and its rules agree. A resource the file never declared
+	# cannot be written by a rule: the alternative is a silent zero the player
+	# would read as a real number (engine-bricks §1).
+	var ledger: Variant = context.get("ledger", {})
+	if ledger is Dictionary and not ledger.is_empty():
+		for problem in Ledger.problems(ledger):
+			issues.append(_issue("V-14", "state.json", String(problem), true))
+		var declared: Dictionary = Ledger.definitions(ledger)
+		for rule in context.get("rules", []):
+			if not (rule is Dictionary):
+				continue
+			for key in _rule_keys(rule):
+				if not declared.has(key):
+					issues.append(_issue(
+						"V-14", "rules",
+						"rule names resource %s, which data/state.json never declares" % key,
+						true,
+					))
+
 	# V-08 — asset inventory. Never fatal: the node degrades to a placeholder.
 	var package_files: Array = context.get("package_files", [])
 	for asset in manifest["assets"]:
@@ -221,3 +239,21 @@ static func locale_gaps(locale: String, nodes: Array, table: Variant) -> String:
 			if not label is String or String(label).strip_edges() == "":
 				return "data/i18n/%s.json has an empty label in node %s" % [locale, node_id]
 	return ""
+
+
+static func _rule_keys(rule: Dictionary) -> Array:
+	## Every resource a rule reads or writes: `when` (one condition or a list of
+	## them) and the keys of `set`.
+	var keys: Array = []
+	var conditions: Variant = rule.get("when", null)
+	if conditions is Dictionary:
+		keys.append(String(conditions.get("key", "")))
+	elif conditions is Array:
+		for condition in conditions:
+			if condition is Dictionary:
+				keys.append(String(condition.get("key", "")))
+	var writes: Variant = rule.get("set", null)
+	if writes is Dictionary:
+		for key in writes:
+			keys.append(String(key))
+	return keys.filter(func(key): return not String(key).is_empty())

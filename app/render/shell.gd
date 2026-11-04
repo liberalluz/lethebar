@@ -850,8 +850,12 @@ func _button(label: String, handler: Callable) -> Button:
 func _readout(view: Dictionary) -> String:
 	var parts: Array = []
 	var state: Dictionary = view.get("state", {})
+	var labels: Dictionary = view.get("labels", {})
 	for key in state:
-		parts.append("%s %s" % [key, str(state[key])])
+		# A declared resource may carry labels: the number stays the state, the
+		# label is what a reader sees (engine-bricks §1).
+		var shown := String(labels.get(key, ""))
+		parts.append("%s %s" % [key, shown if shown != "" else str(state[key])])
 	if view.has("progress"):
 		var progress: Dictionary = view["progress"]
 		parts.append(Locale.text("ui.steps") % [int(progress.get("steps", 0)), int(progress.get("nodes", 0))])

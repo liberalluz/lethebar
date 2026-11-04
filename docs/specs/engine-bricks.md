@@ -60,6 +60,10 @@ sees and how the numbers move.
 
 - Every value is a number. There is no string or boolean state.
 - `min` and `max` are inclusive; writes are clamped, not rejected.
+- A resource may carry `labels`, a map from a numeric value to display text
+  (`{"2": "名动诸侯"}`). The stored value stays a number; the label is what the
+  scene prints for that value, so a rule can move a number and the reader sees a
+  word without the ledger ever holding one.
 - A rule that names an unknown resource is a validation error (`V-14`), not a
   silent zero.
 - A resource that exists but was never written reads as `init`.
