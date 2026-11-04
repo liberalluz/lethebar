@@ -9,9 +9,11 @@ extends RefCounted
 static func known_protocols() -> Array:
 	return ProtocolRegistry.known_ids()
 
-## Supported specVersion window for v0.0.0 (SRS `TBD-003`).
+## Supported specVersion window. `1.0.0` is still readable (ADR-0007) and `2.0.0`
+## is current, so the window has to include both; the upper bound is the version
+## after next, not the current one.
 const SPEC_MIN := "1.0.0"
-const SPEC_MAX := "2.0.0"
+const SPEC_MAX := "3.0.0"
 
 const SUPPORTED_ASSET_TYPES := ManifestSchema.ASSET_TYPES
 
@@ -63,6 +65,49 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 			"outside the supported window %s .. <%s" % [SPEC_MIN, SPEC_MAX],
 			true,
 		))
+	elif ManifestSchema.semver_cmp(
+		ManifestSchema.parse_semver(manifest["specVersion"]),
+		ManifestSchema.parse_semver(ManifestSchema.SPEC_V2),
+	) < 0:
+		# W-01 — a package written for format 1.0.0 still installs; the warning
+		# names what is missing before the window closes in v0.2.0 (ADR-0007).
+		issues.append(_issue(
+			"W-01", "specVersion",
+			"package declares %s; format %s is current and %s is refused from v0.2.0" % [
+				manifest["specVersion"], ManifestSchema.SPEC_V2, manifest["specVersion"],
+			],
+			false,
+		))
+
+	# V-23 — the format 2.0.0 fields have the right shape. Checked after V-02 so a
+	# manifest whose basic fields are malformed is reported once, not twice.
+	for item in ManifestSchema.format_issues(manifest):
+		issues.append(_issue("V-23", item["field"], item["message"], true))
+
+	# V-24 — every requirement is satisfiable right now. A bundle that needs a
+	# package nobody installed is refused at install time, because the player
+	# would otherwise reach the scene where it runs out (ADR-0007).
+	var catalog: Dictionary = context.get("catalog", context.get("installed", {}))
+	for requirement in manifest.get("requires", []):
+		if not requirement is Dictionary:
+			continue
+		var required_id := String(requirement.get("id", ""))
+		var constraint: Array = ManifestSchema.parse_engine_range(requirement.get("version", ""))
+		if constraint.is_empty():
+			continue
+		var available := String(catalog.get(required_id, ""))
+		if available == "":
+			issues.append(_issue(
+				"V-24", "requires",
+				"requires %s %s, which is neither installed nor built in" % [required_id, requirement["version"]],
+				true,
+			))
+		elif not ManifestSchema.version_in_range(available, constraint[0], constraint[1]):
+			issues.append(_issue(
+				"V-24", "requires",
+				"requires %s %s, but %s is installed" % [required_id, requirement["version"], available],
+				true,
+			))
 
 	# V-05 — the engine version this build is, not the one the author hoped for.
 	var engine_version := String(context.get("engine_version", "0.0.0"))

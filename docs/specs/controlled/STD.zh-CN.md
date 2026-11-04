@@ -252,3 +252,20 @@
   3. 请求一个包未声明的语言：显示包内原文，而不是空字符串。
   4. 安装半份的夹具：校验报 `V-22`，且该包未被安装。
 - 出口：步骤 1–4 通过；读者语言为英文时，内置包显示英文正文。
+
+### `TC-FMT-001`
+
+- 覆盖：`REQ-021`
+- 前置：无头运行；由同一模板生成的夹具清单（`fmt-bundle`、`fmt-no-layer`、
+  `fmt-bad-layer`、`fmt-needs`、`fmt-layer`、`fmt-range`、`fmt-ok`、`fmt-legacy`）；
+  除步骤明确先装的那个之外，没有已安装的夹具。
+- 步骤：
+  1. 装 `fmt-bundle`（格式 `2.0.0`、`kind: bundle`、无依赖）：装得上，玩法与从前一致。
+  2. 装 `fmt-no-layer`（`kind: layer` 却没有 `layer`）与 `fmt-bad-layer`
+     （`layer: weather`）：都被 `V-23` 拒绝。
+  3. 装 `fmt-needs`，它唯一的依赖既没装也不是内置包：被 `V-24` 拒绝。
+  4. 先装 `fmt-layer`（`1.0.0`、`kind: layer`、`layer: mod`），再装 `fmt-range`
+     （要求 `>=2.0.0 <3.0.0`）：被 `V-24` 拒绝，且消息同时点名 `fmt-layer` 与它已装的版本。
+  5. 装 `fmt-ok`，要求 `fmt-layer` 在 `>=1.0.0 <2.0.0`：装得上。
+  6. 装 `fmt-legacy`（`specVersion: 1.0.0`）：装得上，且警告列表恰好一条 `W-01`。
+- 出口：步骤 1–6 全过；解析不到依赖的 `2.0.0` 包永远到不了游戏画面。

@@ -37,6 +37,7 @@ second.
 | `REQ-018` | The interface speaks the language the browser asks for, and the player can switch it. | A browser set to English shows English controls; a browser set to Chinese shows Chinese controls; the switch on the landing screen survives a reload. |
 | `REQ-019` | A plugin's declared pictures and sounds are drawn and played. | A plugin that declares a scene image shows it above the text at a non-zero size; a plugin that declares none shows no empty picture area. |
 | `REQ-020` | A plugin carries its text in more than one language, and a partly translated package is refused. | With the browser asking for English, a plugin that ships an English table shows English text; a package whose declared table leaves a scene or a choice empty is refused at install with `V-22`. |
+| `REQ-021` | A package declares which format version it speaks and what it needs. | A package that says `2.0.0` with no requirements installs and plays as before; one whose `kind`/`layer`/`requires` are malformed is refused with `V-23`; one whose requirement is missing or out of range is refused with `V-24`; a `1.0.0` package still installs and carries one `W-01` warning. |
 
 ## 3. Out of scope for v0.0.0
 

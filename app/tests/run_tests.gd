@@ -54,6 +54,7 @@ func _initialize() -> void:
 	_case_locale()
 	_case_i18n()
 	_case_i18n_shipped()
+	_case_format()
 	_case_assets()
 
 	print("")
@@ -95,7 +96,7 @@ func _case_pkg_002() -> void:
 		["V-02 missing field", _package("missing-name", {}, ["name"]), "V-02"],
 		["V-02 wrong type", _package("bad-type", {"saveSchema": "1"}), "V-02"],
 		["V-03 bad id", _package("bad-id", {"id": "Bad_Id"}), "V-03"],
-		["V-04 spec window", _package("spec-too-new", {"specVersion": "2.5.0"}), "V-04"],
+		["V-04 spec window", _package("spec-too-new", {"specVersion": "3.5.0"}), "V-04"],
 		["V-05 engine range", _package("engine-old", {"engine": ">=3.0.0 <4.0.0"}), "V-05"],
 		["V-06 protocol", _package("unknown-protocol", {"protocol": "sandbox@9"}), "V-06"],
 		["V-07 entry node", _package("bad-entry", {"entry": "nope"}), "V-07"],
@@ -606,7 +607,9 @@ func _manifest_defaults() -> Dictionary:
 	return {
 		"id": "test-linear",
 		"version": "1.0.0",
-		"specVersion": "1.0.0",
+		"specVersion": "2.0.0",
+		"kind": "bundle",
+		"requires": [],
 		"engine": ">=4.3.0 <5.0.0",
 		"name": "Test Linear",
 		"protocol": "linear@1",
@@ -1372,6 +1375,107 @@ func _shipped_font() -> Font:
 	if path.is_empty() or not ResourceLoader.exists(path):
 		return null
 	return load(path) as Font
+
+
+func _case_format() -> void:
+	## B15. ADR-0007: a package says which format it speaks and what it needs
+	## before it can be played. The five acceptance lines are the six checks
+	## below; the two refusals are the ones a player would otherwise meet as a
+	## story that cannot be finished.
+	_section("TC-FMT-001 a package declares its format and what it requires")
+	var plain := PackageLoader.new().import_bytes(
+		_package("fmt-bundle", {"id": "fmt-bundle"}), _context()
+	)
+	_check(
+		"TC-FMT-001: a 2.0.0 bundle with no requirements installs",
+		plain.get("status", "") == "installed",
+		String(plain.get("message", ""))
+	)
+
+	var no_layer := PackageLoader.new().import_bytes(
+		_package("fmt-no-layer", {"id": "fmt-no-layer", "kind": "layer"}), _context()
+	)
+	_check(
+		"TC-FMT-001: kind layer without a layer name is refused with V-23",
+		String(no_layer.get("code", "")) == "V-23",
+		String(no_layer.get("message", ""))
+	)
+
+	var bad_layer := PackageLoader.new().import_bytes(
+		_package("fmt-bad-layer", {"id": "fmt-bad-layer", "kind": "layer", "layer": "weather"}),
+		_context()
+	)
+	_check(
+		"TC-FMT-001: an unknown layer name is refused with V-23",
+		String(bad_layer.get("code", "")) == "V-23",
+		String(bad_layer.get("message", ""))
+	)
+
+	var missing := PackageLoader.new().import_bytes(
+		_package("fmt-needs", {
+			"id": "fmt-needs",
+			"requires": [{"id": "ghost", "version": ">=1.0.0 <2.0.0"}],
+		}),
+		_context()
+	)
+	_check(
+		"TC-FMT-001: a requirement nobody installed is refused with V-24",
+		String(missing.get("code", "")) == "V-24",
+		String(missing.get("message", ""))
+	)
+
+	var loader := PackageLoader.new()
+	loader.import_bytes(
+		_package("fmt-layer", {"id": "fmt-layer", "kind": "layer", "layer": "mod"}), _context()
+	)
+	var wrong_range := loader.import_bytes(
+		_package("fmt-range", {
+			"id": "fmt-range",
+			"requires": [{"id": "fmt-layer", "version": ">=2.0.0 <3.0.0"}],
+		}),
+		_context()
+	)
+	var range_message := String(wrong_range.get("message", ""))
+	_check(
+		"TC-FMT-001: a requirement outside its range is refused with V-24",
+		String(wrong_range.get("code", "")) == "V-24",
+		range_message
+	)
+	_check(
+		"TC-FMT-001: the refusal names the package and the installed version",
+		range_message.contains("fmt-layer") and range_message.contains("1.0.0"),
+		range_message
+	)
+
+	var satisfied := loader.import_bytes(
+		_package("fmt-ok", {
+			"id": "fmt-ok",
+			"requires": [{"id": "fmt-layer", "version": ">=1.0.0 <2.0.0"}],
+		}),
+		_context()
+	)
+	_check(
+		"TC-FMT-001: a satisfiable requirement installs",
+		satisfied.get("status", "") == "installed",
+		String(satisfied.get("message", ""))
+	)
+
+	var legacy := PackageLoader.new().import_bytes(
+		_package("fmt-legacy", {"id": "fmt-legacy", "specVersion": "1.0.0"}), _context()
+	)
+	_check(
+		"TC-FMT-001: a 1.0.0 package still installs",
+		legacy.get("status", "") == "installed",
+		String(legacy.get("message", ""))
+	)
+	var warning_codes: Array = []
+	for warning in legacy.get("warnings", []):
+		warning_codes.append(String(warning.get("code", "")))
+	_check(
+		"TC-FMT-001: it carries one W-01 warning naming the format",
+		warning_codes == ["W-01"],
+		", ".join(warning_codes)
+	)
 
 
 func _case_assets() -> void:

@@ -30,6 +30,15 @@ const OPTIONAL_STRING_FIELDS := ["defaultLocale"]
 const OPTIONAL_LIST_FIELDS := ["locales"]
 const OPTIONAL_MAP_FIELDS := ["names"]
 
+## Format 2.0.0 fields (ADR-0007). `kind` says whether the package is playable on
+## its own; `layer` names which piece of the seven-layer design a non-playable
+## package is; `requires` lists the packages it needs before it can be played.
+const KIND_BUNDLE := "bundle"
+const KIND_LAYER := "layer"
+const KINDS := [KIND_BUNDLE, KIND_LAYER]
+const LAYERS := ["profession", "genre", "mod", "content", "meta", "assets"]
+const SPEC_V2 := "2.0.0"
+
 const ID_PATTERN := "^[a-z0-9-]+$"
 const SEMVER_PATTERN := "^(\\d+)\\.(\\d+)\\.(\\d+)$"
 const ENGINE_RANGE_PATTERN := "^>=(\\d+\\.\\d+\\.\\d+) <(\\d+\\.\\d+\\.\\d+)$"
@@ -125,4 +134,45 @@ static func field_shape_issues(manifest: Dictionary) -> Array:
 	for field in OPTIONAL_MAP_FIELDS:
 		if manifest.has(field) and not manifest[field] is Dictionary:
 			issues.append({"field": field, "message": "expected an object keyed by locale"})
+	return issues
+
+
+static func format_issues(manifest: Dictionary) -> Array:
+	## Format 2.0.0 fields, checked separately from the 1.0.0 shape so that a
+	## legacy package is not asked for fields its format never had (V-23).
+	## Returns one entry per problem: {field, message}.
+	var issues: Array = []
+	var is_v2 := parse_semver(manifest.get("specVersion", "")) == parse_semver(SPEC_V2)
+
+	var kind := String(manifest.get("kind", ""))
+	if kind == "":
+		if is_v2:
+			issues.append({"field": "kind", "message": "format 2.0.0 requires kind: %s" % ", ".join(KINDS)})
+	else:
+		if not KINDS.has(kind):
+			issues.append({"field": "kind", "message": "expected one of: %s" % ", ".join(KINDS)})
+		elif kind == KIND_LAYER:
+			var layer := String(manifest.get("layer", ""))
+			if layer == "":
+				issues.append({"field": "layer", "message": "a layer package must name its layer: %s" % ", ".join(LAYERS)})
+			elif not LAYERS.has(layer):
+				issues.append({"field": "layer", "message": "expected one of: %s" % ", ".join(LAYERS)})
+
+	if manifest.has("requires"):
+		var requires: Variant = manifest["requires"]
+		if not requires is Array:
+			issues.append({"field": "requires", "message": "expected an array of {id, version}"})
+		else:
+			for entry in requires:
+				if not entry is Dictionary:
+					issues.append({"field": "requires", "message": "each requirement must be an object with id and version"})
+					continue
+				var required_id := String(entry.get("id", ""))
+				if not is_id(required_id):
+					issues.append({"field": "requires", "message": "requirement id must match [a-z0-9-]+"})
+				elif parse_engine_range(entry.get("version", "")) == []:
+					issues.append({
+						"field": "requires",
+						"message": "requirement %s needs a range like >=1.0.0 <2.0.0" % required_id,
+					})
 	return issues
