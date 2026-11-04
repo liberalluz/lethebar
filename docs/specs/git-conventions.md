@@ -47,6 +47,11 @@ Scopes: pick exactly one from the closed list below.
 - The check reads only the commits a branch adds (`origin/main..HEAD`). It never rewrites or
   rejects merged history, so commits that predate the rule stay exactly as they are.
 - No secrets, no generated build output.
+- The body is plain text. A commit message is never rendered, so backticks, `**bold**` and
+  `__bold__` reach the reader as characters: write `kind`, not `` `kind` ``. `check_commit_body.py`
+  refuses all three outside a fenced block. `0bf59cd` carried ten backticks until it was amended.
+- Detail like the above belongs in this file, not in `CONTRIBUTING.md`: that file is the door, and a
+  rule copied into two places drifts in one of them.
 
 ## 3. Pull requests
 
