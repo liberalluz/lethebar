@@ -14,6 +14,11 @@ review covers its quality.
 `Why:` must be followed by non-empty text, either on the same line or in the
 lines up to the next `Key:` line. `Batch:` accepts `B<n>`, `B<n><letter>`
 (`B5a`) or `none`.
+
+The body is plain text. A commit message is never rendered, so backticks and
+bold markers reach the reader as characters — `0bf59cd` carried ten backticks
+until it was amended. Markdown is therefore refused here, with the reason in
+`docs/specs/git-conventions.md` §2.
 """
 
 from __future__ import annotations
@@ -27,6 +32,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SEPARATOR = "\x1f"
 BATCH_VALUE = re.compile(r"^(B\d+[a-z]?|none)$")
 FENCE = re.compile(r"^```")
+BACKTICK = re.compile(r"`")
+BOLD = re.compile(r"\*\*[^*]+\*\*")
+UNDERSCORE = re.compile(r"(?<![A-Za-z0-9_])__[^_]+__(?![A-Za-z0-9_])")
 
 
 def git(*args: str) -> str:
@@ -72,6 +80,28 @@ def field(body: str, name: str) -> str:
     return " ".join(part for part in collected if part).strip()
 
 
+def _markdown(body: str, kind: str) -> bool:
+    """True when the body uses that markdown marker outside a fenced block.
+
+    A fenced block is data — a pasted log or a diff — and is left alone; the
+    prose around it is what a reader takes as the reason for the commit.
+    """
+    outside: list[str] = []
+    in_fence = False
+    for line in body.splitlines():
+        if FENCE.match(line):
+            in_fence = not in_fence
+            continue
+        if not in_fence:
+            outside.append(line)
+    prose = "\n".join(outside)
+    if kind == "backtick":
+        return bool(BACKTICK.search(prose))
+    if kind == "bold":
+        return bool(BOLD.search(prose))
+    return bool(UNDERSCORE.search(prose))
+
+
 def main() -> int:
     base = base_ref()
     if base is None:
@@ -105,6 +135,11 @@ def main() -> int:
             problems.append(
                 f"{sha[:8]} {subject}: 'Batch: {batch}' should be B<n>, B<n><letter>, or none"
             )
+        for mark in ("backtick", "bold", "underscore-bold"):
+            if _markdown(body, mark):
+                problems.append(
+                    f"{sha[:8]} {subject}: the body carries {mark} markup; a commit message is plain text"
+                )
 
     if problems:
         for problem in problems:

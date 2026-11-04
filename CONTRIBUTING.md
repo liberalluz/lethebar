@@ -37,5 +37,8 @@ branch -> commit -> PR -> review -> merge
 ## Merge
 
 - Merge with `gh pr merge --squash`; never push to `main`.
-- A pull request with one commit needs nothing extra. With more than one, pass `--subject` and `--body-file`, because GitHub otherwise takes the Chinese pull request title or concatenates every commit body — run `python infra/tool/merge/pr_merge.py --body-only --pr <n> --why "<reason>" --batch <Bn|none> --out <file>` to write the body, and `--show` without `--out` to read the whole message. Two ways of getting this wrong are already in the history: hand the whole message to `--body-file` and the subject lands on the first body line (#38 to #45), and pipe the output through a shell redirect and every non-ASCII character comes out as U+FFFD (#46) — `--out` avoids both.
-- After merging, run `python infra/tool/merge/pr_merge.py --verify-only`. It reads the top commit of `origin/main` and fails when the subject or the `Why:` / `Batch:` lines are missing; nothing else checks that commit.
+- A squash merge of several commits takes `--subject` and `--body-file`; the body is generated with
+  `pr_merge.py`, never typed by hand. The rules and the two mistakes already in history are in
+  `docs/specs/git-conventions.md` §4.
+- After merging, run `pr_merge.py --verify-only`; §4 says what it reads and why nothing else checks
+  that commit.
