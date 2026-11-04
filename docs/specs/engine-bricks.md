@@ -1,9 +1,10 @@
 # Engine bricks
 
-**Status**: draft for review. Not normative yet. When the B8 batches land this
-becomes the engine's public primitive surface, and the package format v2 refers to
-it. Until then it exists so that the batches implement slices of one settled shape
-instead of inventing fields three times.
+**Status**: normative from v0.1.0. These eight bricks are the engine's public
+primitive surface, and package format `2.0.0` refers to them (ADR-0007). Until
+v0.1.0 ships they exist so that the batches implement slices of one settled
+shape instead of inventing fields three times; after that, changing a brick is a
+format change and needs a new ADR.
 
 Terms used below:
 
@@ -17,6 +18,29 @@ Terms used below:
 
 A package may use any subset of the bricks. Every brick is optional: a package that
 only declares nodes behaves exactly like today's `linear@1` content.
+
+## How a package turns a brick on
+
+The brick is on when its data file is present. There is no manifest list of
+enabled bricks, and that is deliberate: a list would have to be kept in sync with
+the files, and a package that declares `ledger` but ships no `data/state.json` is
+a validation error nobody asked for. Presence is the declaration, and `V-14` …
+`V-21` check what the present file says.
+
+| Brick | File | Absent means |
+|-------|------|--------------|
+| State ledger | `data/state.json` | no resources; a rule that writes one is `V-14` |
+| Settlement rules | `data/rules.json` | effects apply, nothing settles afterwards |
+| Action menu | `data/actions.json` | choices come from the node, as today |
+| Phase machine | `data/phases.json` | a run ends when the story ends, as today |
+| Checks | `data/checks.json` | no rolls; nothing is random except the session seed |
+| Pools | `data/pools.json` | no draws |
+| Relations | `data/factions.json` | no entities; a relation condition is `V-20` |
+| Clock | none | `tick` still advances, nothing reads it |
+
+The three bricks that change what a player can do — menu, phases, checks — are
+what makes a genre different from a story. The other five change what the player
+sees and how the numbers move.
 
 ---
 
@@ -223,6 +247,15 @@ runtime surprise:
 | V-20  | relations | unknown entity id; `ally`/`hostile` used without a declared threshold |
 | V-21  | clock | a package that declares a clock but no growth rule that reads it |
 | V-22  | locales | a declared locale the engine does not support; a declared locale with no `data/i18n/<locale>.json`; a table that leaves a node, a choice label or the text empty |
+| V-23  | manifest | `kind` that is not `bundle`/`layer`; `layer` missing or unknown on a `kind: layer`; `requires` that is not an array of `{id, version}` |
+| V-24  | requires | a requirement that no installed or built-in package satisfies, or whose version falls outside the constraint |
+| W-01  | manifest | `specVersion` absent (a `1.0.0` package): readable through v0.1.x, refused from v0.2.0 |
+
+The `V-` codes are errors and refuse the package; `W-01` is a warning and the
+package still installs. The split is the same one §8.2 of the SDD makes for a
+missing asset: an author's typo must not strand a player mid-scene, so anything
+that can be degraded is degraded and anything that cannot be judged is refused
+at install time.
 
 
 ## Package locales
@@ -251,6 +284,23 @@ A package that uses all eight bricks but stays under 60 lines of data: three tur
 two resources, one action, one check, one pool, two factions. It exists to prove
 the bricks compose before any real content is written, and it is the fixture for
 the B8a/B8b/B8c acceptance lines.
+
+## Compatibility
+
+Format `2.0.0` is the first version that can express a package depending on
+another package, so it is a major bump (ADR-0007): a `1.0.0` engine cannot judge
+`requires`, and starting a story it cannot finish is worse than refusing it.
+
+| Engine | Reads `1.0.0` | Reads `2.0.0` |
+|--------|---------------|---------------|
+| v0.0.x | yes | no — refused by `V-05` |
+| v0.1.x | yes, with `W-01` | yes |
+| v0.2.0 and later | no — refused by `V-05` | yes |
+
+Adding an optional brick field, or an optional manifest field, is a minor bump
+and needs no new ADR: the test is ADR-0006's — an older engine that ignores the
+field must still read the package the same way. `requires` fails that test,
+which is why this one is major.
 
 ## What is deliberately missing
 
