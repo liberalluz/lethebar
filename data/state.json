@@ -1,0 +1,13 @@
+{
+  "resources": [
+    {"id": "power", "label": "power", "init": 0, "min": 0, "max": 10},
+    {
+      "id": "standing",
+      "label": "standing",
+      "init": 0,
+      "min": 0,
+      "max": 2,
+      "labels": {"0": "兵微将寡", "1": "初露锋芒", "2": "名动诸侯"}
+    }
+  ]
+}

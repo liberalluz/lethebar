@@ -1,0 +1,7 @@
+{
+  "rules": [
+    {"when": {"key": "power", "op": "gte", "value": 1}, "set": {"standing": {"value": 1}}},
+    {"when": {"key": "power", "op": "gte", "value": 5}, "set": {"standing": {"value": 2}}},
+    {"when": {"key": "power", "op": "lte", "value": 0}, "set": {"standing": {"value": 0}}}
+  ]
+}
