@@ -70,7 +70,7 @@ Scopes: pick exactly one from the closed list below.
 
 - Squash merge by default.
 - A squashed commit takes its subject from the branch commit, so the subject stays English and the PR title stays in the PR. Do not change the repository merge settings to route PR titles into `main`.
-- Pass the body on its own: `pr_merge.py --body-only --pr <n>` writes what goes into `--body-file`, and `--show` writes the whole message for reading. Handing the whole message to `--body-file` puts the subject on the first body line as well, which is what #38 to #45 look like; those commits were merged before this rule and are not rewritten.
+- Pass the body on its own: `pr_merge.py --body-only --pr <n> --out <file>` writes what goes into `--body-file`, and `--show` without `--out` writes the whole message for reading. Handing the whole message to `--body-file` puts the subject on the first body line as well, which is what #38 to #45 look like; those commits were merged before this rule and are not rewritten. Redirecting the output through a shell pipe decodes UTF-8 as the local code page and turns every character outside ASCII into U+FFFD, which is what #46 carried until it was amended; `--out` writes the file from Python and has no such step.
 - The author does not self-approve.
 - No direct push to `main`.
 - A failed check is fixed, not bypassed.
