@@ -18,6 +18,8 @@ const RULES_PATH := "data/rules.json"
 const ACTIONS_PATH := "data/actions.json"
 const PHASES_PATH := "data/phases.json"
 const CHECKS_PATH := "data/checks.json"
+const POOLS_PATH := "data/pools.json"
+const FACTIONS_PATH := "data/factions.json"
 const DEFAULT_WORK_DIR := "user://pkg"
 
 var registry: InstallRegistry
@@ -56,7 +58,7 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 
 	var manifest: Dictionary = manifest_variant
 	var node_ids: Array = []
-	var data := {"nodes": [], "mechanics": {}, "assets": {}, "i18n": {}, "ledger": {}, "rules": [], "actions": [], "phases": {}, "checks": []}
+	var data := {"nodes": [], "mechanics": {}, "assets": {}, "i18n": {}, "ledger": {}, "rules": [], "actions": [], "phases": {}, "checks": [], "pools": [], "factions": {}}
 
 	if files.has(NODES_PATH):
 		var nodes_variant: Variant = JSON.parse_string(reader.read_file(NODES_PATH).get_string_from_utf8())
@@ -96,6 +98,17 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 			data["phases"] = variant
 		elif variant.get(entry["field"], null) is Array:
 			data[entry["key"]] = variant[entry["field"]]
+	# A pool is a list to draw from and a faction map is a table of opinions;
+	# neither changes the story graph, so a package that carries neither keeps
+	# the pre-brick behaviour (engine-bricks §6, §7).
+	if files.has(POOLS_PATH):
+		var pools_variant: Variant = JSON.parse_string(reader.read_file(POOLS_PATH).get_string_from_utf8())
+		if pools_variant is Dictionary and pools_variant.get("pools", null) is Array:
+			data["pools"] = pools_variant["pools"]
+	if files.has(FACTIONS_PATH):
+		var factions_variant: Variant = JSON.parse_string(reader.read_file(FACTIONS_PATH).get_string_from_utf8())
+		if factions_variant is Dictionary:
+			data["factions"] = factions_variant
 	# Only the bytes a declared asset actually points at are read, and they stay
 	# undecoded: the render layer turns them into a texture or a stream when a
 	# scene asks for one (SDD §8.1 — read from memory, never from disk mid-run).
@@ -126,6 +139,8 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 	check_context["actions"] = data["actions"]
 	check_context["phases"] = data["phases"]
 	check_context["checks"] = data["checks"]
+	check_context["pools"] = data["pools"]
+	check_context["factions"] = data["factions"]
 	check_context["installed"] = registry.versions()
 	if not check_context.has("protocols"):
 		check_context["protocols"] = ProtocolRegistry.known_ids()

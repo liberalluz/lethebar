@@ -32,6 +32,11 @@ var rules: Array
 var actions: Array
 var checks: Array
 var phase: Dictionary
+var pools: Array
+var pools_left: Dictionary
+var pools_shuffled: Dictionary
+var drawn: Array
+var factions: Dictionary
 var turn: int
 var used: Dictionary
 var fail_reason: String
@@ -70,6 +75,11 @@ static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
 	session.actions = data.get("actions", []) if data.get("actions", null) is Array else []
 	session.checks = data.get("checks", []) if data.get("checks", null) is Array else []
 	session.phase = Phases.defines(data.get("phases", {}) if data.get("phases", null) is Dictionary else {})
+	session.pools = data.get("pools", []) if data.get("pools", null) is Array else []
+	session.pools_left = Pools.remaining(session.pools)
+	session.pools_shuffled = {}
+	session.drawn = []
+	session.factions = Relations.defines(data.get("factions", {}) if data.get("factions", null) is Dictionary else {})
 	session.turn = 1
 	session.used = {}
 	session.fail_reason = ""
@@ -207,6 +217,43 @@ func _after_turn() -> void:
 			finished = true
 
 
+func draw(pool_id: String) -> Dictionary:
+	## One draw out of a pool, through the session RNG so the same seed repeats
+	## and a restored run keeps what it already drew (engine-bricks §6).
+	var pool := Pools.by_id(pools, pool_id)
+	if pool.is_empty():
+		reject("S-06", "pool %s does not exist" % pool_id)
+		return {"items": [], "remaining": [], "rng": rng, "shuffled": false}
+	var left: Array = pools_left.get(pool_id, Pools.items(pool))
+	var shuffled := bool(pools_shuffled.get(pool_id, false))
+	var result := Pools.draw(pool, left, rng, shuffled)
+	rng = int(result["rng"])
+	pools_left[pool_id] = result["remaining"]
+	pools_shuffled[pool_id] = true
+	for item in result["items"]:
+		drawn.append({"pool": pool_id, "item": String(item)})
+	return result
+
+
+func relation(from_id: String, to_id: String) -> float:
+	## What `from_id` feels about `to_id`. Only that direction: the package owns
+	## the numbers and the engine never assumes symmetry (engine-bricks §7).
+	return Relations.value(factions, from_id, to_id)
+
+
+func relation_state(from_id: String, to_id: String) -> String:
+	## The first declared threshold crossed, or "" when none is. The state names
+	## are the package's; the engine carries none of its own.
+	return Relations.state(factions, from_id, to_id)
+
+
+func faction_map() -> Array:
+	var out: Array = []
+	for id in factions.get("order", []):
+		out.append({"id": String(id), "label": Relations.label(factions, String(id))})
+	return out
+
+
 func rank() -> String:
 	return Phases.rank(phase, turn)
 
@@ -260,6 +307,11 @@ func view() -> Dictionary:
 	}
 	if declares("progress"):
 		out["progress"] = {"steps": visited.size(), "nodes": nodes.size()}
+	if not (pools as Array).is_empty():
+		out["pools"] = _pool_view()
+	if Relations.declares(factions):
+		out["factions"] = faction_map()
+		out["thresholds"] = (factions.get("thresholds", {}) as Dictionary).duplicate(true)
 	if Phases.declares(phase):
 		out["turn"] = turn
 		out["rank"] = rank()
@@ -283,6 +335,8 @@ func snapshot() -> Dictionary:
 		"finished": finished,
 		"turn": turn,
 		"used": used.duplicate(true),
+		"pools": _pool_snapshot(),
+		"drawn": drawn.duplicate(true),
 	}
 
 
@@ -333,6 +387,47 @@ func _locale_entry(node: Dictionary) -> Dictionary:
 		return {}
 	var entry: Variant = table.get(String(node.get("id", "")), null)
 	return entry if entry is Dictionary else {}
+
+
+func _pool_view() -> Array:
+	var out: Array = []
+	for pool in pools:
+		if not (pool is Dictionary):
+			continue
+		var id := String(pool.get("id", ""))
+		out.append({
+			"id": id,
+			"left": (pools_left.get(id, []) as Array).duplicate(),
+			"size": Pools.items(pool).size(),
+		})
+	return out
+
+
+func _pool_snapshot() -> Dictionary:
+	## What is left of every pool, and whether its order has been fixed by a
+	## draw. Both travel in the save, so reloading cannot re-roll a draw.
+	var out: Dictionary = {}
+	for pool in pools:
+		if not (pool is Dictionary):
+			continue
+		var id := String(pool.get("id", ""))
+		out[id] = {
+			"left": (pools_left.get(id, []) as Array).duplicate(),
+			"shuffled": bool(pools_shuffled.get(id, false)),
+		}
+	return out
+
+
+func restore_pools(saved: Variant) -> void:
+	if not (saved is Dictionary):
+		return
+	for id in saved:
+		var entry: Variant = saved[id]
+		if not (entry is Dictionary):
+			continue
+		if entry.get("left", null) is Array:
+			pools_left[String(id)] = (entry["left"] as Array).duplicate()
+		pools_shuffled[String(id)] = bool(entry.get("shuffled", false))
 
 
 func step_rng() -> void:

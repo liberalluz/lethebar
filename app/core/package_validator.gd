@@ -132,6 +132,22 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 		for problem in Checks.problems(checks):
 			issues.append(_issue("V-18", "checks.json", String(problem), true))
 
+	# V-19, V-20 — pools and relations. A pool that can be drawn past its end
+	# would fail at the table, not at load, so it is refused here; a faction map
+	# that points at an id it never declares cannot be resolved at all. An
+	# asymmetric pair is only a warning: the engine never rewrites what a package
+	# meant (engine-bricks §7).
+	var pools: Variant = context.get("pools", [])
+	if pools is Array and not (pools as Array).is_empty():
+		for problem in Pools.problems(pools):
+			issues.append(_issue("V-19", "pools.json", String(problem), true))
+	var factions: Variant = context.get("factions", {})
+	if factions is Dictionary and not (factions as Dictionary).is_empty():
+		for problem in Relations.problems(factions):
+			var item: Dictionary = problem
+			var code := "V-20" if bool(item.get("fatal", true)) else "W-02"
+			issues.append(_issue(code, "factions.json", String(item.get("message", "")), bool(item.get("fatal", true))))
+
 	# V-05 — the engine version this build is, not the one the author hoped for.
 	var engine_version := String(context.get("engine_version", "0.0.0"))
 	var engine_range := ManifestSchema.parse_engine_range(manifest["engine"])

@@ -119,6 +119,11 @@ plugin.zip
   `bonus.scale * state[bonus.key]`，与 `target` 比较，并把
   `{roll, bonus, total, target, passed}` 记到 `state.checks.<id>`。
 
+- `pools.json`：`{id, items, draw: {n, replace}}`。一次抽取取走 `n` 条，除非 `replace`
+  为真；剩下的部分进存档，重载不能重掷；顺序在第一次抽取时由会话随机数固定，
+  而不是在加载时打乱。
+- `factions.json`：`thresholds` 与 `entities`，每个势力带一组有方向的 `relations`。
+  非负阈值是下限、负阈值是上限；引擎不发明状态名，也不假设关系对称。
 ### 3.4 资源类型
 
 v0.0.0 注册的类型：`texture`、`audio`、`text`。注册表之外的类型不是错误；
@@ -151,6 +156,9 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-16` | 动作 id 唯一、至少一条效果、上限是引擎会统计的那种；它们触碰的每个资源都已声明 | 拒绝 |
 | `V-17` | `turns` 至少为 1，段位在 `1..turns` 内递增，每条失败都带原因与条件 | 拒绝 |
 | `V-18` | 骰子至少两面、目标落在骰子范围内；加成要点名资源 | 拒绝 |
+| `V-19` | 池子不重复列条目、至少抽一个、不 `replace` 时不抽超过容量 | 拒绝 |
+| `V-20` | 关系点到的势力都已声明、阈值都是数字、状态名都来自 `thresholds` | 拒绝 |
+| `W-02` | 方向不一致的关系对（报告，不重写） | 警告 |
 | `V-23` | `kind`、`layer`、`requires` 符合 §3.2 的形状，且 `2.0.0` 的包必须声明 `kind` | 拒绝 |
 | `V-24` | 每条 `requires` 都由已安装或内置的包满足，且版本落在声明范围内 | 拒绝 |
 | `W-01` | `specVersion` 低于 `2.0.0`：现在可读，`v0.2.0` 起拒绝 | 警告 |
@@ -345,6 +353,7 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 | `REQ-021` | §3.2 清单字段、§4.2 校验（`V-23`、`V-24`、`W-01`） |
 | `REQ-022` | §3.3 数据文件（`state.json`、`rules.json`、`labels`）、§4.2 校验（`V-14`）、§6.1 夹取 |
 | `REQ-023` | §3.3 数据文件（`actions.json`、`phases.json`、`checks.json`）、§4.2 校验（`V-16`、`V-17`、`V-18`）、§6.2 结算与回合 |
+| `REQ-024` | §3.3 数据文件（`pools.json`、`factions.json`）、§4.2 校验（`V-19`、`V-20`、`W-02`） |
 
 ## 13. 决策与待定
 

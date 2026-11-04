@@ -57,6 +57,8 @@ func _initialize() -> void:
 	_case_format()
 	_case_ledger()
 	_case_turn()
+	_case_pools()
+	_case_relations()
 	_case_assets()
 
 	print("")
@@ -442,7 +444,7 @@ func _case_det_001() -> void:
 	)
 	var keys: Array = JSON.parse_string(first).keys()
 	keys.sort()
-	var expected := ["finished", "node", "plugin", "protocol", "rng", "schema", "state", "turn", "used", "version", "visited"]
+	var expected := ["drawn", "finished", "node", "plugin", "pools", "protocol", "rng", "schema", "state", "turn", "used", "version", "visited"]
 	_check("TC-DET-001: the payload keeps its declared shape", str(keys) == str(expected), str(keys))
 
 
@@ -1603,6 +1605,209 @@ func _case_ledger() -> void:
 		"" if resumed == null else str(resumed.state)
 	)
 
+
+
+func _case_pools() -> void:
+	_section("TC-POOL-001 drawing from a pool")
+	var nodes := {"nodes": [{"id": "n1", "text": "One.", "choices": []}]}
+	var pools := {
+		"pools": [
+			{"id": "officers", "items": ["cao", "liu", "sun"], "draw": {"n": 1, "replace": false}},
+			{"id": "loot", "items": ["axe", "bow"], "draw": {"n": 2, "replace": true}},
+		],
+	}
+	var result: Dictionary = PackageLoader.new().import_bytes(
+		_package(
+			"pool-draw",
+			{"id": "pool-draw"},
+			[],
+			[],
+			nodes,
+			{},
+			{"data/pools.json": JSON.stringify(pools).to_utf8_buffer()},
+		),
+		_context()
+	)
+	var entry: Dictionary = result.get("entry", {})
+	_check("TC-POOL-001: a package with a pool installs", not entry.is_empty(), str(result))
+	var session := Session.create(entry)
+	session.start()
+	var first := session.draw("officers")
+	_check(
+		"TC-POOL-001: a draw takes the declared number of items",
+		(first["items"] as Array).size() == 1,
+		str(first)
+	)
+	_check(
+		"TC-POOL-001: drawing removes the item unless replace is true",
+		(session.pools_left.get("officers", []) as Array).size() == 2,
+		str(session.pools_left)
+	)
+	var twin := Session.create(entry)
+	twin.start()
+	var twin_draw := twin.draw("officers")
+	_check(
+		"TC-POOL-001: the same seed draws the same items in the same order",
+		str(twin_draw["items"]) == str(first["items"]),
+		"%s vs %s" % [str(first["items"]), str(twin_draw["items"])]
+	)
+	session.draw("loot")
+	session.draw("loot")
+	_check(
+		"TC-POOL-001: a pool that replaces keeps its contents",
+		(session.pools_left.get("loot", []) as Array).size() == 2,
+		str(session.pools_left)
+	)
+
+	MemoryBackend.reset()
+	var store := SaveStore.new()
+	var saved := store.write(entry, 1, session.snapshot(), "缺")
+	_check("TC-POOL-001: the run saves", saved["ok"], String(saved["message"]))
+	var payload: Dictionary = store.read(entry, 1)["payload"]
+	var resumed := SaveStore.new().resume(entry, payload)
+	_check(
+		"TC-POOL-001: a resumed run keeps what is left of its pool",
+		resumed != null and (resumed.pools_left.get("officers", []) as Array).size() == 2,
+		"" if resumed == null else str(resumed.pools_left)
+	)
+
+	var too_big := {
+		"pools": [{"id": "big", "items": ["a"], "draw": {"n": 2, "replace": false}}],
+	}
+	var refused: Dictionary = PackageLoader.new().import_bytes(
+		_package(
+			"pool-too-big",
+			{"id": "pool-too-big"},
+			[],
+			[],
+			nodes,
+			{},
+			{"data/pools.json": JSON.stringify(too_big).to_utf8_buffer()},
+		),
+		_context()
+	)
+	_check(
+		"TC-POOL-001: drawing more than the pool holds without replace is refused with V-19",
+		String(refused.get("code", "")) == "V-19"
+			and String(refused.get("message", "")).contains("without replace"),
+		"%s %s" % [String(refused.get("code", "-")), String(refused.get("message", ""))]
+	)
+	var twice := {"pools": [{"id": "dupes", "items": ["a", "a"], "draw": {"n": 1, "replace": false}}]}
+	var dup_refused: Dictionary = PackageLoader.new().import_bytes(
+		_package(
+			"pool-dupes",
+			{"id": "pool-dupes"},
+			[],
+			[],
+			nodes,
+			{},
+			{"data/pools.json": JSON.stringify(twice).to_utf8_buffer()},
+		),
+		_context()
+	)
+	_check(
+		"TC-POOL-001: an item listed twice is refused with V-19",
+		String(dup_refused.get("code", "")) == "V-19",
+		"%s %s" % [String(dup_refused.get("code", "-")), String(dup_refused.get("message", ""))]
+	)
+
+
+func _case_relations() -> void:
+	_section("TC-REL-001 directed relations")
+	var nodes := {"nodes": [{"id": "n1", "text": "One.", "choices": []}]}
+	var factions := {
+		"thresholds": {"ally": 60, "hostile": -60},
+		"entities": [
+			{"id": "wei", "label": "魏", "relations": {"shu": -40, "wu": 70}},
+			{"id": "shu", "label": "蜀", "relations": {"wei": -40}},
+			{"id": "wu", "label": "吴", "relations": {"wei": 70}},
+		],
+	}
+	var result: Dictionary = PackageLoader.new().import_bytes(
+		_package(
+			"rel-map",
+			{"id": "rel-map"},
+			[],
+			[],
+			nodes,
+			{},
+			{"data/factions.json": JSON.stringify(factions).to_utf8_buffer()},
+		),
+		_context()
+	)
+	var entry: Dictionary = result.get("entry", {})
+	_check("TC-REL-001: a package with a faction map installs", not entry.is_empty(), str(result))
+	var session := Session.create(entry)
+	session.start()
+	_check(
+		"TC-REL-001: a relation reads in the direction the package wrote",
+		is_equal_approx(session.relation("wei", "shu"), -40.0)
+			and is_equal_approx(session.relation("shu", "wei"), -40.0)
+			and is_equal_approx(session.relation("wei", "wu"), 70.0),
+		"%s %s %s" % [session.relation("wei", "shu"), session.relation("shu", "wei"), session.relation("wei", "wu")]
+	)
+	_check(
+		"TC-REL-001: a state name comes from the package thresholds",
+		session.relation_state("wei", "wu") == "ally"
+			and session.relation_state("wei", "shu") == "",
+		"%s %s" % [session.relation_state("wei", "wu"), session.relation_state("wei", "shu")]
+	)
+	_check(
+		"TC-REL-001: the faction map lists the labels the package wrote",
+		str(session.faction_map()).contains("魏") and str(session.faction_map()).contains("吴"),
+		str(session.faction_map())
+	)
+
+	var lopsided := {
+		"thresholds": {"ally": 60},
+		"entities": [
+			{"id": "wei", "relations": {"wu": 70}},
+			{"id": "wu", "relations": {"wei": 10}},
+		],
+	}
+	var warned: Dictionary = PackageLoader.new().import_bytes(
+		_package(
+			"rel-lopsided",
+			{"id": "rel-lopsided"},
+			[],
+			[],
+			nodes,
+			{},
+			{"data/factions.json": JSON.stringify(lopsided).to_utf8_buffer()},
+		),
+		_context()
+	)
+	var warn_codes: Array = []
+	for issue in warned.get("warnings", []):
+		warn_codes.append(String(issue.get("code", "")))
+	_check(
+		"TC-REL-001: an asymmetric pair installs with a W-02 warning",
+		not (warned.get("entry", {}) as Dictionary).is_empty() and warn_codes.has("W-02"),
+		str(warn_codes)
+	)
+
+	var ghost := {
+		"thresholds": {"ally": 60},
+		"entities": [{"id": "wei", "relations": {"ghost": 5}}],
+	}
+	var refused: Dictionary = PackageLoader.new().import_bytes(
+		_package(
+			"rel-ghost",
+			{"id": "rel-ghost"},
+			[],
+			[],
+			nodes,
+			{},
+			{"data/factions.json": JSON.stringify(ghost).to_utf8_buffer()},
+		),
+		_context()
+	)
+	_check(
+		"TC-REL-001: an unknown entity id is refused with V-20",
+		String(refused.get("code", "")) == "V-20"
+			and String(refused.get("message", "")).contains("ghost"),
+		"%s %s" % [String(refused.get("code", "-")), String(refused.get("message", ""))]
+	)
 
 
 func _case_turn() -> void:

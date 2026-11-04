@@ -132,6 +132,13 @@ installs (§4.2, `W-01`).
   and records `{roll, bonus, total, target, passed}` under `state.checks.<id>`.
 ### 3.4 Asset types
 
+- `pools.json`: `{id, items, draw: {n, replace}}`. A draw takes `n` items and
+  removes them unless `replace` is true; the remainder is saved, so a reload
+  cannot re-roll it, and the order is fixed by the session RNG on the first
+  draw rather than at load.
+- `factions.json`: `thresholds` and `entities`, each entity carrying directed
+  `relations`. A non-negative threshold is a floor, a negative one is a
+  ceiling; the engine invents no state names and assumes no symmetry.
 Registered types in v0.0.0: `texture`, `audio`, `text`. A type outside the
 registry is not an error; the asset is skipped and reported (§8.2).
 
@@ -162,6 +169,9 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-16` | actions have unique ids, at least one effect, and limits the engine counts; every resource they touch is declared | reject |
 | `V-17` | `turns` is at least 1, ranks ascend inside `1..turns`, every failure carries a reason and a condition | reject |
 | `V-18` | a die has at least two sides and the target lies inside the dice range; a bonus names a resource | reject |
+| `V-19` | a pool lists no item twice, draws at least one, and does not draw past its size without replace | reject |
+| `V-20` | every entity a relation points at is declared, every threshold is a number, and every state name comes from `thresholds` | reject |
+| `W-02` | a relation pair that disagrees in direction (reported, not rewritten) | warn |
 | `V-23` | `kind`, `layer` and `requires` have the shape §3.2 gives them, and a `2.0.0` package declares `kind` | reject |
 | `V-24` | every `requires` entry is satisfied by an installed or built-in package whose version falls inside the declared range | reject |
 | `W-01` | `specVersion` is below `2.0.0`: readable now, refused from v0.2.0 | warn |
@@ -390,6 +400,7 @@ declare.
 | `REQ-021` | §3.2 manifest fields, §4.2 validation (`V-23`, `V-24`, `W-01`) |
 | `REQ-022` | §3.3 data files (`state.json`, `rules.json`, `labels`), §4.2 validation (`V-14`), §6.1 clamping |
 | `REQ-023` | §3.3 data files (`actions.json`, `phases.json`, `checks.json`), §4.2 validation (`V-16`, `V-17`, `V-18`), §6.2 settlement and turns |
+| `REQ-024` | §3.3 data files (`pools.json`, `factions.json`), §4.2 validation (`V-19`, `V-20`, `W-02`) |
 
 ## 13. Decisions and open questions
 

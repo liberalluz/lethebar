@@ -356,3 +356,43 @@ path, so the case survives fixture renames.
      equal.
 - Exit: steps 1–6 pass; a disabled action never changes state, a limit is counted
   per run, and the same seed reproduces the same roll.
+
+### `TC-POOL-001`
+
+- Covers: `REQ-024`
+- Preconditions: headless run; fixture `pool-draw` (one pool of three items that
+  draws one and does not replace, one pool of two that draws both and replaces)
+  and fixture `pool-too-big` (a pool of one that draws two without replace), plus
+  `pool-dupes` (the same item listed twice).
+- Steps:
+  1. Install `pool-draw` and draw once: exactly one item comes back and the pool
+     is one item shorter.
+  2. Build a second session from the same entry and draw once: the same item
+     comes back, because both sessions share the seed.
+  3. Draw twice from the replacing pool: it is still two items long.
+  4. Save the run, read it back and resume it: the pool that lost an item is
+     still one item shorter.
+  5. Install `pool-too-big`: refused with `V-19` and the message says the draw
+     exceeds the pool without `replace`.
+  6. Install `pool-dupes`: refused with `V-19` for the repeated item.
+- Exit: steps 1–6 pass; a draw is not re-rolled by a reload and the same seed
+  reproduces the same draw.
+
+### `TC-REL-001`
+
+- Covers: `REQ-024`
+- Preconditions: headless run; fixture `rel-map` (thresholds `ally` 60 and
+  `hostile` -60; `wei` carries `shu` -40 and `wu` 70, `shu` and `wu` carry their
+  own values back), fixture `rel-lopsided` (70 one way, 10 the other) and
+  `rel-ghost` (`wei` points at an undeclared `ghost`).
+- Steps:
+  1. Install `rel-map` and read the two directions of a pair: each returns the
+     number the package wrote for that direction.
+  2. Read `wei → wu` and `wei → shu` as states: the first is `ally`, the second is
+     empty because -40 crosses neither a floor of 60 nor a ceiling of -60.
+  3. Read the faction map: the labels are the ones the package wrote.
+  4. Install `rel-lopsided`: it installs, and the issue list carries `W-02` for
+     the pair that disagrees.
+  5. Install `rel-ghost`: refused with `V-20` naming the unknown entity.
+- Exit: steps 1–5 pass; the engine invents no state names, assumes no symmetry
+  and never rewrites a pair.

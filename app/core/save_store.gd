@@ -48,6 +48,10 @@ func write(entry: Dictionary, slot: int, snapshot: Dictionary, preview: String =
 		"rng": int(snapshot.get("rng", 0)),
 		"visited": snapshot.get("visited", []).duplicate(),
 		"finished": bool(snapshot.get("finished", false)),
+		"turn": int(snapshot.get("turn", 1)),
+		"used": snapshot.get("used", {}).duplicate(true),
+		"pools": snapshot.get("pools", {}).duplicate(true),
+		"drawn": snapshot.get("drawn", []).duplicate(true),
 		"preview": preview.left(PREVIEW_LIMIT),
 		"savedAt": Time.get_datetime_string_from_system(true),
 	}
@@ -105,6 +109,10 @@ func read(entry: Dictionary, slot: int) -> Dictionary:
 			"rng": int(payload.get("rng", 0)),
 			"visited": payload.get("visited", []),
 			"finished": bool(payload.get("finished", false)),
+			"turn": int(payload.get("turn", 1)),
+			"used": payload.get("used", {}),
+			"pools": payload.get("pools", {}),
+			"drawn": payload.get("drawn", []),
 			"preview": String(payload.get("preview", "")),
 			"savedAt": String(payload.get("savedAt", "")),
 		},
@@ -147,6 +155,8 @@ func resume(entry: Dictionary, payload: Dictionary) -> Session:
 	session.finished = bool(payload.get("finished", false))
 	session.turn = int(payload.get("turn", 1))
 	session.used = payload.get("used", {}) if payload.get("used", null) is Dictionary else {}
+	session.drawn = payload.get("drawn", []) if payload.get("drawn", null) is Array else []
+	session.restore_pools(payload.get("pools", {}))
 	return session
 
 
