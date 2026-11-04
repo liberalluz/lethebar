@@ -37,5 +37,5 @@ branch -> commit -> PR -> review -> merge
 ## Merge
 
 - Merge with `gh pr merge --squash`; never push to `main`.
-- A pull request with one commit needs nothing extra. With more than one, pass `--subject` and `--body-file`, because GitHub otherwise takes the Chinese pull request title or concatenates every commit body — run `python infra/tool/merge/pr_merge.py --show --pr <n> --why "<reason>" --batch <Bn|none>` to build both.
+- A pull request with one commit needs nothing extra. With more than one, pass `--subject` and `--body-file`, because GitHub otherwise takes the Chinese pull request title or concatenates every commit body — run `python infra/tool/merge/pr_merge.py --show --pr <n> --why "<reason>" --batch <Bn|none>` to read the whole message, and the same command with `--body-only` to write the file `--body-file` takes. Hand the whole message to `--body-file` and the subject lands on the first body line as well; that is the shape of #38 to #45.
 - After merging, run `python infra/tool/merge/pr_merge.py --verify-only`. It reads the top commit of `origin/main` and fails when the subject or the `Why:` / `Batch:` lines are missing; nothing else checks that commit.
