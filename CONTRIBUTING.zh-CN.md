@@ -37,6 +37,6 @@
 ## 合并
 
 - 用 `gh pr merge --squash` 合并，不要直接推 `main`。
-- 只有一笔提交的 PR 不用额外传参。多笔提交时要传 `--subject` 与 `--body-file`，否则 GitHub 会取中文的 PR 标题、或把每笔提交的正文拼在一起——用 `python infra/tool/merge/pr_merge.py --show --pr <n> --why "<理由>" --batch <Bn|none>` 读整条信息，同一条命令加 `--body-only` 写出 `--body-file` 要的那个文件。把整条信息交给 `--body-file`，标题会跟着落到正文第一行；`#38` 到 `#45` 就是这个形状。
+- 只有一笔提交的 PR 不用额外传参。多笔提交时要传 `--subject` 与 `--body-file`，否则 GitHub 会取中文的 PR 标题、或把每笔提交的正文拼在一起——用 `python infra/tool/merge/pr_merge.py --body-only --pr <n> --why "<理由>" --batch <Bn|none> --out <文件>` 写正文，用不带 `--out` 的 `--show` 读整条信息。已经有两条错法留在历史里：把整条信息交给 `--body-file`，标题会落到正文第一行（`#38` 到 `#45`）；把输出用 shell 重定向写文件，所有非 ASCII 字符会变成 U+FFFD（`#46` 丢的那个破折号）——`--out` 两条都避开。
 - 合并之后跑 `python infra/tool/merge/pr_merge.py --verify-only`。它读 `origin/main` 顶上那条提交，标题或 `Why:` / `Batch:` 缺了就会失败；这条提交没有别的检查覆盖。
 

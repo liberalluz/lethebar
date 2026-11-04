@@ -404,6 +404,7 @@ def _show_body(
     batch: str | None,
     note: str | None,
     subject: str | None,
+    out: str | None = None,
 ) -> int:
     """Print only the body, for `gh pr merge --body-file`.
 
@@ -412,6 +413,11 @@ def _show_body(
     as well, which is what happened to #38 to #45: every one of those commits
     repeats its own subject on the first body line. This prints the body alone so
     that mistake is not available.
+
+    `--out` writes the file here instead of through a shell pipe. Piping this
+    output into a PowerShell redirect decodes UTF-8 as the local code page and
+    turns every character outside ASCII into U+FFFD; that is how `#46` lost its
+    em dash. Writing from Python keeps the bytes as they are.
     """
     commits = _gh_commits(pr_number)
     try:
@@ -422,7 +428,13 @@ def _show_body(
         print(f"cannot build a message: {exc}", file=sys.stderr)
         return 1
     _, body = split_message(message)
-    print(body, end="" if body.endswith("\n") else "\n")
+    text = body if body.endswith("\n") else body + "\n"
+    if out:
+        with open(out, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+        print(f"wrote {len(text)} characters to {out}")
+        return 0
+    print(text, end="")
     return 0
 
 
@@ -464,6 +476,10 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="print just the body, for `gh pr merge --body-file`",
     )
+    parser.add_argument(
+        "--out",
+        help="write the body here instead of printing it; avoids a shell pipe",
+    )
     parser.add_argument("--pr", type=int, help="pull request number, with --show or --body-only")
     parser.add_argument("--verify-only", action="store_true", help="check a merged commit")
     parser.add_argument("--ref", default="origin/main", help="commit to check, default origin/main")
@@ -486,7 +502,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.pr is None:
             print("--body-only needs --pr", file=sys.stderr)
             return 2
-        return _show_body(args.pr, args.why, args.batch, args.note, args.subject)
+        return _show_body(args.pr, args.why, args.batch, args.note, args.subject, args.out)
 
     print(
         "nothing to do: pass --self-test, --show --pr <n>, --body-only --pr <n>, or --verify-only",
