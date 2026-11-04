@@ -9,14 +9,15 @@ English · [简体中文](README.zh-CN.md)
 
 ## Status
 
-**v0.0.1 is out and playable in a browser.**
+**v0.0.2 is out and playable in a browser.**
 
 - Two built-in stories ship with it: `sanguo` (three decision rounds, `turn_based@1`) and `xiuxian` (a five-scene segment, `linear@1`)
 - It also installs a `.zip` pack from your own disk, keeps three save slots per pack, and reopens offline
-- The interface speaks English and Chinese; a pack can carry its own text tables, so `sanguo` reads in either language
+- The interface speaks English and Chinese; a pack can carry its own text tables, so both stories read in either language
 - A pack can declare pictures and sound, and a scene draws them; `sanguo` ships a painted scene and a short theme
+- The shipped font covers CJK extension A, so an ideograph outside the BMP block draws as a glyph instead of a box
 - Verified on desktop Chrome and on iOS Safari, online and with the network off
-- Known gaps: only PNG, JPEG and WAV; one picture band and one portrait column; `xiuxian` still carries Chinese text only
+- Known gaps: only PNG, JPEG and WAV; one picture band and one portrait column; CJK extension B still draws as boxes
 - Next: `v0.1.0` opens the pack format to the eight content bricks
 
 This repository is public now because the plugin spec should be seen and challenged early.
