@@ -249,7 +249,7 @@ runtime surprise:
 | V-22  | locales | a declared locale the engine does not support; a declared locale with no `data/i18n/<locale>.json`; a table that leaves a node, a choice label or the text empty |
 | V-23  | manifest | `kind` that is not `bundle`/`layer`; `layer` missing or unknown on a `kind: layer`; `requires` that is not an array of `{id, version}` |
 | V-24  | requires | a requirement that no installed or built-in package satisfies, or whose version falls outside the constraint |
-| W-01  | manifest | `specVersion` absent (a `1.0.0` package): readable through v0.1.x, refused from v0.2.0 |
+| W-01  | manifest | `specVersion` still declares `1.0.0`: readable through v0.1.x, refused from v0.2.0 |
 
 The `V-` codes are errors and refuse the package; `W-01` is a warning and the
 package still installs. The split is the same one §8.2 of the SDD makes for a

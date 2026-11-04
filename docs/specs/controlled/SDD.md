@@ -94,6 +94,12 @@ format works identically in a browser and in a native build.
 | `entry` | string | starting node id |
 | `saveSchema` | integer | save payload version this plugin produces |
 | `assets` | array of `{type,path}` | declared asset inventory |
+| `kind` | `bundle` \| `layer` | required by format `2.0.0`: playable on its own, or a piece another package requires (ADR-0007) |
+| `layer` | `profession` \| `genre` \| `mod` \| `content` \| `meta` \| `assets` | required when `kind` is `layer`; names which piece of the seven-layer design it is |
+| `requires` | array of `{id, version}` | packages that have to be installed before this one can be played; `version` uses the same range syntax as `engine` |
+
+A package written for `1.0.0` declares none of the last three fields and still
+installs (§4.2, `W-01`).
 
 ### 3.3 Data files
 
@@ -131,9 +137,15 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-07` | `entry` node exists in `nodes.json` | reject |
 | `V-08` | every declared asset path exists in the package | warn, skip asset |
 | `V-09` | `saveSchema` is a positive integer | reject |
+| `V-23` | `kind`, `layer` and `requires` have the shape §3.2 gives them, and a `2.0.0` package declares `kind` | reject |
+| `V-24` | every `requires` entry is satisfied by an installed or built-in package whose version falls inside the declared range | reject |
+| `W-01` | `specVersion` is below `2.0.0`: readable now, refused from v0.2.0 | warn |
 
 Every rejection names its code and the offending field; a rejection never
-disturbs already-installed plugins or their saves.
+disturbs already-installed plugins or their saves. `V-24` is checked at install
+time rather than when the story starts, because a bundle whose requirement is
+missing cannot be finished and the player would only find out at the scene where
+it runs out (ADR-0007).
 
 ### 4.3 Install registry
 
@@ -343,6 +355,7 @@ declare.
 | `REQ-018` | §11.1 interface language |
 | `REQ-019` | §8.3 placement, §8.4 accepted formats |
 | `REQ-020` | §11.2 package language, §4.2 validation (`V-22`) |
+| `REQ-021` | §3.2 manifest fields, §4.2 validation (`V-23`, `V-24`, `W-01`) |
 
 ## 13. Decisions and open questions
 

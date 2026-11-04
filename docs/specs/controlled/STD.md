@@ -285,3 +285,26 @@ path, so the case survives fixture renames.
      installed.
 - Exit: steps 1–4 pass, and the built-in package shows English text when the
   reader's language is English.
+
+### `TC-FMT-001`
+
+- Covers: `REQ-021`
+- Preconditions: headless run; fixture manifests built from one template
+  (`fmt-bundle`, `fmt-no-layer`, `fmt-bad-layer`, `fmt-needs`, `fmt-layer`,
+  `fmt-range`, `fmt-ok`, `fmt-legacy`); no fixture installed except where a step
+  installs one first.
+- Steps:
+  1. Install `fmt-bundle` (format `2.0.0`, `kind: bundle`, no requirements): it
+     installs and the session plays as before.
+  2. Install `fmt-no-layer` (`kind: layer`, no `layer`) and `fmt-bad-layer`
+     (`layer: weather`): both are refused with `V-23`.
+  3. Install `fmt-needs`, whose only requirement is a package that is neither
+     installed nor built in: refused with `V-24`.
+  4. Install `fmt-layer` (`1.0.0`, `kind: layer`, `layer: mod`), then
+     `fmt-range`, which requires `>=2.0.0 <3.0.0`: refused with `V-24`, and the
+     message names both `fmt-layer` and its installed version.
+  5. Install `fmt-ok`, which requires `fmt-layer` at `>=1.0.0 <2.0.0`: installs.
+  6. Install `fmt-legacy` (`specVersion: 1.0.0`): installs, and its warning list
+     is exactly one `W-01`.
+- Exit: steps 1–6 pass; a `2.0.0` package that cannot resolve its requirements
+  never reaches the play screen.
