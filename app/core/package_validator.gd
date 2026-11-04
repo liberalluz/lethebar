@@ -108,6 +108,30 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 				true,
 			))
 
+	# V-16, V-17, V-18 — the other three bricks, each refused where an author's
+	# typo would otherwise become a runtime surprise (engine-bricks, validation
+	# surface). They are only checked when the package declares them: a package
+	# without a menu, a phase machine or a check is a reading experience.
+	var actions: Array = context.get("actions", [])
+	var declared_resources: Dictionary = {}
+	var actions_ledger: Variant = context.get("ledger", {})
+	if actions_ledger is Dictionary and not actions_ledger.is_empty():
+		declared_resources = Ledger.definitions(actions_ledger)
+	if not actions.is_empty():
+		for problem in Menu.problems(actions):
+			issues.append(_issue("V-16", "actions.json", String(problem), true))
+		for key in Menu.referenced_keys(actions):
+			if not declared_resources.is_empty() and not declared_resources.has(key):
+				issues.append(_issue("V-16", "actions.json", "action names resource %s, which data/state.json never declares" % key, true))
+	var phases: Variant = context.get("phases", {})
+	if phases is Dictionary and Phases.declares(phases):
+		for problem in Phases.problems(phases):
+			issues.append(_issue("V-17", "phases.json", String(problem), true))
+	var checks: Array = context.get("checks", [])
+	if not checks.is_empty():
+		for problem in Checks.problems(checks):
+			issues.append(_issue("V-18", "checks.json", String(problem), true))
+
 	# V-05 — the engine version this build is, not the one the author hoped for.
 	var engine_version := String(context.get("engine_version", "0.0.0"))
 	var engine_range := ManifestSchema.parse_engine_range(manifest["engine"])

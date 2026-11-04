@@ -118,6 +118,18 @@ installs (§4.2, `W-01`).
   writes must be declared in `state.json` (`V-14`). There is no control flow and
   no expression language beyond comparisons and arithmetic.
 
+- `actions.json`: the menu. Each action has `id`, `label`, optional `costs`,
+  `requires`, `effects` and `limit` (`per_turn` or `per_run`). Costs and effects
+  are applied to a copy and committed together, so a refused action writes
+  nothing; an action whose `requires` fail is listed as unavailable with the
+  failing condition instead of disappearing.
+- `phases.json`: `turns`, `ranks` and `fail`. The turn number is the only
+  bookkeeping — a rank is read from it, so a restored save shows the rank for its
+  turn. `fail` is evaluated after settlement; the first match ends the run and
+  its `reason` is what the player is told.
+- `checks.json`: `{id, when, roll, target, bonus}`. A check rolls from the session
+  RNG, adds `bonus.scale * state[bonus.key]`, compares the total with `target`,
+  and records `{roll, bonus, total, target, passed}` under `state.checks.<id>`.
 ### 3.4 Asset types
 
 Registered types in v0.0.0: `texture`, `audio`, `text`. A type outside the
@@ -147,6 +159,9 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-08` | every declared asset path exists in the package | warn, skip asset |
 | `V-09` | `saveSchema` is a positive integer | reject |
 | `V-14` | every resource a rule reads or writes is declared in `state.json`, and the ledger itself is well formed | reject |
+| `V-16` | actions have unique ids, at least one effect, and limits the engine counts; every resource they touch is declared | reject |
+| `V-17` | `turns` is at least 1, ranks ascend inside `1..turns`, every failure carries a reason and a condition | reject |
+| `V-18` | a die has at least two sides and the target lies inside the dice range; a bonus names a resource | reject |
 | `V-23` | `kind`, `layer` and `requires` have the shape §3.2 gives them, and a `2.0.0` package declares `kind` | reject |
 | `V-24` | every `requires` entry is satisfied by an installed or built-in package whose version falls inside the declared range | reject |
 | `W-01` | `specVersion` is below `2.0.0`: readable now, refused from v0.2.0 | warn |
@@ -374,6 +389,7 @@ declare.
 | `REQ-020` | §11.2 package language, §4.2 validation (`V-22`) |
 | `REQ-021` | §3.2 manifest fields, §4.2 validation (`V-23`, `V-24`, `W-01`) |
 | `REQ-022` | §3.3 data files (`state.json`, `rules.json`, `labels`), §4.2 validation (`V-14`), §6.1 clamping |
+| `REQ-023` | §3.3 data files (`actions.json`, `phases.json`, `checks.json`), §4.2 validation (`V-16`, `V-17`, `V-18`), §6.2 settlement and turns |
 
 ## 13. Decisions and open questions
 

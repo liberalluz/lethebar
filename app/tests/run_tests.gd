@@ -56,6 +56,7 @@ func _initialize() -> void:
 	_case_i18n_shipped()
 	_case_format()
 	_case_ledger()
+	_case_turn()
 	_case_assets()
 
 	print("")
@@ -441,7 +442,7 @@ func _case_det_001() -> void:
 	)
 	var keys: Array = JSON.parse_string(first).keys()
 	keys.sort()
-	var expected := ["finished", "node", "plugin", "protocol", "rng", "schema", "state", "version", "visited"]
+	var expected := ["finished", "node", "plugin", "protocol", "rng", "schema", "state", "turn", "used", "version", "visited"]
 	_check("TC-DET-001: the payload keeps its declared shape", str(keys) == str(expected), str(keys))
 
 
@@ -1600,6 +1601,124 @@ func _case_ledger() -> void:
 		"TC-LEDGER-001: a resumed run reads the numbers it saved",
 		resumed != null and is_equal_approx(float(resumed.state.get("power", -1.0)), float(ordered_session.state.get("power", -2.0))),
 		"" if resumed == null else str(resumed.state)
+	)
+
+
+
+func _case_turn() -> void:
+	_section("TC-TURN-001 the menu, the phase machine and a check")
+	var nodes := {
+		"nodes": [
+			{"id": "n1", "text": "One.", "choices": [{"label": "Go", "next": "n2"}]},
+			{"id": "n2", "text": "Two.", "choices": []},
+		],
+	}
+	var ledger := {"resources": [{"id": "grain", "init": 10, "min": 0, "max": 100}, {"id": "pop", "init": 0, "min": 0, "max": 100}, {"id": "prestige", "init": 4, "min": 0, "max": 100}]}
+	var actions := {
+		"actions": [
+			{"id": "recruit", "label": "招兵", "costs": {"grain": {"add": -20}}, "requires": [{"key": "grain", "op": "gte", "value": 20}], "effects": [{"pop": {"add": 3}}], "limit": {"per_run": 1}},
+			{"id": "drill", "label": "操练", "effects": [{"pop": {"add": 1}}]},
+		],
+	}
+	var phases := {"turns": 3, "ranks": [{"at": 1, "title": "校尉"}, {"at": 2, "title": "将军"}], "fail": [{"when": {"key": "pop", "op": "gte", "value": 3}, "reason": "人满为患"}]}
+	var checks := {"checks": [{"id": "battle", "roll": {"dice": 1, "sides": 100}, "target": 60, "bonus": {"key": "prestige", "scale": 0.5}}]}
+	var files := {
+		"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+		"data/actions.json": JSON.stringify(actions).to_utf8_buffer(),
+		"data/phases.json": JSON.stringify(phases).to_utf8_buffer(),
+		"data/checks.json": JSON.stringify(checks).to_utf8_buffer(),
+	}
+	var menu_result: Dictionary = PackageLoader.new().import_bytes(
+		_package("turn-menu", {"id": "turn-menu"}, [], [], nodes, {}, files),
+		_context()
+	)
+	var entry: Dictionary = menu_result.get("entry", {})
+	_check("TC-TURN-001: the package with a menu installs", not entry.is_empty(), str(menu_result))
+	var session := Session.create(entry)
+	session.start()
+
+	var menu := session.menu()
+	var recruit: Dictionary = menu[0]
+	_check(
+		"TC-TURN-001: an action whose requirement fails is listed as unavailable",
+		not recruit["enabled"] and String(recruit["reason"]).contains("grain"),
+		str(recruit)
+	)
+	var before := session.state.duplicate(true)
+	session.act("recruit")
+	_check(
+		"TC-TURN-001: an unavailable action writes nothing",
+		float(session.state.get("grain", 0.0)) == float(before.get("grain", -1.0)) and float(session.state.get("pop", 9.0)) == 0.0,
+		str(session.state)
+	)
+	var drilled := session.act("drill")
+	_check(
+		"TC-TURN-001: an available action applies its effects",
+		float(drilled["state"].get("pop", 0.0)) == 1.0,
+		str(drilled["state"])
+	)
+	session.act("drill")
+	var limited := session.act("drill")
+	_check(
+		"TC-TURN-001: the third drill ends the run through the failure condition",
+		bool(limited.get("finished", false)) and String(limited.get("failReason", "")) == "人满为患",
+		"%s %s" % [str(limited.get("finished", false)), String(limited.get("failReason", ""))]
+	)
+
+	var ledger_two := {"resources": [{"id": "grain", "init": 25, "min": 0, "max": 100}, {"id": "pop", "init": 0, "min": 0, "max": 100}]}
+	var spend := {"actions": [{"id": "spend", "label": "spend", "costs": {"grain": {"add": -20}}, "effects": [{"pop": {"add": 1}}], "limit": {"per_run": 1}}]}
+	var run_phases := {"turns": 3, "ranks": [{"at": 1, "title": "校尉"}, {"at": 2, "title": "将军"}], "fail": []}
+	var run_files := {
+		"data/state.json": JSON.stringify(ledger_two).to_utf8_buffer(),
+		"data/actions.json": JSON.stringify(spend).to_utf8_buffer(),
+		"data/phases.json": JSON.stringify(run_phases).to_utf8_buffer(),
+	}
+	var run_result: Dictionary = PackageLoader.new().import_bytes(
+		_package("turn-run", {"id": "turn-run"}, [], [], nodes, {}, run_files),
+		_context()
+	)
+	var run: Dictionary = run_result.get("entry", {})
+	var run_session := Session.create(run)
+	run_session.start()
+	var spent := run_session.act("spend")
+	_check(
+		"TC-TURN-001: costs and effects are applied in one step",
+		float(spent["state"].get("grain", 0.0)) == 5.0 and float(spent["state"].get("pop", 0.0)) == 1.0,
+		str(spent["state"])
+	)
+	_check(
+		"TC-TURN-001: acting advances the turn",
+		int(spent.get("turn", 0)) == 2,
+		str(spent.get("turn", -1))
+	)
+	var twice := run_session.act("spend")
+	_check(
+		"TC-TURN-001: a per-run limit refuses the second use and writes nothing",
+		float(twice["state"].get("grain", 0.0)) == 5.0 and float(twice["state"].get("pop", 0.0)) == 1.0,
+		str(twice["state"])
+	)
+	_check(
+		"TC-TURN-001: the rank follows the turn",
+		String(spent.get("rank", "")) == "将军",
+		String(spent.get("rank", ""))
+	)
+
+	var check_run := Session.create(entry)
+	check_run.start()
+	var rolled := check_run.resolve("battle")
+	var stored: Dictionary = check_run.state.get("checks", {}).get("battle", {})
+	_check(
+		"TC-TURN-001: a check stores the numbers that decided it",
+		bool(rolled["ok"]) and stored.get("total", -1) == int(rolled["roll"]) + int(rolled["bonus"]) and stored.get("target", 0) == 60,
+		str(stored)
+	)
+	var again := Session.create(entry)
+	again.start()
+	var second := again.resolve("battle")
+	_check(
+		"TC-TURN-001: the same seed repeats the same roll",
+		int(second["roll"]) == int(rolled["roll"]),
+		"%s vs %s" % [str(second["roll"]), str(rolled["roll"])]
 	)
 
 

@@ -29,6 +29,12 @@ var i18n: Dictionary
 var ledger: Dictionary
 var ledger_defs: Dictionary
 var rules: Array
+var actions: Array
+var checks: Array
+var phase: Dictionary
+var turn: int
+var used: Dictionary
+var fail_reason: String
 
 
 static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
@@ -61,6 +67,12 @@ static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
 	if data.get("mechanics", null) is Dictionary:
 		session.mechanics = data["mechanics"]
 	session.rules = data.get("rules", []) if data.get("rules", null) is Array else []
+	session.actions = data.get("actions", []) if data.get("actions", null) is Array else []
+	session.checks = data.get("checks", []) if data.get("checks", null) is Array else []
+	session.phase = Phases.defines(data.get("phases", {}) if data.get("phases", null) is Dictionary else {})
+	session.turn = 1
+	session.used = {}
+	session.fail_reason = ""
 	session.i18n = data.get("i18n", {}) if data.get("i18n", null) is Dictionary else {}
 	session.locale = String(options.get("locale", ""))
 	var counter := int(options.get("start_counter", DEFAULT_START_COUNTER))
@@ -134,6 +146,84 @@ func label_for(id: String) -> String:
 	return Ledger.label_for(ledger_defs, id, float(state.get(id, 0.0)))
 
 
+
+func act(action_id: String) -> Dictionary:
+	## One turn of the menu (engine-bricks §3). Costs and effects are applied to a
+	## copy and committed together: if any part is refused nothing is written.
+	if finished:
+		return view()
+	var action := Menu.by_id(actions, action_id)
+	if action.is_empty():
+		reject("S-04", "no action named %s" % action_id)
+		return view()
+	var availability := Menu.availability(action, self)
+	if not availability["enabled"]:
+		reject("S-05", "%s is not available: %s" % [action_id, String(availability["reason"])])
+		return view()
+	var before := state.duplicate(true)
+	var scratch := state.duplicate(true)
+	var costs: Variant = action.get("costs", {})
+	if costs is Dictionary:
+		var paid := Mechanics.apply_effects([costs], scratch)
+		_absorb(paid["warnings"])
+		scratch = paid["state"]
+	var effects: Variant = action.get("effects", [])
+	if effects is Array:
+		var done := Mechanics.apply_effects(effects, scratch)
+		_absorb(done["warnings"])
+		scratch = done["state"]
+	scratch = _clamped(scratch)
+	state = scratch
+	Menu.record_use(action, self)
+	_step_rng()
+	turn += 1
+	_after_turn()
+	if state == before:
+		pass
+	return view()
+
+
+func resolve(check_id: String) -> Dictionary:
+	## A check keeps the numbers that decided it, so the interface can say why
+	## (engine-bricks §5). A run only ends here when the package says so.
+	if finished:
+		return view()
+	var result := Checks.resolve(self, check_id)
+	_after_turn()
+	apply_rules()
+	return result
+
+
+func _after_turn() -> void:
+	## The phase machine reads the turn, so the rank needs no bookkeeping; a
+	## failing condition ends the run and its reason is what the player is told.
+	if Phases.declares(phase):
+		var failed := Phases.failure(phase, state)
+		if not failed.is_empty():
+			fail_reason = String(failed.get("reason", ""))
+			finished = true
+			return
+		if turn > int(phase.get("turns", Phases.DEFAULT_TURNS)):
+			finished = true
+
+
+func rank() -> String:
+	return Phases.rank(phase, turn)
+
+
+func menu() -> Array:
+	var out: Array = []
+	for action in actions:
+		var availability := Menu.availability(action, self)
+		out.append({
+			"id": String(action.get("id", "")),
+			"label": String(action.get("label", action.get("id", ""))),
+			"enabled": availability["enabled"],
+			"reason": String(availability["reason"]),
+		})
+	return out
+
+
 func choices() -> Array:
 	return choices_of(nodes.get(current, {}))
 
@@ -170,6 +260,11 @@ func view() -> Dictionary:
 	}
 	if declares("progress"):
 		out["progress"] = {"steps": visited.size(), "nodes": nodes.size()}
+	if Phases.declares(phase):
+		out["turn"] = turn
+		out["rank"] = rank()
+		out["actions"] = menu()
+		out["failReason"] = fail_reason
 	return out
 
 
@@ -186,6 +281,8 @@ func snapshot() -> Dictionary:
 		"rng": rng,
 		"visited": visited.duplicate(),
 		"finished": finished,
+		"turn": turn,
+		"used": used.duplicate(true),
 	}
 
 
@@ -236,6 +333,10 @@ func _locale_entry(node: Dictionary) -> Dictionary:
 		return {}
 	var entry: Variant = table.get(String(node.get("id", "")), null)
 	return entry if entry is Dictionary else {}
+
+
+func step_rng() -> void:
+	_step_rng()
 
 
 func _step_rng() -> void:

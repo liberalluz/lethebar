@@ -145,6 +145,8 @@ func resume(entry: Dictionary, payload: Dictionary) -> Session:
 	session.rng = int(payload.get("rng", 1))
 	session.visited = payload.get("visited", []).duplicate()
 	session.finished = bool(payload.get("finished", false))
+	session.turn = int(payload.get("turn", 1))
+	session.used = payload.get("used", {}) if payload.get("used", null) is Dictionary else {}
 	return session
 
 
