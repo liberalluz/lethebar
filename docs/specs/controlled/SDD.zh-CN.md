@@ -108,6 +108,17 @@ plugin.zip
 - 规则点名资源，而不是自由变量：规则读写的每个键都必须在 `state.json` 里声明（`V-14`）。
   没有控制流，除比较与算术外没有表达式语言。
 
+- `actions.json`：菜单。每个动作有 `id`、`label`，可带 `costs`、`requires`、
+  `effects` 与 `limit`（`per_turn` 或 `per_run`）。代价与效果先作用在副本上再一起提交，
+  被拒的动作什么都不写；`requires` 不满足的动作被列为不可用并给出不满足的条件，而不是
+  从菜单里消失。
+- `phases.json`：`turns`、`ranks`、`fail`。回合数是唯一的记账——段位从它读出，所以恢复
+  的存档显示它那一回合的段位。`fail` 在结算之后求值；第一条命中的结束本次运行，它的
+  `reason` 就是告诉玩家的那句话。
+- `checks.json`：`{id, when, roll, target, bonus}`。判定用会话随机数掷骰，加上
+  `bonus.scale * state[bonus.key]`，与 `target` 比较，并把
+  `{roll, bonus, total, target, passed}` 记到 `state.checks.<id>`。
+
 ### 3.4 资源类型
 
 v0.0.0 注册的类型：`texture`、`audio`、`text`。注册表之外的类型不是错误；
@@ -137,6 +148,9 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-08` | 声明的每个资源路径都在包内 | 警告，跳过该资源 |
 | `V-09` | `saveSchema` 为正整数 | 拒绝 |
 | `V-14` | 规则读写的每个资源都在 `state.json` 里声明，且账本自身形状正确 | 拒绝 |
+| `V-16` | 动作 id 唯一、至少一条效果、上限是引擎会统计的那种；它们触碰的每个资源都已声明 | 拒绝 |
+| `V-17` | `turns` 至少为 1，段位在 `1..turns` 内递增，每条失败都带原因与条件 | 拒绝 |
+| `V-18` | 骰子至少两面、目标落在骰子范围内；加成要点名资源 | 拒绝 |
 | `V-23` | `kind`、`layer`、`requires` 符合 §3.2 的形状，且 `2.0.0` 的包必须声明 `kind` | 拒绝 |
 | `V-24` | 每条 `requires` 都由已安装或内置的包满足，且版本落在声明范围内 | 拒绝 |
 | `W-01` | `specVersion` 低于 `2.0.0`：现在可读，`v0.2.0` 起拒绝 | 警告 |
@@ -330,6 +344,7 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 | `REQ-020` | §11.2 包内语言、§4.2 校验（`V-22`） |
 | `REQ-021` | §3.2 清单字段、§4.2 校验（`V-23`、`V-24`、`W-01`） |
 | `REQ-022` | §3.3 数据文件（`state.json`、`rules.json`、`labels`）、§4.2 校验（`V-14`）、§6.1 夹取 |
+| `REQ-023` | §3.3 数据文件（`actions.json`、`phases.json`、`checks.json`）、§4.2 校验（`V-16`、`V-17`、`V-18`）、§6.2 结算与回合 |
 
 ## 13. 决策与待定
 

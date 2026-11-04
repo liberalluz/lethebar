@@ -332,3 +332,27 @@ path, so the case survives fixture renames.
      the resumed state carries `power` = 0 and `standing` = 0.
 - Exit: steps 1–5 pass; no value ever leaves its declared bounds, and no rule
   survives installation while naming a resource the ledger does not declare.
+
+### `TC-TURN-001`
+
+- Covers: `REQ-023`
+- Preconditions: headless run; fixture `turn-menu` (ledger `grain` 10, `pop` 0,
+  `prestige` 4; actions `recruit` costing 20 grain and requiring 20, and `drill`
+  adding 1 pop; phase machine with ranks and one failure at `pop >= 3`; one check
+  named `battle`) and fixture `turn-run` (grain 25; one action `spend` with
+  `per_run: 1`; a phase machine with two ranks and no failures).
+- Steps:
+  1. Install `turn-menu` and read the menu: `recruit` is listed as unavailable
+     and the reason names `grain`.
+  2. Take `recruit`: nothing changes, because an unavailable action writes nothing.
+  3. Take `drill` twice: the second ends the run, because `pop` reaches the
+     failure threshold and the reason is shown.
+  4. Install `turn-run`, take `spend`: grain drops by 20 and pop rises by 1 in one
+     step, and the turn reads 2.
+  5. Take `spend` again: the per-run limit refuses it and both values stay as they
+     were.
+  6. Resolve the `battle` check on two sessions built from the same seed: both
+     store `roll`, `bonus`, `total`, `target` and `passed`, and the two rolls are
+     equal.
+- Exit: steps 1–6 pass; a disabled action never changes state, a limit is counted
+  per run, and the same seed reproduces the same roll.
