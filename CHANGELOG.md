@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.0.2 - 2026-11-04
+
+### Added
+- The `修仙` pack now carries an English table: an English reader meets English scene text and English choice labels in the second built-in story, not Chinese.
+- `TC-I18N-001` in the suite: the shipped Xiuxian pack is played in English and must leave no Chinese ideograph in its entry scene or its labels.
+
+### Changed
+- `xiuxian`'s manifest declares `defaultLocale`, `locales` and `names`, so it is listed as `Cultivation` on an English landing page and as `修仙` on a Chinese one.
+- The font subset is rebuilt from the full Noto Sans SC with `infra/build_font.py`, so the repertoire is reproducible instead of being whatever the last person happened to cut.
+- The web payload grows from 3,473,468 to 4,142,764 bytes (`index.pck`), the only file that changes: the engine payload is byte-identical and keeps its cache name.
+
+### Fixed
+- An ideograph from CJK extension A (`U+3400-U+4DBF`) now draws as a glyph instead of a box: the shipped font covers that block as well as the BMP block it already covered.
+
 ## v0.0.1 - 2026-11-03
 
 ### Added
