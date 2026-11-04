@@ -26,6 +26,9 @@ var rng: int
 var finished: bool
 var locale: String
 var i18n: Dictionary
+var ledger: Dictionary
+var ledger_defs: Dictionary
+var rules: Array
 
 
 static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
@@ -41,19 +44,23 @@ static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
 	session.save_schema = int(session.manifest.get("saveSchema", 0))
 	session.protocol_id = String(session.manifest.get("protocol", ""))
 	session.entry_node = String(session.manifest.get("entry", ""))
-	session.state = {}
 	session.visited = []
 	session.warnings = []
 	session.finished = false
 	session.current = ""
 	session.nodes = {}
 	session.mechanics = {}
+	session.rules = []
 	var data: Dictionary = entry.get("data", {})
+	session.ledger = data.get("ledger", {}) if data.get("ledger", null) is Dictionary else {}
+	session.ledger_defs = Ledger.definitions(session.ledger)
+	session.state = Ledger.initial(session.ledger_defs)
 	for node in data.get("nodes", []):
 		if node is Dictionary and node.has("id"):
 			session.nodes[String(node["id"])] = node
 	if data.get("mechanics", null) is Dictionary:
 		session.mechanics = data["mechanics"]
+	session.rules = data.get("rules", []) if data.get("rules", null) is Array else []
 	session.i18n = data.get("i18n", {}) if data.get("i18n", null) is Dictionary else {}
 	session.locale = String(options.get("locale", ""))
 	var counter := int(options.get("start_counter", DEFAULT_START_COUNTER))
@@ -91,18 +98,40 @@ func goto(next_id: String) -> Dictionary:
 
 
 func apply_rules() -> void:
-	var rules: Array = []
-	if mechanics.get("rules", null) is Array:
-		rules = mechanics["rules"]
 	var result := Mechanics.apply(rules, state)
-	state = result["state"]
+	state = _clamped(result["state"])
 	_absorb(result["warnings"])
 
 
 func apply_effects(effects: Array) -> void:
 	var result := Mechanics.apply_effects(effects, state)
-	state = result["state"]
+	state = _clamped(result["state"])
 	_absorb(result["warnings"])
+
+
+func _clamped(values: Dictionary) -> Dictionary:
+	## A declared bound is a clamp, not a refusal: the story keeps playing and the
+	## number stops at its edge (engine-bricks §1).
+	if ledger_defs.is_empty():
+		return values
+	var out := values.duplicate(true)
+	for id in ledger_defs:
+		if out.has(id) and (out[id] is int or out[id] is float):
+			out[id] = Ledger.clamp_value(ledger_defs, String(id), float(out[id]))
+	return out
+
+
+func _state_labels() -> Dictionary:
+	var out: Dictionary = {}
+	for id in ledger_defs:
+		var text := Ledger.label_for(ledger_defs, String(id), float(state.get(id, 0.0)))
+		if text != "":
+			out[id] = text
+	return out
+
+
+func label_for(id: String) -> String:
+	return Ledger.label_for(ledger_defs, id, float(state.get(id, 0.0)))
 
 
 func choices() -> Array:
@@ -135,6 +164,7 @@ func view() -> Dictionary:
 		"assets": node.get("assets", []),
 		"choices": offered,
 		"state": state.duplicate(true),
+		"labels": _state_labels(),
 		"finished": finished,
 		"warnings": warnings.duplicate(true),
 	}

@@ -55,6 +55,7 @@ func _initialize() -> void:
 	_case_i18n()
 	_case_i18n_shipped()
 	_case_format()
+	_case_ledger()
 	_case_assets()
 
 	print("")
@@ -1475,6 +1476,130 @@ func _case_format() -> void:
 		"TC-FMT-001: it carries one W-01 warning naming the format",
 		warning_codes == ["W-01"],
 		", ".join(warning_codes)
+	)
+
+
+
+func _case_ledger() -> void:
+	_section("TC-LEDGER-001 a package declares its numbers and their bounds")
+	var nodes := {
+		"nodes": [
+			{"id": "n1", "text": "One.", "choices": [{"label": "Go", "next": "n2", "effects": [{"power": {"add": 10}}]}]},
+			{"id": "n2", "text": "Two.", "choices": []},
+		],
+	}
+	var ledger := {
+		"resources": [
+			{"id": "power", "label": "power", "init": 3, "min": 0, "max": 5},
+		],
+	}
+	var rules := {"rules": []}
+	var entry: Dictionary = PackageLoader.new().import_bytes(
+		_package(
+			"ledger-basic",
+			{"id": "ledger-basic"},
+			[],
+			[],
+			nodes,
+			{},
+			{
+				"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+				"data/rules.json": JSON.stringify(rules).to_utf8_buffer(),
+			},
+		),
+		_context()
+	)["entry"]
+	_check("TC-LEDGER-001: the package with a ledger installs", not entry.is_empty(), str(entry))
+	var session := Session.create(entry)
+	session.start()
+	_check(
+		"TC-LEDGER-001: a declared resource starts at its init value",
+		float(session.state.get("power", -1.0)) == 3.0,
+		str(session.state)
+	)
+	session.choose(0)
+	_check(
+		"TC-LEDGER-001: an effect above max is clamped, not refused",
+		float(session.state.get("power", -1.0)) == 5.0,
+		str(session.state)
+	)
+
+	var undeclared_rules := {"rules": [{"when": {"key": "gold", "op": "gte", "value": 1}, "set": {"power": {"add": 1}}}]}
+	var refused := PackageLoader.new().import_bytes(
+		_package(
+			"ledger-undeclared",
+			{"id": "ledger-undeclared"},
+			[],
+			[],
+			nodes,
+			{},
+			{
+				"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+				"data/rules.json": JSON.stringify(undeclared_rules).to_utf8_buffer(),
+			},
+		),
+		_context()
+	)
+	_check(
+		"TC-LEDGER-001: a rule that names an undeclared resource is refused with V-14",
+		String(refused.get("code", "")) == "V-14" and String(refused.get("message", "")).contains("gold"),
+		"%s %s" % [String(refused.get("code", "-")), String(refused.get("message", ""))]
+	)
+
+	# A choice moves `power` down to 0; the settlement rule that reads it must run
+	# afterwards, or the label would lag one scene behind the number.
+	var ordered_nodes := {
+		"nodes": [
+			{"id": "n1", "text": "One.", "choices": [{"label": "Go", "next": "n2", "effects": [{"power": {"value": 0}}]}]},
+			{"id": "n2", "text": "Two.", "choices": []},
+		],
+	}
+	var ordered_state := {
+		"resources": [
+			{"id": "power", "init": 3, "min": 0, "max": 5},
+			{"id": "standing", "init": 2, "min": 0, "max": 2, "labels": {"0": "兵微将寡", "2": "名动诸侯"}},
+		],
+	}
+	var ordered_rules := {"rules": [{"when": {"key": "power", "op": "lte", "value": 0}, "set": {"standing": {"value": 0}}}]}
+	var ordered: Dictionary = PackageLoader.new().import_bytes(
+		_package(
+			"ledger-ordered",
+			{"id": "ledger-ordered"},
+			[],
+			[],
+			ordered_nodes,
+			{},
+			{
+				"data/state.json": JSON.stringify(ordered_state).to_utf8_buffer(),
+				"data/rules.json": JSON.stringify(ordered_rules).to_utf8_buffer(),
+			},
+		),
+		_context()
+	)["entry"]
+	var ordered_session := Session.create(ordered)
+	var opening := ordered_session.start()
+	ordered_session.choose(0)
+	_check(
+		"TC-LEDGER-001: rules run after the choice effects",
+		float(ordered_session.state.get("standing", -1.0)) == 0.0,
+		str(ordered_session.state)
+	)
+	_check(
+		"TC-LEDGER-001: a labelled resource reads as its label",
+		String(opening.get("labels", {}).get("standing", "")) == "名动诸侯",
+		str(opening.get("labels", {}))
+	)
+
+	MemoryBackend.reset()
+	var store := SaveStore.new()
+	var saved := store.write(ordered, 1, ordered_session.snapshot(), "零")
+	_check("TC-LEDGER-001: the run saves", saved["ok"], String(saved["message"]))
+	var payload: Dictionary = store.read(ordered, 1)["payload"]
+	var resumed := SaveStore.new().resume(ordered, payload)
+	_check(
+		"TC-LEDGER-001: a resumed run reads the numbers it saved",
+		resumed != null and is_equal_approx(float(resumed.state.get("power", -1.0)), float(ordered_session.state.get("power", -2.0))),
+		"" if resumed == null else str(resumed.state)
 	)
 
 

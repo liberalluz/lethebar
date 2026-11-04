@@ -13,6 +13,8 @@ extends RefCounted
 const MANIFEST_PATH := "manifest.json"
 const NODES_PATH := "data/nodes.json"
 const MECHANICS_PATH := "data/mechanics.json"
+const STATE_PATH := "data/state.json"
+const RULES_PATH := "data/rules.json"
 const DEFAULT_WORK_DIR := "user://pkg"
 
 var registry: InstallRegistry
@@ -51,7 +53,7 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 
 	var manifest: Dictionary = manifest_variant
 	var node_ids: Array = []
-	var data := {"nodes": [], "mechanics": {}, "assets": {}, "i18n": {}}
+	var data := {"nodes": [], "mechanics": {}, "assets": {}, "i18n": {}, "ledger": {}, "rules": []}
 
 	if files.has(NODES_PATH):
 		var nodes_variant: Variant = JSON.parse_string(reader.read_file(NODES_PATH).get_string_from_utf8())
@@ -64,6 +66,19 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 		var mechanics_variant: Variant = JSON.parse_string(reader.read_file(MECHANICS_PATH).get_string_from_utf8())
 		if mechanics_variant is Dictionary:
 			data["mechanics"] = mechanics_variant
+	# The ledger and its settlement rules (engine-bricks §1, §2). A package that
+	# carries neither keeps the pre-brick behaviour: rules over whatever keys a
+	# story happens to write, no bounds.
+	if files.has(STATE_PATH):
+		var state_variant: Variant = JSON.parse_string(reader.read_file(STATE_PATH).get_string_from_utf8())
+		if state_variant is Dictionary:
+			data["ledger"] = state_variant
+	if files.has(RULES_PATH):
+		var rules_variant: Variant = JSON.parse_string(reader.read_file(RULES_PATH).get_string_from_utf8())
+		if rules_variant is Dictionary and rules_variant.get("rules", null) is Array:
+			data["rules"] = rules_variant["rules"]
+	elif data["mechanics"].get("rules", null) is Array:
+		data["rules"] = data["mechanics"]["rules"]
 	# Only the bytes a declared asset actually points at are read, and they stay
 	# undecoded: the render layer turns them into a texture or a stream when a
 	# scene asks for one (SDD §8.1 — read from memory, never from disk mid-run).
@@ -89,6 +104,8 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 	check_context["node_ids"] = node_ids
 	check_context["nodes"] = data["nodes"]
 	check_context["i18n"] = data["i18n"]
+	check_context["ledger"] = data["ledger"]
+	check_context["rules"] = data["rules"]
 	check_context["installed"] = registry.versions()
 	if not check_context.has("protocols"):
 		check_context["protocols"] = ProtocolRegistry.known_ids()

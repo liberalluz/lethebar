@@ -308,3 +308,27 @@ path, so the case survives fixture renames.
      is exactly one `W-01`.
 - Exit: steps 1–6 pass; a `2.0.0` package that cannot resolve its requirements
   never reaches the play screen.
+
+### `TC-LEDGER-001`
+
+- Covers: `REQ-022`
+- Preconditions: headless run; four fixture packages, all built from one
+  template: `ledger-basic` (resources `power` `init 3`, `min 0`, `max 5`; one
+  choice whose effect adds 10), `ledger-undeclared` (same ledger, one rule that
+  reads `gold`), `ledger-ordered` (`power` and `standing`, one rule that reads
+  `power` and writes `standing`; the choice sets `power` to 0), and one packaged
+  save slot.
+- Steps:
+  1. Install `ledger-basic` and open its first scene: the session state carries
+     `power` = 3, the declared `init` value.
+  2. Take the only choice, whose effect adds 10: `power` reads 5, the declared
+     `max`, instead of 13 and instead of the choice being refused.
+  3. Install `ledger-undeclared`: refused with `V-14`, and the message names
+     `gold`.
+  4. Install `ledger-ordered`, open the first scene and take the choice: `power`
+     becomes 0 and `standing` becomes 0 in the same step, because the rules run
+     after the effects.
+  5. Open a save slot on that run and save it; read the payload back and resume:
+     the resumed state carries `power` = 0 and `standing` = 0.
+- Exit: steps 1–5 pass; no value ever leaves its declared bounds, and no rule
+  survives installation while naming a resource the ledger does not declare.

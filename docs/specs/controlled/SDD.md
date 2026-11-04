@@ -105,9 +105,18 @@ installs (§4.2, `W-01`).
 
 - `nodes.json`: nodes with `id`, `text`, `assets`, `choices[]`; each choice has
   `label`, `next`, and `effects[]`.
-- `mechanics.json`: named rule tables. A rule is `{when, set}` over declared
-  state keys; there is no control flow and no expression language beyond
-  comparisons and arithmetic.
+- `state.json`: the ledger. Every resource has `id`, `init`, `min` and `max`,
+  may carry a display `label`, and may map numeric values to display text with
+  `labels` (for example `{"2": "名动诸侯"}`). A value is a number; a label is
+  text drawn instead of the number and never changes it.
+- `rules.json`: settlement rules, each `{when, set}`, evaluated in file order
+  after the chosen action's own effects. A rule reads the values the effect
+  just left behind, which is why a label can follow the number in the same
+  step. `mechanics.json` keeps the same shape and is read when `rules.json` is
+  absent, so packages written before the ledger still play.
+- A rule names resources rather than free variables: every key a rule reads or
+  writes must be declared in `state.json` (`V-14`). There is no control flow and
+  no expression language beyond comparisons and arithmetic.
 
 ### 3.4 Asset types
 
@@ -137,6 +146,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-07` | `entry` node exists in `nodes.json` | reject |
 | `V-08` | every declared asset path exists in the package | warn, skip asset |
 | `V-09` | `saveSchema` is a positive integer | reject |
+| `V-14` | every resource a rule reads or writes is declared in `state.json`, and the ledger itself is well formed | reject |
 | `V-23` | `kind`, `layer` and `requires` have the shape §3.2 gives them, and a `2.0.0` package declares `kind` | reject |
 | `V-24` | every `requires` entry is satisfied by an installed or built-in package whose version falls inside the declared range | reject |
 | `W-01` | `specVersion` is below `2.0.0`: readable now, refused from v0.2.0 | warn |
@@ -187,14 +197,21 @@ new ones; a third protocol is a product decision, not a plugin.
 
 ### 6.1 Shape
 
-A session holds: plugin identity, protocol instance, current node, progression
-state (mechanic-owned keys), RNG state, and a warning list. Sessions are created
-from a plugin and are never shared between plugins.
+A session holds: plugin identity, protocol instance, current node, the ledger
+values, RNG state, and a warning list. Sessions are created from a plugin and are
+never shared between plugins.
+
+Ledger values are clamped into their declared `min`/`max` after the action's
+effects and after the settlement rules, so no path — not a choice effect, not a
+rule, not a resumed save — can push a number outside its bounds. Clamping hides
+nothing: the value simply stops at its bound.
 
 ### 6.2 Mechanics
 
 Mechanics are declarative: the plugin names mechanic ids and supplies rule tables
-in `mechanics.json`; the session applies matching rules after each node advance.
+in `rules.json` (`mechanics.json` before it); the session applies matching rules
+after each node advance, in file order, on top of the effects the choice just
+applied.
 Two mechanics are part of v0.0.0: a power supply (a resource that changes on
 choices) and a progress display (a derived value shown in the scene header).
 
@@ -356,6 +373,7 @@ declare.
 | `REQ-019` | §8.3 placement, §8.4 accepted formats |
 | `REQ-020` | §11.2 package language, §4.2 validation (`V-22`) |
 | `REQ-021` | §3.2 manifest fields, §4.2 validation (`V-23`, `V-24`, `W-01`) |
+| `REQ-022` | §3.3 data files (`state.json`, `rules.json`, `labels`), §4.2 validation (`V-14`), §6.1 clamping |
 
 ## 13. Decisions and open questions
 

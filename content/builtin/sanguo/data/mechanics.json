@@ -1,6 +1,0 @@
-{
-  "rules": [
-    {"when": {"key": "power", "op": "gte", "value": 5}, "set": {"standing": "名动诸侯"}},
-    {"when": {"key": "power", "op": "lte", "value": 0}, "set": {"standing": "兵微将寡"}}
-  ]
-}
