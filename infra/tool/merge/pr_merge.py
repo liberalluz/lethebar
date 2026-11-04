@@ -272,6 +272,13 @@ def _self_test() -> int:
     check("one commit keeps its body", "Why: assets were validated" in built, True)
     check("one commit keeps Batch", "Batch: B9" in built, True)
 
+    built_subject, built_body = split_message(built)
+    check(
+        "the body does not start by repeating the subject",
+        built_body.lstrip().startswith(built_subject),
+        False,
+    )
+
     two = [{"message": "feat(app): a\n\nWhy: a\nBatch: B9"}, {"message": "chore(infra): b"}]
     check("two commits need --subject", error_of(lambda: build_message(35, two)).startswith(
         "this pull request holds 2 commits, so --subject is required"
@@ -391,6 +398,34 @@ def _show(
     return 0
 
 
+def _show_body(
+    pr_number: int,
+    why: str | None,
+    batch: str | None,
+    note: str | None,
+    subject: str | None,
+) -> int:
+    """Print only the body, for `gh pr merge --body-file`.
+
+    A merge takes the subject through `--subject` and the body through
+    `--body-file`. Handing it the whole message puts the subject into the body
+    as well, which is what happened to #38 to #45: every one of those commits
+    repeats its own subject on the first body line. This prints the body alone so
+    that mistake is not available.
+    """
+    commits = _gh_commits(pr_number)
+    try:
+        message = build_message(
+            pr_number, commits, why=why, batch=batch, note=note, subject=subject
+        )
+    except MessageError as exc:
+        print(f"cannot build a message: {exc}", file=sys.stderr)
+        return 1
+    _, body = split_message(message)
+    print(body, end="" if body.endswith("\n") else "\n")
+    return 0
+
+
 def _on_default_branch(ref: str) -> bool:
     """Say whether the commit is already an ancestor of the default branch."""
     for base in ("origin/main", "main"):
@@ -424,7 +459,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--self-test", action="store_true", help="run the message rules")
     parser.add_argument("--show", action="store_true", help="print the message for a pull request")
-    parser.add_argument("--pr", type=int, help="pull request number, with --show")
+    parser.add_argument(
+        "--body-only",
+        action="store_true",
+        help="print just the body, for `gh pr merge --body-file`",
+    )
+    parser.add_argument("--pr", type=int, help="pull request number, with --show or --body-only")
     parser.add_argument("--verify-only", action="store_true", help="check a merged commit")
     parser.add_argument("--ref", default="origin/main", help="commit to check, default origin/main")
     parser.add_argument("--why", help="one line saying what the pull request solves")
@@ -442,9 +482,14 @@ def main(argv: list[str] | None = None) -> int:
             print("--show needs --pr", file=sys.stderr)
             return 2
         return _show(args.pr, args.why, args.batch, args.note, args.subject)
+    if args.body_only:
+        if args.pr is None:
+            print("--body-only needs --pr", file=sys.stderr)
+            return 2
+        return _show_body(args.pr, args.why, args.batch, args.note, args.subject)
 
     print(
-        "nothing to do: pass --self-test, --show --pr <n>, or --verify-only",
+        "nothing to do: pass --self-test, --show --pr <n>, --body-only --pr <n>, or --verify-only",
         file=sys.stderr,
     )
     return 2
