@@ -513,3 +513,17 @@ path, so the case survives fixture renames.
 - Exit: the first installs; the second is rejected with `V-27` naming `map@1`;
   the third is rejected with `V-27` naming `text`; the fourth installs with
   exactly one `W-03`; every id in the table parses as `name@major`.
+
+### `TC-SAFE-001` the install-time envelope is enforced
+
+- Covers: `REQ-030`.
+- Fixture: a package with 501 extra entries; one whose extra file is `../evil.json`;
+  one with `Data/Extra.json`; one carrying a 5 MB entry; one declaring a
+  5000x5000 picture; one declaring a ninety-second WAV; and one ordinary package
+  with a 100x100 picture and a small extra file.
+- Steps:
+  1. Install each package in turn and read the code and message.
+  2. Read the archive and total helpers with a 9 MB and a 40 MB value.
+- Exit: the crowded, heavy, wide and long packages are refused with `V-28`,
+  `V-28`, `V-30` and `V-30`; the two path packages with `V-29`; every message
+  gives the measured value or the limit; the ordinary package installs.

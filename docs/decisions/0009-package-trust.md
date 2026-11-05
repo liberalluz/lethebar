@@ -46,12 +46,24 @@ rather than an omission, and so the preconditions are explicit:
 
 Two further rules keep the tiers from leaking into each other:
 
-- **The install-time envelope applies to both.** A size cap, a per-file cap, an
-  entry-count cap, a compression-ratio cap, a path charset whitelist, an image
-  dimension cap and an audio length cap. The numbers belong in `SDD.md` §4.2 and
-  are set by the batch that implements them (`B30`); this record fixes only that
-  the envelope exists, is checked before anything is written to disk, and refuses
-  with the same stable codes as the other manifest rejections.
+- **The install-time envelope applies to both.** The loader checks it before the
+  manifest is read, from the constants in `app/core/package_limits.gd`; every
+  refusal names what was measured and uses the same stable codes as the other
+  manifest rejections.
+
+  | Limit | Value | Code |
+  | --- | --- | --- |
+  | The archive | 8 MB | `V-28` |
+  | Entries | 500 | `V-28` |
+  | One entry, unpacked | 4 MB | `V-28` |
+  | Everything unpacked | 32 MB | `V-28` |
+  | Path shape | relative, `[a-z0-9._/-]`, no `..`, no backslash | `V-29` |
+  | Picture edge | 4096 px | `V-30` |
+  | Audio | 2 MB and 60 seconds | `V-30` |
+
+  There is no compression-ratio rule. Godot 4.7's `ZIPReader` reports files and
+  bytes, not an entry's declared size, so a ratio cannot be measured here; the
+  32 MB unpacked cap already bounds how far an archive can expand.
 - **A capability still comes from the engine.** `ADR-0008` stands unchanged. The
   `scripted` tier, when it exists, lets a package *use* a capability the engine
   provides; it does not let a package provide one.

@@ -66,6 +66,7 @@ func _initialize() -> void:
 	_case_wire()
 	_case_save_flush()
 	_case_capabilities()
+	_case_limits()
 	_case_assets()
 
 	print("")
@@ -2520,6 +2521,108 @@ func _case_capabilities() -> void:
 			broken.append(capability)
 	_check("TC-CAP-001: every known capability parses", broken.is_empty(), str(broken))
 	_check("TC-CAP-001: the table covers the bricks", known_ids.size() >= 17, str(known_ids.size()))
+
+
+func _long_wav_bytes(seconds: float) -> PackedByteArray:
+	## A canonical 44-byte WAV header followed by silence at 8 kHz mono 8-bit, so
+	## `PackageLimits.wav_seconds()` reports the requested duration without the
+	## fixture having to be a real recording.
+	var bytes := PackedByteArray()
+	bytes.append_array("RIFF".to_utf8_buffer())
+	bytes.append_array([0, 0, 0, 0])
+	bytes.append_array("WAVEfmt ".to_utf8_buffer())
+	bytes.append_array([16, 0, 0, 0, 1, 0, 1, 0])
+	bytes.append_array([0x40, 0x1F, 0, 0])
+	bytes.append_array([0x40, 0x1F, 0, 0])
+	bytes.append_array([1, 0, 8, 0])
+	bytes.append_array("data".to_utf8_buffer())
+	bytes.append_array([0, 0, 0, 0])
+	var silence := PackedByteArray()
+	silence.resize(int(8000.0 * seconds))
+	bytes.append_array(silence)
+	return bytes
+
+
+func _case_limits() -> void:
+	_section("TC-SAFE-001 a package is held to the install-time envelope")
+	var loader := PackageLoader.new()
+
+	# Entry count. The archive is small but holds more files than a plugin may.
+	var many: Array = []
+	for index in 501:
+		many.append("data/part-%03d.json" % index)
+	var crowded := loader.import_bytes(_package("limits-many", {}, [], many), _context())
+	_check("TC-SAFE-001: too many entries is refused", String(crowded.get("code", "")) == "V-28", String(crowded.get("code", "")))
+	_check("TC-SAFE-001: the count is reported", String(crowded.get("message", "")).contains("the limit is 500"), String(crowded.get("message", "")))
+
+	# Path shape. A path that climbs out of the package, or one a filesystem would
+	# treat differently, is refused before any content is read.
+	var climbing := loader.import_bytes(_package("limits-climb", {}, [], ["../evil.json"]), _context())
+	_check("TC-SAFE-001: a path that climbs out is refused", String(climbing.get("code", "")) == "V-29", String(climbing.get("code", "")))
+	var uppercase := loader.import_bytes(_package("limits-case", {}, [], ["Data/Extra.json"]), _context())
+	_check("TC-SAFE-001: an uppercase path is refused", String(uppercase.get("code", "")) == "V-29", String(uppercase.get("code", "")))
+
+	# One entry that unpacks past the per-entry cap.
+	var fat := PackedByteArray()
+	fat.resize(5 * 1024 * 1024)
+	var heavy := loader.import_bytes(
+		_package("limits-heavy", {}, [], [], {}, {}, {"data/big.bin": fat}),
+		_context(),
+	)
+	_check("TC-SAFE-001: an oversized entry is refused", String(heavy.get("code", "")) == "V-28", String(heavy.get("code", "")))
+	_check("TC-SAFE-001: the entry is named", String(heavy.get("message", "")).contains("data/big.bin"), String(heavy.get("message", "")))
+
+	# Asset limits: a picture past 4096 px and audio past 60 seconds.
+	var wide := loader.import_bytes(
+		_package(
+			"limits-wide",
+			{"assets": [{"type": "texture", "path": "assets/huge.png"}]},
+			[],
+			[],
+			{},
+			{},
+			{"assets/huge.png": _png_bytes(5000, 5000)},
+		),
+		_context(),
+	)
+	_check("TC-SAFE-001: an oversized picture is refused", String(wide.get("code", "")) == "V-30", String(wide.get("code", "")))
+	_check("TC-SAFE-001: the picture size is reported", String(wide.get("message", "")).contains("5000"), String(wide.get("message", "")))
+
+	var long_audio := loader.import_bytes(
+		_package(
+			"limits-long",
+			{"assets": [{"type": "audio", "path": "assets/long.wav"}]},
+			[],
+			[],
+			{},
+			{},
+			{"assets/long.wav": _long_wav_bytes(90.0)},
+		),
+		_context(),
+	)
+	_check("TC-SAFE-001: audio past a minute is refused", String(long_audio.get("code", "")) == "V-30", String(long_audio.get("code", "")))
+	_check("TC-SAFE-001: the duration is reported", String(long_audio.get("message", "")).contains("90.0"), String(long_audio.get("message", "")))
+
+	# The two limits no fixture can reach without building a genuinely large
+	# archive are exercised through the helpers the loader itself calls.
+	_check("TC-SAFE-001: an oversized archive is refused", PackageLimits.archive_problem(9 * 1024 * 1024).contains("9.0 MB"))
+	_check("TC-SAFE-001: an oversized total is refused", PackageLimits.total_problem(40 * 1024 * 1024).contains("40.0 MB"))
+
+	# A package inside the envelope still installs: the limits must refuse nothing
+	# the three built-in packages do.
+	var fits := loader.import_bytes(
+		_package(
+			"limits-fits",
+			{"assets": [{"type": "texture", "path": "assets/ok.png"}]},
+			[],
+			["data/extra.json"],
+			{},
+			{},
+			{"assets/ok.png": _png_bytes(100, 100)},
+		),
+		_context(),
+	)
+	_check("TC-SAFE-001: a package inside the envelope installs", fits["status"] == "installed", String(fits.get("code", "")))
 
 
 func _case_assets() -> void:
