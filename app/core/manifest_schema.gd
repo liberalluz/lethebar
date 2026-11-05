@@ -28,7 +28,13 @@ const STRING_FIELDS := ["id", "version", "specVersion", "engine", "name", "proto
 ## the pack's own title per locale.
 const OPTIONAL_STRING_FIELDS := ["defaultLocale"]
 const OPTIONAL_LIST_FIELDS := ["locales"]
-const OPTIONAL_MAP_FIELDS := ["names"]
+const OPTIONAL_MAP_FIELDS := ["names", "clock"]
+## The only two meanings `clock.per` has: a turn of the action menu, or a node
+## of a linear story. Anything else is out of scope for format 2.0.0.
+const CLOCK_UNITS := ["turn", "node"]
+## The key a settlement rule reads to see how much time the engine counts. It is
+## never a resource: a package cannot declare it, and a rule cannot write it.
+const TICK_KEY := "tick"
 
 ## Format 2.0.0 fields (ADR-0007). `kind` says whether the package is playable on
 ## its own; `layer` names which piece of the seven-layer design a non-playable

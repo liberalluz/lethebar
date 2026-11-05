@@ -97,9 +97,11 @@ format works identically in a browser and in a native build.
 | `kind` | `bundle` \| `layer` | required by format `2.0.0`: playable on its own, or a piece another package requires (ADR-0007) |
 | `layer` | `profession` \| `genre` \| `mod` \| `content` \| `meta` \| `assets` | required when `kind` is `layer`; names which piece of the seven-layer design it is |
 | `requires` | array of `{id, version}` | packages that have to be installed before this one can be played; `version` uses the same range syntax as `engine` |
+| `clock` | `{per: turn \| node}` | optional: which advance counts a tick. `turn` counts actions, `node` counts node advances; the engine always counts, the field only says which count a rule may read |
 
 A package written for `1.0.0` declares none of the last three fields and still
-installs (§4.2, `W-01`).
+installs (§4.2, `W-01`). `clock` is independent of the format version: a `1.0.0`
+package may declare it as well.
 
 ### 3.3 Data files
 
@@ -175,6 +177,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-23` | `kind`, `layer` and `requires` have the shape §3.2 gives them, and a `2.0.0` package declares `kind` | reject |
 | `V-24` | every `requires` entry is satisfied by an installed or built-in package whose version falls inside the declared range | reject |
 | `W-01` | `specVersion` is below `2.0.0`: readable now, refused from v0.2.0 | warn |
+| `V-21` | `clock.per` is `turn` or `node`, and a package that declares a clock also carries at least one rule whose `when` reads `tick` | reject |
 
 Every rejection names its code and the offending field; a rejection never
 disturbs already-installed plugins or their saves. `V-24` is checked at install
@@ -239,6 +242,26 @@ after each node advance, in file order, on top of the effects the choice just
 applied.
 Two mechanics are part of v0.0.0: a power supply (a resource that changes on
 choices) and a progress display (a derived value shown in the scene header).
+
+### 6.5 The clock
+
+The engine owns one counter, `tick`, starting at zero for every run. It never
+reads the wall clock and no package can declare, reset or write it: a rule may
+name `tick` in a `when`, and a rule whose `set` names `tick` is refused with
+`V-14` (`V-21` covers the opposite mistake, a clock nobody reads).
+
+Which advance counts is the package's choice, through `clock.per`:
+
+- `turn` — one action advances the tick; a plain node advance does not.
+- `node` — every node advance counts, including the one that lands on the entry
+  node when the run starts.
+- absent — the tick still advances on node advances, but no rule may read it,
+  because `V-21` only asks for a reader when a clock is declared.
+
+A package that declares a clock runs its rules after each action as well as
+after each node advance; a package without one keeps the older behaviour and
+runs them only after advancing. The tick travels in the save payload, so a
+resumed run continues from the number the player left.
 
 ### 6.3 Determinism
 
@@ -401,6 +424,7 @@ declare.
 | `REQ-022` | §3.3 data files (`state.json`, `rules.json`, `labels`), §4.2 validation (`V-14`), §6.1 clamping |
 | `REQ-023` | §3.3 data files (`actions.json`, `phases.json`, `checks.json`), §4.2 validation (`V-16`, `V-17`, `V-18`), §6.2 settlement and turns |
 | `REQ-024` | §3.3 data files (`pools.json`, `factions.json`), §4.2 validation (`V-19`, `V-20`, `W-02`) |
+| `REQ-025` | §3.2 manifest field (`clock`), §4.2 validation (`V-21`, `V-14`), §6.5 the clock |
 
 ## 13. Decisions and open questions
 

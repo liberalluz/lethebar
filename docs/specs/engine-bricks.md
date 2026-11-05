@@ -232,6 +232,12 @@ No file. The clock lives in the engine.
 - Idle genres read `tick` to compute growth; they never read the wall clock.
 - A package may declare `{"clock": {"per": "turn"}}` to say that its growth is
   per turn rather than per node; anything else is out of scope for v2.
+- The declaration sits in the manifest, next to `engine`; `turn` counts actions
+  and `node` counts every node advance, including the entry node.
+- `tick` is read-only for packages: a rule may name it in a `when`, never in a
+  `set` (`V-14`), and a declared clock that no rule reads is refused (`V-21`).
+- A package without a clock still advances the tick on node advances, but its
+  rules may not read it; the engine never reads the wall clock.
 
 ---
 

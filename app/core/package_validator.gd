@@ -179,20 +179,56 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 	# cannot be written by a rule: the alternative is a silent zero the player
 	# would read as a real number (engine-bricks §1).
 	var ledger: Variant = context.get("ledger", {})
+	var declared: Dictionary = {}
 	if ledger is Dictionary and not ledger.is_empty():
 		for problem in Ledger.problems(ledger):
 			issues.append(_issue("V-14", "state.json", String(problem), true))
-		var declared: Dictionary = Ledger.definitions(ledger)
-		for rule in context.get("rules", []):
-			if not (rule is Dictionary):
+		declared = Ledger.definitions(ledger)
+	# The tick is readable by every rule and writable by none, whether or not the
+	# package keeps a ledger: time is the engine's, not the author's.
+	var timing_rules: Array = context.get("rules", [])
+	for rule in timing_rules:
+		if not (rule is Dictionary):
+			continue
+		if _writes_tick(rule):
+			issues.append(_issue(
+				"V-14", "rules",
+				"a rule cannot write %s: the tick is the engine's clock" % ManifestSchema.TICK_KEY,
+				true,
+			))
+		for key in _rule_keys(rule):
+			if String(key) == ManifestSchema.TICK_KEY:
 				continue
-			for key in _rule_keys(rule):
-				if not declared.has(key):
-					issues.append(_issue(
-						"V-14", "rules",
-						"rule names resource %s, which data/state.json never declares" % key,
-						true,
-					))
+			if ledger is Dictionary and not ledger.is_empty() and not declared.has(key):
+				issues.append(_issue(
+					"V-14", "rules",
+					"rule names resource %s, which data/state.json never declares" % key,
+					true,
+				))
+
+	# V-21 — a declared clock has to be read. A package that says its growth is
+	# counted in turns but ships no rule looking at the tick has declared a
+	# mechanic it never uses, which is the kind of mistake an author cannot see.
+	var clock: Variant = manifest.get("clock", null)
+	if clock is Dictionary:
+		var per := String(clock.get("per", ""))
+		if not ManifestSchema.CLOCK_UNITS.has(per):
+			issues.append(_issue(
+				"V-21", "clock",
+				"clock.per must be one of %s, not %s" % [", ".join(ManifestSchema.CLOCK_UNITS), per],
+				true,
+			))
+		var reads := false
+		for rule in timing_rules:
+			if rule is Dictionary and _reads_tick(rule):
+				reads = true
+				break
+		if not reads:
+			issues.append(_issue(
+				"V-21", "clock",
+				"a clock is declared but no rule reads the tick",
+				true,
+			))
 
 	# V-08 — asset inventory. Never fatal: the node degrades to a placeholder.
 	var package_files: Array = context.get("package_files", [])
@@ -297,3 +333,21 @@ static func _rule_keys(rule: Dictionary) -> Array:
 		for key in writes:
 			keys.append(String(key))
 	return keys.filter(func(key): return not String(key).is_empty())
+
+
+static func _reads_tick(rule: Dictionary) -> bool:
+	## A rule reads the tick when its condition names it. Writing it is a
+	## different question, and a refused one: the tick is the engine's clock.
+	var conditions: Variant = rule.get("when", null)
+	if conditions is Dictionary:
+		return String(conditions.get("key", "")) == ManifestSchema.TICK_KEY
+	if conditions is Array:
+		for condition in conditions:
+			if condition is Dictionary and String(condition.get("key", "")) == ManifestSchema.TICK_KEY:
+				return true
+	return false
+
+
+static func _writes_tick(rule: Dictionary) -> bool:
+	var writes: Variant = rule.get("set", null)
+	return writes is Dictionary and writes.has(ManifestSchema.TICK_KEY)

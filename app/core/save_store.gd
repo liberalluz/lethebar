@@ -49,6 +49,7 @@ func write(entry: Dictionary, slot: int, snapshot: Dictionary, preview: String =
 		"visited": snapshot.get("visited", []).duplicate(),
 		"finished": bool(snapshot.get("finished", false)),
 		"turn": int(snapshot.get("turn", 1)),
+		"tick": int(snapshot.get("tick", 0)),
 		"used": snapshot.get("used", {}).duplicate(true),
 		"pools": snapshot.get("pools", {}).duplicate(true),
 		"drawn": snapshot.get("drawn", []).duplicate(true),
@@ -110,6 +111,7 @@ func read(entry: Dictionary, slot: int) -> Dictionary:
 			"visited": payload.get("visited", []),
 			"finished": bool(payload.get("finished", false)),
 			"turn": int(payload.get("turn", 1)),
+			"tick": int(payload.get("tick", 0)),
 			"used": payload.get("used", {}),
 			"pools": payload.get("pools", {}),
 			"drawn": payload.get("drawn", []),
@@ -154,6 +156,7 @@ func resume(entry: Dictionary, payload: Dictionary) -> Session:
 	session.visited = payload.get("visited", []).duplicate()
 	session.finished = bool(payload.get("finished", false))
 	session.turn = int(payload.get("turn", 1))
+	session.tick = int(payload.get("tick", 0))
 	session.used = payload.get("used", {}) if payload.get("used", null) is Dictionary else {}
 	session.drawn = payload.get("drawn", []) if payload.get("drawn", null) is Array else []
 	session.restore_pools(payload.get("pools", {}))

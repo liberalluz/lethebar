@@ -38,6 +38,8 @@ var pools_shuffled: Dictionary
 var drawn: Array
 var factions: Dictionary
 var turn: int
+var tick: int
+var clock_per: String
 var used: Dictionary
 var fail_reason: String
 
@@ -81,6 +83,12 @@ static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
 	session.drawn = []
 	session.factions = Relations.defines(data.get("factions", {}) if data.get("factions", null) is Dictionary else {})
 	session.turn = 1
+	# The clock is the engine's own count of advances, never the wall clock; a
+	# package may say which advance it counts (engine-bricks §8). Empty means it
+	# counts everything, which is what a package that declares no clock gets.
+	var clock: Variant = session.manifest.get("clock", {})
+	session.clock_per = String(clock.get("per", "")) if clock is Dictionary else ""
+	session.tick = 0
 	session.used = {}
 	session.fail_reason = ""
 	session.i18n = data.get("i18n", {}) if data.get("i18n", null) is Dictionary else {}
@@ -112,6 +120,8 @@ func goto(next_id: String) -> Dictionary:
 		return view()
 	current = next_id
 	visited.append(current)
+	if clock_per != "turn":
+		tick += 1
 	_step_rng()
 	apply_rules()
 	var node: Dictionary = nodes[current]
@@ -120,7 +130,9 @@ func goto(next_id: String) -> Dictionary:
 
 
 func apply_rules() -> void:
-	var result := Mechanics.apply(rules, state)
+	## Rules see the tick the way they see a resource, but only the engine can
+	## move it: a package that tries to write it is refused at install (V-14).
+	var result := Mechanics.apply(rules, state, {ManifestSchema.TICK_KEY: float(tick)})
 	state = _clamped(result["state"])
 	_absorb(result["warnings"])
 
@@ -187,6 +199,12 @@ func act(action_id: String) -> Dictionary:
 	Menu.record_use(action, self)
 	_step_rng()
 	turn += 1
+	if clock_per != "node":
+		tick += 1
+	# A clock that counts turns is the one thing that makes growth happen on an
+	# action, so the rules run here as well; without a clock nothing changes.
+	if clock_per != "":
+		apply_rules()
 	_after_turn()
 	if state == before:
 		pass
@@ -334,6 +352,7 @@ func snapshot() -> Dictionary:
 		"visited": visited.duplicate(),
 		"finished": finished,
 		"turn": turn,
+		"tick": tick,
 		"used": used.duplicate(true),
 		"pools": _pool_snapshot(),
 		"drawn": drawn.duplicate(true),
