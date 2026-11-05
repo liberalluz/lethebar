@@ -229,6 +229,33 @@ def commits_from_payload(items: list[dict[str, Any]]) -> list[dict[str, str]]:
     return commits
 
 
+def repair_cut_headline(items: list[dict[str, Any]], local: str) -> list[dict[str, Any]]:
+    """Replace a cut single-commit headline with the local commit.
+
+    gh cuts `messageHeadline` at about seventy characters and moves the rest into
+    `messageBody`, so rebuilding the message from the payload starts the body
+    with the leftover. The local commit is the truth; use it when it continues
+    the cut headline, and refuse rather than emit the leftover.
+    """
+    if len(items) != 1:
+        return items
+    headline = str(items[0].get("messageHeadline", "") or "").strip()
+    if not headline.endswith(("…", "...")):
+        return items
+    first, _, rest = local.partition("\n")
+    cut = headline.removesuffix("…").removesuffix("...").strip()
+    if not first.strip().startswith(cut) or rest.strip().startswith("…"):
+        raise MessageError(
+            "GitHub cut this commit's headline and the local commit does not continue it: "
+            "check out the pull request branch, or pass --subject and --body"
+        )
+    return [{"messageHeadline": first.strip(), "messageBody": rest.strip()}]
+
+
+def _local_message() -> str:
+    return _git("log", "-1", "--format=%B", "HEAD").strip()
+
+
 def _gh_commits(pr_number: int) -> list[dict[str, str]]:
     result = subprocess.run(
         ["gh", "pr", "view", str(pr_number), "--json", "commits"],
@@ -240,7 +267,8 @@ def _gh_commits(pr_number: int) -> list[dict[str, str]]:
     if result.returncode != 0:
         raise MessageError(f"gh pr view {pr_number} failed: {result.stderr.strip()}")
     payload: dict[str, Any] = json.loads(result.stdout or "{}")
-    return commits_from_payload(payload.get("commits", []))
+    items = payload.get("commits", [])
+    return commits_from_payload(repair_cut_headline(items, _local_message()))
 
 
 def _self_test() -> int:
@@ -373,6 +401,21 @@ def _self_test() -> int:
     check("the adapter feeds build_message",
           build_message(1, payload, subject="feat(app): both", why="r", batch="B9").splitlines()[0],
           "feat(app): both (#1)")
+
+    cut = [{"messageHeadline": "docs(repo): move onto the single language block and the English pull …",
+            "messageBody": "…request\n\nWhy: w\nBatch: B26"}]
+    repaired = repair_cut_headline(
+        cut, "docs(repo): move onto the single language block and the English pull request\n\nWhy: w\nBatch: B26"
+    )
+    check("a cut headline is replaced by the local commit",
+          commits_from_payload(repaired)[0]["message"],
+          "docs(repo): move onto the single language block and the English pull request\n\nWhy: w\nBatch: B26")
+    check("a headline that is not cut is left alone", repair_cut_headline(payload, "anything"), payload)
+    try:
+        repair_cut_headline(cut, "chore(infra): unrelated")
+        check("a cut headline with no matching local commit is refused", "no error", "error")
+    except MessageError:
+        check("a cut headline with no matching local commit is refused", "error", "error")
 
     print(f"\n{failures} failure(s)")
     return 1 if failures else 0

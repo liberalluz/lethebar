@@ -1082,6 +1082,9 @@ def cmd_check(args: argparse.Namespace) -> int:
 def pr_body(root: Path, batch_id: str) -> str:
     card = read_card(root, batch_id)
     state = read_state(root, batch_id)
+    written = batch_dir(root, batch_id) / "pr-body.source.md"
+    if written.is_file():
+        return written.read_text(encoding="utf-8").strip()
     changed = changed_paths(root, str(state.get("base", "main")), load_config(root))
     lines = [
         f"# {card.get('goal', '')}",
@@ -1265,7 +1268,7 @@ def cmd_pr(args: argparse.Namespace) -> int:
     body_path = args.body_file or (batch_dir(root, batch_id) / "pr-body.md")
     body_path = body_path if body_path.is_absolute() else root / body_path
     write_text(body_path, body + "\n")
-    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(body_path.read_bytes()).hexdigest()
     print(f"prepared {body_path.relative_to(root)}")
     print(f"body hash: {digest[:8]}")
     state["status"] = "pr_ready"
@@ -1509,7 +1512,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("id", nargs="?")
     pr.add_argument("--prepare", action="store_true")
     pr.add_argument("--create", action="store_true")
-    pr.add_argument("--body-file")
+    pr.add_argument("--body-file", type=Path)
     pr.add_argument("--confirm")
     pr.set_defaults(func=cmd_pr)
 
