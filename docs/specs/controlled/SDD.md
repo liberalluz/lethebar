@@ -174,12 +174,14 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-19` | a pool lists no item twice, draws at least one, and does not draw past its size without replace | reject |
 | `V-20` | every entity a relation points at is declared, every threshold is a number, and every state name comes from `thresholds` | reject |
 | `W-02` | a relation pair that disagrees in direction (reported, not rewritten) | warn |
+| `W-03` | a format 1.0.0 package names a capability without its major version (reported, still installs) | warn |
 | `V-23` | `kind`, `layer` and `requires` have the shape §3.2 gives them, and a `2.0.0` package declares `kind` | reject |
 | `V-24` | every `requires` entry is satisfied by an installed or built-in package whose version falls inside the declared range | reject |
 | `W-01` | `specVersion` is below `2.0.0`: readable now, refused from v0.2.0 | warn |
 | `V-21` | `clock.per` is `turn` or `node`, and a package that declares a clock also carries at least one rule whose `when` reads `tick` | reject |
 | `V-25` | a condition names a relation state declared in `factions.json`, or an item some pool contains | reject |
 | `V-26` | an action's `draw.pool` names a pool `pools.json` declares | reject |
+| `V-27` | every entry in `capabilities` is a capability id `name@major` the engine provides (ADR-0008) | reject |
 
 Every rejection names its code and the offending field; a rejection never
 disturbs already-installed plugins or their saves. `V-24` is checked at install
@@ -465,6 +467,7 @@ it did before this section existed.
 | `REQ-026` | §6.1 when a run ends, §11 the scene draws the menu |
 | `REQ-027` | §3.3 data file (`actions.json`, `requires` and `draw`), §4.2 validation (`V-25`, `V-26`), `engine-bricks` §7 conditions |
 | `REQ-028` | §7.4 storage, §7.5 durability (`SaveStore` flush request and probe), `app/core/save_store.gd` |
+| `REQ-029` | §4.2 validation (`V-27`, `W-03`), `docs/specs/capabilities.md`, `PackageValidator.KNOWN_CAPABILITIES` |
 
 ## 13. Decisions and open questions
 

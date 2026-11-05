@@ -10,7 +10,7 @@
   "defaultLocale": "zh-CN",
   "locales": ["en"],
   "protocol": "linear@1",
-  "capabilities": ["render.2d", "text"],
+  "capabilities": ["render.2d@1", "text@1"],
   "mechanics": ["progress"],
   "entry": "x1",
   "saveSchema": 1,

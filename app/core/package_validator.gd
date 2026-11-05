@@ -22,6 +22,39 @@ const SUPPORTED_ASSET_TYPES := ManifestSchema.ASSET_TYPES
 ## language (V-22).
 const SUPPORTED_LOCALES := ["en", "zh-CN"]
 
+## Capabilities this engine can provide (ADR-0008). Each id has a row in
+## `docs/specs/capabilities.md`, and a package that asks for anything else is
+## refused by name (V-27). The first three are what the renderer draws; the rest
+## are the bricks as they exist in this build.
+const KNOWN_CAPABILITIES := [
+	"text@1",
+	"render.2d@1",
+	"audio@1",
+	"narrative@1",
+	"rounds@1",
+	"ledger@1",
+	"rules@1",
+	"menu@1",
+	"phases@1",
+	"pools@1",
+	"relations@1",
+	"conditions@1",
+	"draws@1",
+	"clock@1",
+	"actions@1",
+	"assets@1",
+	"locale@1",
+	"save@2",
+	"offline@1",
+	"format@2",
+]
+
+
+static func known_capabilities() -> Array:
+	## The test reads this instead of a second copy, so the specification and the
+	## engine cannot drift without one of them failing.
+	return KNOWN_CAPABILITIES
+
 
 static func _issue(code: String, field: String, message: String, fatal: bool) -> Dictionary:	return {"code": code, "field": field, "message": message, "fatal": fatal}
 
@@ -82,6 +115,41 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 	# manifest whose basic fields are malformed is reported once, not twice.
 	for item in ManifestSchema.format_issues(manifest):
 		issues.append(_issue("V-23", item["field"], item["message"], true))
+
+	# V-27 — every capability the package asks for is one this engine provides
+	# (ADR-0008). The field has always said what a package needs from the engine;
+	# until this check existed nothing read it. A package written for format 1.0.0
+	# may still carry the unversioned form that format used, and installs with
+	# W-03 so that published packages do not stop working (ADR-0006).
+	var legacy_format := ManifestSchema.semver_cmp(
+		ManifestSchema.parse_semver(manifest["specVersion"]),
+		ManifestSchema.parse_semver(ManifestSchema.SPEC_V2),
+	) < 0
+	for entry in manifest["capabilities"]:
+		var parsed_capability := ManifestSchema.parse_capability(entry)
+		if parsed_capability.is_empty():
+			if legacy_format:
+				issues.append(_issue(
+					"W-03", "capabilities",
+					"%s names no version; format %s requires %s@<major>" % [
+						entry, ManifestSchema.SPEC_V2, entry,
+					],
+					false,
+				))
+				continue
+			issues.append(_issue(
+				"V-27", "capabilities",
+				"not a capability id: %s (expected name@major, for example text@1)" % entry,
+				true,
+			))
+			continue
+		var capability := ManifestSchema.capability_id(parsed_capability[0], parsed_capability[1])
+		if not KNOWN_CAPABILITIES.has(capability):
+			issues.append(_issue(
+				"V-27", "capabilities",
+				"this engine does not provide %s" % capability,
+				true,
+			))
 
 	# V-24 — every requirement is satisfiable right now. A bundle that needs a
 	# package nobody installed is refused at install time, because the player

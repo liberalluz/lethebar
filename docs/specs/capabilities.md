@@ -5,9 +5,14 @@ require. The contract is in `docs/decisions/0008-capability-contract.md`; this
 file is the list it points at.
 
 A capability identifier is `name@major`. The engine provides it; a package names
-it in `requires.capabilities`; an engine that cannot provide it refuses the
+it in the `capabilities` field of its manifest; an engine that cannot provide it refuses the
 install and names what is missing. Growing a capability compatibly keeps its
 major version; changing what it guarantees starts a new one (`map@2`).
+
+A package is checked when it is installed, not when it is played: an unknown
+capability is `V-27`, and a format 1.0.0 package that still names a capability
+without its major version installs with `W-03` so that nothing published earlier
+stops working (ADR-0006). The ids below are the ones this build accepts.
 
 Nothing here describes content. Officers, cards, cities and scenes are data a
 package carries; a capability is what the engine knows how to do with them.
