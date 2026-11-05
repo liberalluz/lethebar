@@ -9,16 +9,26 @@ English · [简体中文](README.zh-CN.md)
 
 ## Status
 
-**v0.0.2 is out and playable in a browser.**
+**v0.1.0 is out and playable in a browser.**
 
-- Two built-in stories ship with it: `sanguo` (three decision rounds, `turn_based@1`) and `xiuxian` (a five-scene segment, `linear@1`)
-- It also installs a `.zip` pack from your own disk, keeps three save slots per pack, and reopens offline
-- The interface speaks English and Chinese; a pack can carry its own text tables, so both stories read in either language
-- A pack can declare pictures and sound, and a scene draws them; `sanguo` ships a painted scene and a short theme
-- The shipped font covers CJK extension A, so an ideograph outside the BMP block draws as a glyph instead of a box
+- Eight content bricks are now the pack format: a ledger of numbers with bounds and
+  labels, rules that settle after an action, an action menu, a phase machine with ranks
+  and failure conditions, dice checks, item pools, directed relations, and a clock
+- A scene draws one button per action, keeps an unavailable one visible with its reason,
+  and shows the turn and the rank; an action can wait on a relation or on an item already
+  drawn, and can draw from a pool as part of itself
+- Three built-in stories ship with it: `sanguo` (`turn_based@1`), `xiuxian` (`linear@1`),
+  and `jianghu`, which is written only as data — a whole new kind of story on the same engine
+- Packs declare format `2.0.0`; a pack still on `1.0.0` installs with one warning until
+  `v0.2.0`, and the installer refuses a malformed or unmet requirement before it is played
+- A save waits for the storage layer to say it is durable, so the slot screen says
+  "Saving…" and only then "Saved"; a reload at that moment finds the run
+- The interface speaks English and Chinese, packs can carry their own text tables, and a
+  pack can declare pictures and sound that the scene draws and plays
 - Verified on desktop Chrome and on iOS Safari, online and with the network off
-- Known gaps: only PNG, JPEG and WAV; one picture band and one portrait column; CJK extension B still draws as boxes
-- Next: `v0.1.0` opens the pack format to the eight content bricks
+- Known gaps: only PNG, JPEG and WAV; one picture band and one portrait column; CJK
+  extension B still draws as boxes; relations cannot be changed by a rule yet
+- Next: `v0.2.0` makes `sanguo` deep — 24 turns, four resources, five ranks, three ways to lose
 
 This repository is public now because the plugin spec should be seen and challenged early.
 
