@@ -80,7 +80,25 @@
         "res://tests/run_tests.gd"
       ],
       "cwd": "."
+    },
+    {
+      "name": "translation",
+      "command": [
+        "python",
+        "infra/checks/check_translation.py"
+      ],
+      "cwd": "."
     }
+  ],
+  "translate": [
+    "python",
+    "infra/tool/merge/translate_body.py",
+    "--body",
+    "{body}",
+    "--locale",
+    "{locale}",
+    "--out",
+    "{out}"
   ],
   "pr_create": [],
   "merge": []

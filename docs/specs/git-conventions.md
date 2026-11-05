@@ -98,12 +98,19 @@ one `language` block; change that file first, then this table.
 | `docs/specs/controlled/*` | English source plus `zh-CN` translation | `language` |
 | Out-of-repo documents (`lethebar-docs`) | English | `language.external` (`en-US`) |
 | Pull request title and body | English | `language.external` (`en-US`) |
+| The translation of a PR body | every `supported` locale other than the external one | `language` |
 
 - A PR title keeps the `type(scope)` prefix and reads as one English sentence:
   `docs(repo): write the v0.1.0 changelog and say what shipped`.
 - A PR body uses the five template sections; do not invent another structure. The
   `Verification` section carries the command and its decisive output verbatim,
   because a body that only says "it passed" is not evidence.
+- A PR body carries a translation. `batch.py pr --prepare` runs `config.translate`,
+  which writes `.batch/<id>/pr-body.<locale>.md` and a manifest recording the sha256
+  of the English body it translated; the `translation` check refuses a missing
+  translation or one older than the body. The hook reads `LETHEBAR_TRANSLATION_FILE`
+  when it is set and asks `DEEPSEEK_API_KEY` otherwise; without either it fails, and
+  the batch has no translation to ship.
 - Commit messages stay English per §2, including the squashed commits on `main`.
   The subject of a squashed commit is the subject of the branch commit, so it is
   English as well; do not hand-translate it.
