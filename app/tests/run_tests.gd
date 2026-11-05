@@ -65,6 +65,7 @@ func _initialize() -> void:
 	_case_scene()
 	_case_wire()
 	_case_save_flush()
+	_case_capabilities()
 	_case_assets()
 
 	print("")
@@ -181,7 +182,7 @@ func _case_pkg_005() -> void:
 		"id": "spec-only-pack",
 		"name": "Spec Only",
 		"protocol": "linear@1",
-		"capabilities": ["text", "audio"],
+		"capabilities": ["text@1", "audio@1"],
 		"mechanics": ["momentum"],
 		"entry": "start",
 	}, [], [], {"nodes": [{"id": "start", "text": "Start.", "choices": []}]})
@@ -623,7 +624,7 @@ func _manifest_defaults() -> Dictionary:
 		"engine": ">=4.3.0 <5.0.0",
 		"name": "Test Linear",
 		"protocol": "linear@1",
-		"capabilities": ["text"],
+		"capabilities": ["text@1"],
 		"mechanics": ["basic"],
 		"entry": "n1",
 		"saveSchema": 1,
@@ -2458,6 +2459,67 @@ func _case_builtin_003() -> void:
 		String(english_view.get("text", "")).contains("last lamp in the inn"),
 		String(english_view.get("text", "")),
 	)
+
+
+func _case_capabilities() -> void:
+	_section("TC-CAP-001 a package declares the engine capabilities it needs")
+	var loader := PackageLoader.new()
+
+	# A capability this engine provides installs. `ledger@1` is one of the
+	# bricks, so asking for it must not depend on the package using the brick.
+	var known := loader.import_bytes(
+		_package("caps-known", {"capabilities": ["ledger@1", "text@1"]}),
+		_context(),
+	)
+	_check("TC-CAP-001: a provided capability installs", known["status"] == "installed", String(known.get("code", "")))
+
+	# A capability this engine does not provide is refused, and the refusal names
+	# it: the contract is only usable if the failure says what is missing.
+	var missing := loader.import_bytes(
+		_package("caps-missing", {"capabilities": ["map@1"]}),
+		_context(),
+	)
+	_check("TC-CAP-001: an unprovided capability is refused", missing["status"] == "rejected", String(missing.get("code", "")))
+	_check(
+		"TC-CAP-001: the refusal names the capability",
+		String(missing.get("code", "")) == "V-27" and String(missing.get("message", "")).contains("map@1"),
+		"%s / %s" % [missing.get("code", ""), missing.get("message", "")],
+	)
+
+	# Format 2.0.0 requires the versioned form. A bare name is a leftover of
+	# 1.0.0 and is refused here rather than read as major zero.
+	var unversioned := loader.import_bytes(
+		_package("caps-unversioned", {"capabilities": ["text"]}),
+		_context(),
+	)
+	_check(
+		"TC-CAP-001: an unversioned id is refused in 2.0.0",
+		String(unversioned.get("code", "")) == "V-27" and String(unversioned.get("message", "")).contains("text"),
+		String(unversioned.get("message", "")),
+	)
+
+	# The same package written for 1.0.0 keeps installing, with one warning, so a
+	# package published before this batch does not stop working (ADR-0006).
+	var legacy := loader.import_bytes(
+		_package("caps-legacy", {"id": "caps-legacy", "specVersion": "1.0.0", "capabilities": ["text"]}),
+		_context(),
+	)
+	var w03 := 0
+	for warning in legacy.get("warnings", []):
+		if String(warning.get("code", "")) == "W-03":
+			w03 += 1
+	_check("TC-CAP-001: a 1.0.0 package still installs", legacy["status"] == "installed", String(legacy.get("code", "")))
+	_check("TC-CAP-001: it carries one W-03 warning", w03 == 1, str(legacy.get("warnings", [])))
+
+	# The ids the validator provides and the shape the schema parses cannot
+	# drift: every known id has to read back as `name@major`.
+	var known_ids := PackageValidator.known_capabilities()
+	var broken: Array = []
+	for capability in known_ids:
+		if ManifestSchema.parse_capability(capability).is_empty():
+			broken.append(capability)
+	_check("TC-CAP-001: every known capability parses", broken.is_empty(), str(broken))
+	_check("TC-CAP-001: the table covers the bricks", known_ids.size() >= 17, str(known_ids.size()))
 
 
 func _case_assets() -> void:

@@ -10,7 +10,7 @@
   "locales": ["en"],
   "names": {"zh-CN": "江湖夜雨", "en": "Rain over the Jianghu"},
   "protocol": "linear@1",
-  "capabilities": ["text"],
+  "capabilities": ["text@1"],
   "mechanics": [],
   "entry": "inn",
   "saveSchema": 1,

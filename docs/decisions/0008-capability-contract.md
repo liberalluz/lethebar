@@ -26,7 +26,7 @@ is `name@major` — `map@1`, `cards.hand@1`, `battle.realtime@1`.
 
 1. **The engine provides capabilities; packages only name them.** A package
    cannot introduce a capability, and a capability never comes from a package.
-2. **A package declares what it needs.** `requires.capabilities` lists the
+2. **A package declares what it needs.** The `capabilities` field lists the
    capabilities the package cannot run without. An empty list is the same as
    omitting the field: the package needs nothing beyond narration.
 3. **A missing capability refuses the install.** The rejection names the

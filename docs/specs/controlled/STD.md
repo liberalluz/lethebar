@@ -497,3 +497,19 @@ path, so the case survives fixture renames.
 - Exit: the first write reports `pending`; the screen says it is writing while the
   backend is busy and says saved only after it agrees; the slot screen stays where
   it is; without a flush hook the write is finished at once.
+
+### `TC-CAP-001` capabilities are checked at install
+
+- Covers: `REQ-029`.
+- Fixture: four packages that differ only in `capabilities` — `["ledger@1","text@1"]`,
+  `["map@1"]`, `["text"]` written for format 2.0.0, and `["text"]` written for
+  format 1.0.0.
+- Steps:
+  1. Install the first package and read the result.
+  2. Install the second and read the code and the message.
+  3. Install the third and read the code and the message.
+  4. Install the fourth and read its warnings.
+  5. Ask the validator for its capability table and parse every id in it.
+- Exit: the first installs; the second is rejected with `V-27` naming `map@1`;
+  the third is rejected with `V-27` naming `text`; the fourth installs with
+  exactly one `W-03`; every id in the table parses as `name@major`.

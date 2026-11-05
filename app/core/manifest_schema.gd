@@ -51,6 +51,26 @@ const ENGINE_RANGE_PATTERN := "^>=(\\d+\\.\\d+\\.\\d+) <(\\d+\\.\\d+\\.\\d+)$"
 
 const ASSET_TYPES := ["texture", "audio", "text"]
 
+## A capability id is `name@major` (ADR-0008): a lowercase dotted name and a
+## positive major version, e.g. `render.2d@1` or `save@2`. The schema knows only
+## the shape; which ids the engine actually provides is a constant in
+## `PackageValidator`.
+const CAPABILITY_PATTERN := "^([a-z][a-z0-9]*(?:\\.[a-z0-9]+)*)@([1-9]\\d*)$"
+
+
+static func parse_capability(value: Variant) -> Array:
+	## Returns `[name, major]`, or `[]` when the value is not a capability id.
+	if not value is String:
+		return []
+	var m := _regex(CAPABILITY_PATTERN).search(value)
+	if m == null:
+		return []
+	return [m.get_string(1), int(m.get_string(2))]
+
+
+static func capability_id(name: String, major: int) -> String:
+	return "%s@%d" % [name, major]
+
 
 static func _regex(pattern: String) -> RegEx:
 	var re := RegEx.new()
