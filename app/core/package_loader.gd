@@ -45,6 +45,15 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 		return _rejected("V-01", "package", "not a readable zip file", [])
 
 	var files := Array(reader.get_files())
+
+	# ADR-0009's install-time envelope (REQ-030). Checked before the manifest is
+	# read, because none of it should depend on the package being well formed.
+	var envelope := _envelope_problem(bytes, files, reader)
+	if not envelope.is_empty():
+		reader.close()
+		_discard(scratch)
+		return _rejected(String(envelope["code"]), "package", String(envelope["message"]), [])
+
 	if not files.has(MANIFEST_PATH):
 		reader.close()
 		_discard(scratch)
@@ -112,9 +121,29 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 	# Only the bytes a declared asset actually points at are read, and they stay
 	# undecoded: the render layer turns them into a texture or a stream when a
 	# scene asks for one (SDD §8.1 — read from memory, never from disk mid-run).
+	var asset_types := {}
+	for asset in manifest.get("assets", []):
+		if asset is Dictionary:
+			asset_types[String(asset.get("path", ""))] = String(asset.get("type", ""))
 	for asset_path in _referenced_assets(manifest, data["nodes"]):
-		if files.has(asset_path):
-			data["assets"][asset_path] = reader.read_file(asset_path)
+		if not files.has(asset_path):
+			continue
+		var asset_bytes := reader.read_file(asset_path)
+		var asset_problem := ""
+		match String(asset_types.get(asset_path, "")):
+			"texture":
+				asset_problem = PackageLimits.texture_problem(
+					asset_path, PackageLimits.texture_size(asset_bytes),
+				)
+			"audio":
+				asset_problem = PackageLimits.audio_problem(
+					asset_path, asset_bytes.size(), PackageLimits.wav_seconds(asset_bytes),
+				)
+		if asset_problem != "":
+			reader.close()
+			_discard(scratch)
+			return _rejected("V-30", "assets", asset_problem, [])
+		data["assets"][asset_path] = asset_bytes
 	# A declared locale is carried as one table of text per language. A table
 	# that is absent stays absent here; V-22 refuses the package by name, so the
 	# player never meets a scene that switches language halfway.
@@ -163,6 +192,33 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 		"warnings": warnings,
 		"issues": issues,
 	}
+
+
+func _envelope_problem(bytes: PackedByteArray, files: Array, reader: ZIPReader) -> Dictionary:
+	## The envelope in `PackageLimits` applied to a real archive: the zip itself,
+	## how many entries it holds, the shape of every path, and the bytes each entry
+	## unpacks to. Returns `{}` when the package fits.
+	var archive := PackageLimits.archive_problem(bytes.size())
+	if archive != "":
+		return {"code": "V-28", "message": archive}
+	var count := PackageLimits.entries_problem(files.size())
+	if count != "":
+		return {"code": "V-28", "message": count}
+	var total := 0
+	for path in files:
+		var path_text := String(path)
+		var shape := PackageLimits.path_problem(path_text)
+		if shape != "":
+			return {"code": "V-29", "message": shape}
+		var entry := reader.read_file(path_text)
+		total += entry.size()
+		var oversized := PackageLimits.entry_problem(path_text, entry.size())
+		if oversized != "":
+			return {"code": "V-28", "message": oversized}
+	var unpacked := PackageLimits.total_problem(total)
+	if unpacked != "":
+		return {"code": "V-28", "message": unpacked}
+	return {}
 
 
 func _referenced_assets(manifest: Dictionary, nodes: Array) -> Array:

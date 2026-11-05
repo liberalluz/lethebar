@@ -169,6 +169,9 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-25` | 条件里的关系状态在 `factions.json` 里声明过，或点名的条目存在于某个池子里 | 拒绝 |
 | `V-26` | 动作的 `draw.pool` 在 `pools.json` 里声明过 | 拒绝 |
 | `V-27` | `capabilities` 的每一条都是引擎已提供的 `name@major` 能力标识（ADR-0008） | 拒绝 |
+| `V-28` | 压缩包本身、条目数、每个条目解压后的字节与解压总量都在上限内；由加载器在读取清单之前判定 | 拒绝 |
+| `V-29` | 每个条目路径都是相对路径、全小写且落在字符集白名单内 | 拒绝 |
+| `V-30` | 声明的图片任一边不超过 4096 px，声音不超过 2 MB 且不超过 60 秒 | 拒绝 |
 
 每次拒绝都给出代码与出错字段；拒绝不会扰动已安装插件及其存档。
 
@@ -406,6 +409,7 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 | `REQ-027` | §3.3 数据文件（`actions.json` 的 `requires` 与 `draw`）、§4.2 校验（`V-25`、`V-26`）、`engine-bricks` §7 条件 |
 | `REQ-028` | §7.4 存储、§7.5 落盘（`SaveStore` 的落盘请求与探针）、`app/core/save_store.gd` |
 | `REQ-029` | §4.2 校验（`V-27`、`W-03`）、`docs/specs/capabilities.md`、`PackageValidator.KNOWN_CAPABILITIES` |
+| `REQ-030` | §4.2 校验（`V-28`–`V-30`）、`app/core/package_limits.gd`、加载器的信封检查 |
 
 ## 13. 决策与待定
 

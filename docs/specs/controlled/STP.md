@@ -4,7 +4,7 @@ English · [简体中文](STP.zh-CN.md)
 
 ## Scope
 
-Covers the thirty P1 requirements of `SRS.md` (v0.0.0) against the design in
+Covers the thirty-one P1 requirements of `SRS.md` (v0.0.0) against the design in
 `SDD.md`. Does not cover the plugin market, the plugin editor, 3D, multiplayer,
 accounts, cloud saves, or the native iOS build; those are out of scope for
 v0.0.0 and have no tests here by design.
@@ -92,6 +92,7 @@ claims: if they fail, the architecture claim fails, not just a feature.
 | `TC-WIRE-001` | `REQ-027` | An action waits on a relation state and on a drawn item; taking a drawing action draws in the same step and unlocks the action waiting on the item; the drawn item and the relation survive a resume; a condition naming an undeclared state is refused with `V-25` and a draw naming an undeclared pool with `V-26`. |
 | `TC-SAVE-003` | `REQ-028` | A save is reported finished only after storage says it has nothing left to flush, and the slot screen shows the wait. |
 | `TC-CAP-001` | `REQ-029` | A package that names a capability the engine does not provide is refused, the refusal names it, and a 1.0.0 package with a bare name still installs with one warning. |
+| `TC-SAFE-001` | `REQ-030` | A package outside the envelope is refused by code (V-28 size or count, V-29 path, V-30 asset) with the measured value named, and a package inside it still installs. |
 | `TC-BUILTIN-003` | `TC-BUILTIN-001`, `TC-WIRE-001` | A third shipped story, written only as data, installs and is played to an ending: the scene draws one button per declared action, the first turn shows the declared rank, drawing from the pool unlocks the action waiting on the item, playing on ends the run with the declared failure reason, and an English session reads the English table, all without a change under `app/core`. |
 
 ## Gaps

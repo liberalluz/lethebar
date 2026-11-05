@@ -182,6 +182,9 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-25` | a condition names a relation state declared in `factions.json`, or an item some pool contains | reject |
 | `V-26` | an action's `draw.pool` names a pool `pools.json` declares | reject |
 | `V-27` | every entry in `capabilities` is a capability id `name@major` the engine provides (ADR-0008) | reject |
+| `V-28` | the archive, its entry count, each entry's unpacked bytes and the unpacked total are inside the envelope; raised by the loader before the manifest is read | reject |
+| `V-29` | every entry path is relative, lowercase and inside the charset whitelist | reject |
+| `V-30` | a declared picture is at most 4096 px on an edge and a declared sound is at most 2 MB and 60 seconds | reject |
 
 Every rejection names its code and the offending field; a rejection never
 disturbs already-installed plugins or their saves. `V-24` is checked at install
@@ -468,6 +471,7 @@ it did before this section existed.
 | `REQ-027` | §3.3 data file (`actions.json`, `requires` and `draw`), §4.2 validation (`V-25`, `V-26`), `engine-bricks` §7 conditions |
 | `REQ-028` | §7.4 storage, §7.5 durability (`SaveStore` flush request and probe), `app/core/save_store.gd` |
 | `REQ-029` | §4.2 validation (`V-27`, `W-03`), `docs/specs/capabilities.md`, `PackageValidator.KNOWN_CAPABILITIES` |
+| `REQ-030` | §4.2 validation (`V-28`–`V-30`), `app/core/package_limits.gd`, loader envelope pass |
 
 ## 13. Decisions and open questions
 
