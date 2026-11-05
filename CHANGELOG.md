@@ -1,5 +1,52 @@
 # Changelog
 
+## v0.1.0 - 2026-11-05
+
+### Added
+- A package says which format it speaks, whether it is playable on its own (`kind: bundle`) or a piece another package requires (`kind: layer` with a `layer` name), and what it needs (`requires`), as ADR-0007 settles.
+- The installer refuses a package whose `kind`/`layer`/`requires` are malformed (`V-23`) or whose requirement is missing or outside its range (`V-24`), and says which package and which version it wanted.
+- The built-in stories declare format `2.0.0` with no requirements, so what players install is the shape the format asks for.
+- A package can declare its numbers and their bounds in `data/state.json`, and a resource may map values to display text with `labels`.
+- `data/rules.json` settles values in file order after the chosen action's own effects, so a rule reads what the effect just wrote.
+- `V-14`: a rule that names a resource the ledger never declares is refused at installation, naming the resource.
+- A package can declare an action menu in `data/actions.json`: costs, effects and `requires` are applied together, and an action whose requirement fails is listed as unavailable with the failing condition instead of vanishing.
+- `data/phases.json` gives a run a length, ranks read from the turn number, and failure conditions whose reason is shown when they end the run.
+- `data/checks.json` resolves dice checks from the session RNG and records the numbers that decided them under `state.checks.<id>`.
+- `V-16`, `V-17` and `V-18` refuse a malformed menu, phase machine or check at install time.
+- A package can declare item pools in `data/pools.json`: a draw takes the declared number of items and removes them unless the pool replaces them, and what is left travels in the save so a reload cannot re-roll it.
+- `data/factions.json` declares directed relations between factions, with the state names supplied by the package through `thresholds`.
+- `V-19` refuses a pool that lists an item twice or draws past its size without `replace`; `V-20` refuses a relation that points at an undeclared entity, and `W-02` reports a pair that disagrees in direction without rewriting it.
+- A package can declare `clock.per` and a rule can read the engine tick, so content that grows per turn no longer has to fake a counter with resources.
+- `TC-CLOCK-001` asserts the tick, both advance modes, the save, and the two refusals.
+- A package that declares actions is playable: the scene draws one button per action, keeps an unavailable action visible and disabled with its reason, and shows the turn and the rank.
+- `TC-SCENE-001` covers the six lines: the run opens with an empty choice list, every action is a button, an unavailable one is disabled, an action advances the turn and the rank, an ended run shows why and offers nothing, and a package without actions renders as before.
+- An action can wait on a relation state the package declares, and on an item a run has already drawn; both read the same numbers the scene shows.
+- An action can draw from a pool as part of itself, so the draw and the action's own effects commit in one step and the item unlocks whatever waited on it.
+- Validation codes V-25 and V-26 refuse a condition that names a state or an item the package never declared, and a draw that names a pool it never declared.
+- Test case TC-WIRE-001 covers the two gates, the joined draw, a save and resume, and both refusals.
+- A third built-in story, `jianghu`, written only as data: a ledger of three resources, four actions, one pool, a phase machine with three ranks and a failure condition, and an English table.
+- Test case TC-BUILTIN-003 installs that story from the shipped build and plays it to an ending, so a whole new kind of story is shown to run on the bricks the engine already ships.
+
+### Changed
+- A package that still declares `1.0.0` installs and carries one `W-01` warning; from v0.2.0 on it is refused.
+- Sanguo now keeps `power` and `standing` as numbers with labels (`兵微将寡`, `初露锋芒`, `名动诸侯`) instead of writing a string from a rule.
+- Values are clamped into their declared `min`/`max` after both effects and rules; a choice that would overflow stops at the bound instead of failing.
+- A save now carries the turn number and the per-action counters, so a restored run keeps its rank and its used-up actions.
+- A save now carries what is left of every pool and the order the session RNG fixed on its first draw, so a restored run draws the same way it would have.
+- The tick travels in the save payload, so a resumed run continues counting from where the player left instead of starting over.
+- A run no longer ends merely because the node it lands on offers no choices when the package declares a phase machine; the phase machine's failure condition or turn limit ends it instead, which is what a menu-driven package needs.
+- The readout names the items a run has drawn, because the player can now act on them.
+- The build now stages three packages instead of two; `chars.txt` grows to cover the new story's text.
+- The browser check waits for that state instead of sleeping two seconds before reloading, and it counts restored slots from the cross-pack list on the landing screen rather than from whichever pack it happened to open.
+- `CONTRIBUTING.md`, `CONTRIBUTING.zh-CN.md` and `docs/specs/git-conventions.md` now name `--out` as the way to produce the `--body-file` argument, and record both ways it has gone wrong: the subject repeated in the body (`#38` to `#45`) and U+FFFD from a redirect (`#46`).
+- `CONTRIBUTING.md` and `CONTRIBUTING.zh-CN.md` point at `docs/specs/git-conventions.md` §2 and §4 instead of repeating the merge rules, which had already grown three paragraphs of history.
+
+### Fixed
+- A save now reports itself as pending until the storage layer says it has nothing left to flush, so the slot screen says "Saving…" before it says the slot is saved and a reload cannot outrun the write. Installing a package passes through the same gate.
+- `pr_merge.py --body-only` prints the body alone, so `gh pr merge --body-file` no longer puts the subject on the first body line. `#38` to `#45` were merged with the whole message and each carries that duplicate; they are left as they are, and §4 of `git-conventions.md` now says which flag feeds which argument.
+- `pr_merge.py --body-only --out <file>` writes the merge body to a file itself, so the text never passes through a shell pipe that decodes UTF-8 as the local code page; `#46` lost an em dash to that step and was amended.
+- `infra/checks/check_commit_body.py` refuses backticks, `**bold**` and `__bold__` in a commit body outside a fenced block: a commit message is never rendered, so the markers reached the reader as characters. `0bf59cd` carried ten backticks until it was amended.
+
 ## v0.0.2 - 2026-11-04
 
 ### Added
