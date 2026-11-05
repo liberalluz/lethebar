@@ -1,0 +1,9 @@
+{
+  "pools": [
+    {
+      "id": "relics",
+      "items": ["old_sword"],
+      "draw": {"n": 1, "replace": false}
+    }
+  ]
+}

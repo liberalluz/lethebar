@@ -1,0 +1,33 @@
+{
+  "actions": [
+    {
+      "id": "train",
+      "label": "在后院练剑",
+      "costs": {"qi": {"add": -10}},
+      "effects": [{"fame": {"add": 6}}],
+      "limit": {"per_turn": 1}
+    },
+    {
+      "id": "rest",
+      "label": "打坐调息",
+      "costs": {"silver": {"add": -2}},
+      "requires": [{"key": "silver", "op": "gte", "value": 2}],
+      "effects": [{"qi": {"add": 15}}],
+      "limit": {"per_turn": 1}
+    },
+    {
+      "id": "search",
+      "label": "上后山搜寻",
+      "draw": {"pool": "relics"},
+      "effects": [{"fame": {"add": 2}}],
+      "limit": {"per_run": 1}
+    },
+    {
+      "id": "wield",
+      "label": "拔出那柄旧剑",
+      "requires": [{"drawn": "old_sword"}],
+      "effects": [{"fame": {"add": 25}}, {"qi": {"add": -5}}],
+      "limit": {"per_run": 1}
+    }
+  ]
+}
