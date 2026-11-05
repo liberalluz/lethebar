@@ -483,3 +483,17 @@ path, so the case survives fixture renames.
   the waiting action is disabled before the draw and enabled after it, with the
   drawn item named in the readout; the run ends with the declared failure reason;
   the English session reads the English text.
+
+## TC-SAVE-003 — a save is reportable only after storage settles
+
+- Covers: `REQ-028`.
+- Fixture: a shell whose store reports `pending` for two probes and clean after
+  that, plus a store whose backend has no flush at all.
+- Steps:
+  1. Save into a slot and read what the store returned.
+  2. While the backend still reports busy, read the slot screen.
+  3. Answer the probe, then read the slot screen again.
+  4. Repeat with a backend that has nothing to flush.
+- Exit: the first write reports `pending`; the screen says it is writing while the
+  backend is busy and says saved only after it agrees; the slot screen stays where
+  it is; without a flush hook the write is finished at once.

@@ -312,6 +312,23 @@ write fails (quota, private mode), the session continues and the warning channel
 reports that the slot was not written; the player is never told a save succeeded
 when it did not.
 
+### 7.5 Durability
+
+A write is not finished when the call returns; it is finished when storage says
+it has nothing left to flush. `SaveStore` carries a request and a probe: `write()`
+asks for a flush and then asks whether the backend is still busy, and reports
+`pending` while it is. The shell polls that flag every frame and only then says
+the slot is saved.
+
+In the browser the store is `user://`, which the engine maps onto IndexedDB and
+flushes on its own schedule. The export does not expose that flush to the page,
+so the shell waits a bounded amount of wall time (1.5 s) rather than calling it.
+Wall time, not frames: a headless browser draws far faster than sixty frames a
+second, and a frame budget would be a fraction of the window storage needs.
+
+Installing a package writes to the same store and passes through the same gate:
+`mark_writing()` exists so that a reload cannot outrun an install either.
+
 ## 8. Asset strategy
 
 ### 8.1 Resolution
@@ -447,6 +464,7 @@ it did before this section existed.
 | `REQ-025` | §3.2 manifest field (`clock`), §4.2 validation (`V-21`, `V-14`), §6.5 the clock |
 | `REQ-026` | §6.1 when a run ends, §11 the scene draws the menu |
 | `REQ-027` | §3.3 data file (`actions.json`, `requires` and `draw`), §4.2 validation (`V-25`, `V-26`), `engine-bricks` §7 conditions |
+| `REQ-028` | §7.4 storage, §7.5 durability (`SaveStore` flush request and probe), `app/core/save_store.gd` |
 
 ## 13. Decisions and open questions
 

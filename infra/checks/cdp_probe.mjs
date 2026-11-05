@@ -321,6 +321,7 @@ const interaction = {
   session: false,
   saved: false,
   imported: false,
+  savingSeen: false,
   asked: false,
   installed: null,
   offline: false,
@@ -331,12 +332,17 @@ const interaction = {
 if (landingScreen === "landing") {
   const stories = ((await appState()) || {}).stories || [];
   interaction.plugins = stories.length > 0;
+  // A story may declare no pictures at all, and then the band is empty on
+  // purpose. Open one that declares a picture when the assertion is about a
+  // picture reaching the screen.
+  const picturedStory = stories.find((story) => Number(story.pictures || 0) > 0) || stories[0];
   if (interaction.plugins) {
     // `New game` → story list → the story itself: the same two clicks a player
     // takes, so the measured time is the path they actually walk.
     await clickLabel("New game");
     const onPlugins = await waitState((state) => state.screen === "plugins");
-    interaction.session = onPlugins && (await clickLabel(String(stories[0].title))) !== null;
+    interaction.session =
+    onPlugins && (await clickLabel(String((picturedStory || stories[0] || {}).title || ""))) !== null;
     if (interaction.session && (await waitState((state) => state.screen === "session"))) {
       clickToSceneMs = Math.round((await evaluate("performance.now()")) - clickStarted);
       // The desktop suite decodes a PNG in a headless renderer; the browser is a
@@ -381,9 +387,23 @@ if (landingScreen === "landing") {
       await clickLabel("Saves");
       if (await waitState((state) => state.screen === "saves")) {
         await clickLabel("Save");
-        interaction.saved = Boolean(
-          await waitState((state) => (state.slots || []).some((slot) => slot.length > 0), 30),
+        // The shell does not say saved until the engine had frames to fold the
+        // write into IndexedDB; the state carries both halves, so the probe waits
+        // for the answer instead of sleeping through a guess.
+        // Wait for the write to start, then for it to settle. Waiting only for
+        // "settled and the slot is filled" is a race: the previous screen's state
+        // already says not-saving, so it would return before the write began.
+        const started = Boolean(await waitState((state) => state.saving === true, 60));
+        // Evidence that the shell told the player it was writing. Without this
+        // the only proof that the wait exists is the absence of a sleep.
+        interaction.savingSeen = started;
+        const finished = Boolean(
+          await waitState(
+            (state) => state.saving === false && (state.slots || []).some((slot) => slot.length > 0),
+            240,
+          ),
         );
+        interaction.saved = started && finished;
         // The slots screen is where a narrow window used to push Save and Load
         // off the right edge, so it gets a picture of its own next to the first
         // scene one: `<shot>-saves.png`.
@@ -472,17 +492,15 @@ let offline = {
 
 if (interaction.saved) {
   offline.attempted = true;
-  // The engine persists `user://` to IndexedDB in a scheduled background sync, so
-  // a reload fired in the same tick as an import aborts that transaction and the
-  // pack is lost. Wait long enough for the write to land before cutting the
-  // network; a player who reloads inside that window loses the import too, which
-  // is recorded as a known limitation rather than papered over here.
-  await sleep(2000);
-  // Prove the write landed before blaming the cache for losing it: reload while
-  // still online and wait until the imported pack is back. A fixed sleep was a
-  // guess — the pack came and went between runs because the sync is scheduled.
+  // The install is written through the same gate as a save, so wait until the
+  // shell stops saying it is writing before treating the reload as a player one.
+  await waitState((state) => state.saving === false, 240);
+  // Nothing sleeps here. The save click already waited for the shell to stop
+  // saying "saving", which it does only after the engine had frames to fold the
+  // write in, so this reload fires when a player would reload. If the pack is
+  // missing, the write did not land — that is the finding, not a timing accident.
   offline.persistTries = 0;
-  for (let attempt = 0; attempt < 8; attempt += 1) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     offline.persistTries = attempt + 1;
     await onSession("Page.navigate", { url });
     const back = await waitState((state) => state.screen === "landing", 100);
@@ -508,11 +526,16 @@ if (interaction.saved) {
     // TC-OFF-004: the pack the player installed is in the same store as the
     // saves, so it either comes back from IndexedDB or it was never really there.
     offline.importedRestored = interaction.installed ? offline.packIds.includes(interaction.installed) : null;
+    // The saved slot may belong to any pack, so count the cross-pack list the
+    // landing screen publishes instead of this pack's three slots.
+    offline.slotsRestored = (back.saves || []).length;
     offline.sessions = await openFirstPack();
     if (offline.sessions) {
       await clickLabel("Saves");
       const saves = await waitState((state) => state.screen === "saves", 30);
-      if (saves) offline.slotsRestored = (saves.slots || []).filter((slot) => slot.length > 0).length;
+      // The save screen of a pack that never saved is empty on purpose; this
+      // only proves the screen still opens offline.
+      if (saves) offline.packSlots = (saves.slots || []).length;
     }
     // `Continue` exists only because a slot is saved, and it lists the saves
     // themselves: one click, then the run is back where it stopped. This walks

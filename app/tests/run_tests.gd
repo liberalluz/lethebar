@@ -64,6 +64,7 @@ func _initialize() -> void:
 	_case_clock()
 	_case_scene()
 	_case_wire()
+	_case_save_flush()
 	_case_assets()
 
 	print("")
@@ -1610,6 +1611,61 @@ func _case_ledger() -> void:
 		"" if resumed == null else str(resumed.state)
 	)
 
+
+
+func _case_save_flush() -> void:
+	_section("TC-SAVE-003 a save is durable before the scene moves on")
+	MemoryBackend.reset()
+	var entry: Dictionary = PackageLoader.new().import_bytes(_turn_package("flush"), _context())["entry"]
+	var session := Session.create(entry)
+	session.start()
+
+	var state := {"calls": 0, "durable": false}
+	var store := SaveStore.new()
+	store.flush_request = func() -> void:
+		pass
+	store.flush_probe = func() -> bool:
+		state["calls"] = int(state["calls"]) + 1
+		return bool(state["durable"])
+	var written := store.write(entry, 1, session.snapshot(), "flush")
+	_check("TC-SAVE-003: the write still lands", bool(written["ok"]), str(written))
+	_check(
+		"TC-SAVE-003: a write reports itself as pending until the backend is durable",
+		bool(written.get("pending", false)),
+		str(written)
+	)
+	_check("TC-SAVE-003: the store is not settled while the backend says no", not store.settled())
+	state["durable"] = true
+	_check("TC-SAVE-003: the store settles once the backend says yes", store.settled())
+	_check("TC-SAVE-003: the probe was asked at least twice", int(state["calls"]) >= 2, str(state["calls"]))
+
+	var plain := SaveStore.new()
+	var quick := plain.write(entry, 2, session.snapshot(), "plain")
+	_check(
+		"TC-SAVE-003: a backend with nothing to flush reports the slot as saved",
+		bool(quick["ok"]) and not bool(quick.get("pending", true)) and plain.settled(),
+		str(quick)
+	)
+
+	var shell := _shell()
+	var bytes := _package("flush-ui", {"id": "flush-ui"}, [], [], {"nodes": [{"id": "n1", "text": "Flush.", "choices": []}]})
+	var imported := shell.try_import(bytes)
+	_check("TC-SAVE-003: the fixture pack opens", String(imported.get("node", "")) == "n1", str(imported))
+	var gate := {"durable": false}
+	shell.saves.flush_request = func() -> void:
+		pass
+	shell.saves.flush_probe = func() -> bool:
+		return bool(gate["durable"])
+	var click := shell.save_to(1)
+	_check("TC-SAVE-003: the save screen says it is writing", shell._status.text == Locale.text("ui.saving"), shell._status.text)
+	gate["durable"] = true
+	shell.poll_saves()
+	_check(
+		"TC-SAVE-003: the save screen says it is saved once the backend agrees",
+		shell._status.text == Locale.text("ui.saved_to") % 1,
+		shell._status.text
+	)
+	_check("TC-SAVE-003: the save screen stays open after the write", String(shell.screen) == "saves" and click.has("node"), str(shell.screen))
 
 
 func _case_pools() -> void:

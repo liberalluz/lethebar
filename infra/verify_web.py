@@ -233,6 +233,11 @@ def main() -> int:
     if report.get("ok") and not interaction.get("saved"):
         report["ok"] = False
         report["interactionFailure"] = "the save screen did not answer a click on Save"
+    # TC-SAVE-003: the shell has to say it is writing before it says it is saved,
+    # otherwise the only evidence for the wait is that nothing slept.
+    if report.get("ok") and not interaction.get("savingSeen"):
+        report["ok"] = False
+        report["interactionFailure"] = "the save screen never said it was writing"
     # TC-ASSET-001: the browser decodes the picture itself. The desktop suite can
     # only say that a texture exists; this says the first scene filled a slot.
     if report.get("ok") and "scene" not in (interaction.get("pictures") or []):
