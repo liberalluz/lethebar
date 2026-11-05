@@ -223,6 +223,7 @@ sees and how the numbers move.
   declares that state; using it without a declaration is a validation error, so
   there are no magic numbers in the engine to disagree with a package's intent.
 - A package that uses no relations omits the file entirely.
+- A condition may also name an item that has been drawn, `{"drawn": "cao_cao"}`, and an action may take one item out of a pool as part of itself with `draw: {"pool": "officers"}`. The shorthand `{"relation": "shu", "state": "ally"}` asks whether any entity stands in that state toward `shu`; the long form `{"relation": {"from": "wei", "to": "shu", "state": "ally"}}` asks about exactly that direction. Both are install-time checked (`V-25`, `V-26`).
 
 ## 8. Clock
 

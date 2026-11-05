@@ -891,6 +891,14 @@ func _readout(view: Dictionary) -> String:
 		# A package with a phase machine has a turn and a rank; both are the
 		# engine's numbers, the scene only reads them (REQ-026).
 		parts.append(Locale.text("ui.turn_rank") % [int(view.get("turn", 0)), String(view.get("rank", ""))])
+	if view.has("drawn") and not (view["drawn"] as Array).is_empty():
+		# What a run has drawn is a fact the player can act on: an action may wait
+		# on it, so the scene says it (REQ-027).
+		var items: Array = view["drawn"]
+		var names := PackedStringArray()
+		for item in items:
+			names.append(String(item))
+		parts.append(Locale.text("ui.drawn") % ", ".join(names))
 	if parts.is_empty():
 		return ""
 	return " · ".join(parts)

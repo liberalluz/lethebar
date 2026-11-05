@@ -34,7 +34,7 @@ static func availability(action: Dictionary, session: Session) -> Dictionary:
 	var requires: Variant = action.get("requires", null)
 	if requires is Array:
 		for condition in requires:
-			if condition is Dictionary and not _holds(condition, session.state):
+			if condition is Dictionary and not _holds(condition, session):
 				return {"enabled": false, "reason": _reason(condition)}
 	if limit_reached(action, session):
 		return {"enabled": false, "reason": "used up"}
@@ -104,16 +104,35 @@ static func referenced_keys(actions: Array) -> Array:
 		var requires: Variant = action.get("requires", null)
 		if requires is Array:
 			for condition in requires:
-				if condition is Dictionary and not out.has(String(condition.get("key", ""))):
-					out.append(String(condition.get("key", "")))
+				if condition is Dictionary and _is_resource(condition):
+					var key := String(condition.get("key", ""))
+					if not out.has(key):
+						out.append(key)
 	return out
 
 
-static func _holds(condition: Dictionary, state: Dictionary) -> bool:
+static func _is_resource(condition: Dictionary) -> bool:
+	## A relation or a drawn item is not a number in the ledger, so the validator
+	## must ask a different question about it (V-25 and V-26 rather than V-14).
+	return condition.has("key") and not condition.has("relation") and not condition.has("drawn")
+
+
+static func _holds(condition: Dictionary, session: Session) -> bool:
+	## Three shapes: a number in the ledger, a relation state, or an item that has
+	## already been drawn (engine-bricks ��7). They are checked here because only
+	## the session knows which of the three a package means.
+	if condition.has("relation"):
+		return _relation_holds(condition, session)
+	if condition.has("drawn"):
+		var item := String(condition.get("drawn", ""))
+		for entry in session.drawn:
+			if entry is Dictionary and String(entry.get("item", "")) == item:
+				return true
+		return false
 	var key := String(condition.get("key", ""))
 	var op := String(condition.get("op", ""))
 	var value := float(condition.get("value", 0.0))
-	var current := float(state.get(key, 0.0))
+	var current := float(session.state.get(key, 0.0))
 	match op:
 		"gte":
 			return current >= value
@@ -128,7 +147,33 @@ static func _holds(condition: Dictionary, state: Dictionary) -> bool:
 	return false
 
 
+static func _relation_holds(condition: Dictionary, session: Session) -> bool:
+	## `{"relation": "shu", "state": "ally"}` means some entity stands in that
+	## state toward shu, which is the shorthand engine-bricks writes. The long
+	## form names both ends when a package needs exactly one direction.
+	var state_name := String(condition.get("state", ""))
+	var named: Variant = condition.get("relation")
+	if named is Dictionary:
+		var from_id := String(named.get("from", ""))
+		var to_id := String(named.get("to", ""))
+		return session.relation_state(from_id, to_id) == state_name
+	var target := String(named)
+	for entity_id in session.factions.get("order", []):
+		var from_id := String(entity_id)
+		if from_id == "" or from_id == target:
+			continue
+		if session.relation_state(from_id, target) == state_name:
+			return true
+	return false
+
+
 static func _reason(condition: Dictionary) -> String:
+	if condition.has("relation"):
+		var named: Variant = condition.get("relation")
+		var target := String(named) if not named is Dictionary else "%s -> %s" % [String(named.get("from", "")), String(named.get("to", ""))]
+		return "%s is not %s" % [target, String(condition.get("state", ""))]
+	if condition.has("drawn"):
+		return "%s has not been drawn" % String(condition.get("drawn", ""))
 	var key := String(condition.get("key", ""))
 	var op := String(condition.get("op", ""))
 	var value := float(condition.get("value", 0.0))

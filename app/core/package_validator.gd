@@ -148,6 +148,70 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 			var code := "V-20" if bool(item.get("fatal", true)) else "W-02"
 			issues.append(_issue(code, "factions.json", String(item.get("message", "")), bool(item.get("fatal", true))))
 
+	# V-25, V-26 — a condition that names a relation state or a drawn item, and a
+	# draw that names a pool. Both are install-time questions: at the table a typo
+	# would look like a door that never opens (REQ-027).
+	if not actions.is_empty():
+		var thresholds: Dictionary = {}
+		var entity_ids: Array = []
+		if factions is Dictionary:
+			var declared: Variant = factions.get("thresholds", {})
+			if declared is Dictionary:
+				thresholds = declared
+			for entity in factions.get("entities", []):
+				if entity is Dictionary:
+					entity_ids.append(String(entity.get("id", "")))
+		var pool_ids: Array = []
+		var pool_items: Array = []
+		if pools is Array:
+			for pool in pools:
+				if not pool is Dictionary:
+					continue
+				pool_ids.append(String(pool.get("id", "")))
+				for item in pool.get("items", []):
+					pool_items.append(String(item))
+		for action in actions:
+			var requires: Variant = action.get("requires", [])
+			if requires is Array:
+				for condition in requires:
+					if not condition is Dictionary:
+						continue
+					if condition.has("relation"):
+						var state_name := String(condition.get("state", ""))
+						if not thresholds.has(state_name):
+							issues.append(_issue(
+								"V-25", "actions.json",
+								"relation state %s is never declared in data/factions.json" % state_name,
+								true,
+							))
+						var named: Variant = condition.get("relation")
+						if named is Dictionary:
+							for side in ["from", "to"]:
+								var entity_id := String(named.get(side, ""))
+								if entity_id != "" and not entity_ids.has(entity_id):
+									issues.append(_issue(
+										"V-25", "actions.json",
+										"relation names entity %s, which data/factions.json never declares" % entity_id,
+										true,
+									))
+					if condition.has("drawn"):
+						var item := String(condition.get("drawn", ""))
+						if not pool_items.has(item):
+							issues.append(_issue(
+								"V-25", "actions.json",
+								"drawn condition names %s, which no pool contains" % item,
+								true,
+							))
+			var draws: Variant = action.get("draw", null)
+			if draws is Dictionary:
+				var pool_id := String(draws.get("pool", ""))
+				if not pool_ids.has(pool_id):
+					issues.append(_issue(
+						"V-26", "actions.json",
+						"action %s draws from %s, which data/pools.json never declares" % [String(action.get("id", "")), pool_id],
+						true,
+					))
+
 	# V-05 — the engine version this build is, not the one the author hoped for.
 	var engine_version := String(context.get("engine_version", "0.0.0"))
 	var engine_range := ManifestSchema.parse_engine_range(manifest["engine"])

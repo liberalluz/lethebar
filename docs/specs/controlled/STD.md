@@ -437,3 +437,28 @@ path, so the case survives fixture renames.
   grain; the turn moves from one to two and the readout names the second rank;
   the ended run shows the failure reason and offers no action buttons; `sanguo`
   shows five buttons and no turn in its readout.
+
+
+### `TC-WIRE-001`
+
+- Covers: `REQ-027`
+- Preconditions: a package that declares `data/actions.json`, `data/pools.json` and
+  `data/factions.json`. Its entry node has no choices, its thresholds declare
+  `ally` and `hostile`, one entity stands at `ally` toward another, and one pool
+  holds a single item.
+- Steps:
+  1. Install the package and open its scene.
+  2. Read the action that waits on the relation state, the one that waits on the
+     item, and the one that draws.
+  3. Take the drawing action once.
+  4. Read the same two waiting actions again.
+  5. Save to a slot, load it back, and read the drawn items and the relation.
+  6. Install a package whose condition names an undeclared state, then one whose
+     `draw` names an undeclared pool.
+- Exit: the scene opens; the action waiting on the relation state is available
+  while the one waiting on a state no entity has is disabled with that reason; the
+  action waiting on the item is disabled until it is drawn; taking the drawing
+  action puts exactly that item in the drawn list, the readout names it, and the
+  action waiting on it becomes available; after a resume the drawn items and the
+  relation state are unchanged; the package with the undeclared state is refused
+  with `V-25` and the one with the undeclared pool with `V-26`.

@@ -4,7 +4,7 @@ English · [简体中文](STP.zh-CN.md)
 
 ## Scope
 
-Covers the twenty-six P1 requirements of `SRS.md` (v0.0.0) against the design in
+Covers the twenty-seven P1 requirements of `SRS.md` (v0.0.0) against the design in
 `SDD.md`. Does not cover the plugin market, the plugin editor, 3D, multiplayer,
 accounts, cloud saves, or the native iOS build; those are out of scope for
 v0.0.0 and have no tests here by design.
@@ -89,6 +89,7 @@ claims: if they fail, the architecture claim fails, not just a feature.
 | `TC-REL-001` | `REQ-024` | Relations read only in the direction the package wrote; a state name comes from the package thresholds and not from the engine; an unknown entity is refused with `V-20`, and a pair that disagrees is warned about with `W-02` without being rewritten. |
 | `TC-CLOCK-001` | `REQ-025` | A package that declares a clock advances the tick on the declared advance; a rule naming `tick` fires when the count reaches its number; the count survives a save and a resume; a rule that writes `tick` is refused with `V-14`, and a clock nobody reads is refused with `V-21`. |
 | `TC-SCENE-001` | `REQ-026` | A package that declares actions opens its scene and is not finished by an empty choice list; each action is a button, an unavailable one is disabled with its reason, an action advances the turn and the readout shows the rank, an ended run shows the reason and no actions, and a package without actions renders as before. |
+| `TC-WIRE-001` | `REQ-027` | An action waits on a relation state and on a drawn item; taking a drawing action draws in the same step and unlocks the action waiting on the item; the drawn item and the relation survive a resume; a condition naming an undeclared state is refused with `V-25` and a draw naming an undeclared pool with `V-26`. |
 
 ## Gaps
 

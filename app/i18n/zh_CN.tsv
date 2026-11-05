@@ -33,3 +33,4 @@ ui.steps	第 %d/%d 步
 ui.turn_rank	第 %d 回合 · %s
 ui.blocked	%s — %s
 ui.run_over	这一局结束了：%s
+ui.drawn	已抽取：%s

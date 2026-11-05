@@ -61,6 +61,7 @@ func _initialize() -> void:
 	_case_relations()
 	_case_clock()
 	_case_scene()
+	_case_wire()
 	_case_assets()
 
 	print("")
@@ -2161,6 +2162,151 @@ func _case_scene() -> void:
 		"TC-SCENE-001: a package without actions looks exactly as before",
 		plain_labels.size() == 5 and not plain._status.text.contains(turn_prefix),
 		"%s %s" % [str(plain_labels), plain._status.text]
+	)
+
+
+func _case_wire() -> void:
+	# Two bricks could only be reached from the assertions: a relation had a value
+	# nothing waited on, and a pool could only be drawn by calling the API. These
+	# assertions are the contract for making both part of play.
+	_section("TC-WIRE-001 a relation state and a drawn item can gate an action")
+	var nodes := {"nodes": [{"id": "w1", "text": "A tent at dusk.", "choices": []}]}
+	var ledger := {
+		"resources": [
+			{"id": "grain", "init": 10, "min": 0, "max": 100},
+			{"id": "pop", "init": 0, "min": 0, "max": 100},
+		],
+	}
+	var factions := {
+		"thresholds": {"ally": 60, "hostile": -60},
+		"entities": [
+			{"id": "wei", "label": "Wei", "relations": {"shu": 70, "wu": -70}},
+			{"id": "shu", "label": "Shu", "relations": {"wei": -40}},
+			{"id": "wu", "label": "Wu", "relations": {"wei": -70}},
+		],
+	}
+	var pools := {"pools": [{"id": "officers", "items": ["cao_cao"], "draw": {"n": 1, "replace": false}}]}
+	var actions := {
+		"actions": [
+			{
+				"id": "court",
+				"label": "Court the house of Shu",
+				"requires": [{"relation": "shu", "state": "ally"}],
+				"effects": [{"pop": {"add": 1}}],
+			},
+			{
+				"id": "betray",
+				"label": "Turn on Wu",
+				"requires": [{"relation": "wu", "state": "ally"}],
+				"effects": [{"pop": {"add": 1}}],
+			},
+			{"id": "invite", "label": "Invite the general", "requires": [{"drawn": "cao_cao"}], "effects": [{"pop": {"add": 1}}]},
+			{"id": "summon", "label": "Summon an officer", "draw": {"pool": "officers"}, "effects": [{"pop": {"add": 1}}]},
+		],
+	}
+	var phases := {"turns": 10, "ranks": [], "fail": []}
+	var files := {
+		"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+		"data/factions.json": JSON.stringify(factions).to_utf8_buffer(),
+		"data/pools.json": JSON.stringify(pools).to_utf8_buffer(),
+		"data/actions.json": JSON.stringify(actions).to_utf8_buffer(),
+		"data/phases.json": JSON.stringify(phases).to_utf8_buffer(),
+	}
+	var shell := _shell()
+	shell.try_import(_package("wire-run", {"id": "wire-run", "entry": "w1"}, [], [], nodes, {}, files))
+	_check("TC-WIRE-001: the package opens", shell.screen_name() == "session", "%s %s" % [shell.screen_name(), shell._sub.text])
+	var court := _button_pressed_text(shell, "Court")
+	var betray := _button_pressed_text(shell, "Turn on Wu")
+	var invite := _button_pressed_text(shell, "Invite")
+	_check(
+		"TC-WIRE-001: an action waits on a relation state the package declared",
+		court != null and not court.disabled,
+		"disabled=%s text=%s" % [court.disabled if court != null else "no button", court.text if court != null else "-"]
+	)
+	_check(
+		"TC-WIRE-001: a relation that is not in that state keeps the action disabled with a reason",
+		betray != null and betray.disabled and betray.text.contains("wu"),
+		"disabled=%s text=%s" % [betray.disabled if betray != null else "no button", betray.text if betray != null else "-"]
+	)
+	_check(
+		"TC-WIRE-001: an action waits on an item that has not been drawn yet",
+		invite != null and invite.disabled and invite.text.contains("cao_cao"),
+		"disabled=%s text=%s" % [invite.disabled if invite != null else "no button", invite.text if invite != null else "-"]
+	)
+	var summon := _button_pressed_text(shell, "Summon")
+	_check("TC-WIRE-001: the drawing action is available", summon != null and not summon.disabled)
+	shell.act("summon")
+	var drawn_ids: Array = []
+	for entry in shell.session.drawn:
+		drawn_ids.append(String(entry.get("item", "")))
+	_check("TC-WIRE-001: the action drew from the pool in the same step", drawn_ids == ["cao_cao"], str(drawn_ids))
+	_check(
+		"TC-WIRE-001: the scene names what was drawn",
+		shell._status.text.contains("cao_cao"),
+		shell._status.text
+	)
+	var invite_after := _button_pressed_text(shell, "Invite")
+	_check(
+		"TC-WIRE-001: drawing the item unlocks the action that waits on it",
+		invite_after != null and not invite_after.disabled,
+		"disabled=%s text=%s" % [invite_after.disabled if invite_after != null else "no button", invite_after.text if invite_after != null else "-"]
+	)
+	shell.save_to(1)
+	shell.load_from(1)
+	var kept: Array = []
+	for entry in shell.session.drawn:
+		kept.append(String(entry.get("item", "")))
+	_check(
+		"TC-WIRE-001: the drawn items and the relation survive a resume",
+		kept == ["cao_cao"] and shell.session.relation_state("wei", "shu") == "ally",
+		"%s %s" % [str(kept), shell.session.relation_state("wei", "shu")]
+	)
+
+	var bad_state := {
+		"actions": [
+			{"id": "court", "label": "Court", "requires": [{"relation": "shu", "state": "legend"}], "effects": [{"pop": {"add": 1}}]},
+		],
+	}
+	var state_bytes: PackedByteArray = _package(
+		"wire-bad-state",
+		{"id": "wire-bad-state", "entry": "w1"},
+		[],
+		[],
+		nodes,
+		{},
+		{
+			"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+			"data/factions.json": JSON.stringify(factions).to_utf8_buffer(),
+			"data/actions.json": JSON.stringify(bad_state).to_utf8_buffer(),
+			"data/phases.json": JSON.stringify(phases).to_utf8_buffer(),
+		}
+	)
+	var refused_state: Dictionary = PackageLoader.new().import_bytes(state_bytes, _context())
+	_check(
+		"TC-WIRE-001: a relation state the package never declared is refused at install",
+		String(refused_state.get("code", "")) == "V-25",
+		"%s %s" % [String(refused_state.get("code", "-")), String(refused_state.get("message", ""))]
+	)
+	var bad_pool := {"actions": [{"id": "summon", "label": "Summon", "draw": {"pool": "ghosts"}, "effects": [{"pop": {"add": 1}}]}]}
+	var pool_bytes: PackedByteArray = _package(
+		"wire-bad-pool",
+		{"id": "wire-bad-pool", "entry": "w1"},
+		[],
+		[],
+		nodes,
+		{},
+		{
+			"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+			"data/pools.json": JSON.stringify(pools).to_utf8_buffer(),
+			"data/actions.json": JSON.stringify(bad_pool).to_utf8_buffer(),
+			"data/phases.json": JSON.stringify(phases).to_utf8_buffer(),
+		}
+	)
+	var refused_pool: Dictionary = PackageLoader.new().import_bytes(pool_bytes, _context())
+	_check(
+		"TC-WIRE-001: a draw naming a pool the package never declared is refused at install",
+		String(refused_pool.get("code", "")) == "V-26",
+		"%s %s" % [String(refused_pool.get("code", "-")), String(refused_pool.get("message", ""))]
 	)
 
 
