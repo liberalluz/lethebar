@@ -30,3 +30,6 @@ ui.failed_heading	没能装成功
 ui.failed_hint	什么都没装。你可以换一个包。
 ui.slot_head	%s · 存档位 %d
 ui.steps	第 %d/%d 步
+ui.turn_rank	第 %d 回合 · %s
+ui.blocked	%s — %s
+ui.run_over	这一局结束了：%s

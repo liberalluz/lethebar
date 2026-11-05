@@ -229,6 +229,13 @@ A session holds: plugin identity, protocol instance, current node, the ledger
 values, RNG state, and a warning list. Sessions are created from a plugin and are
 never shared between plugins.
 
+A run ends when the node it lands on offers no choices **and** the package does
+not declare a phase machine. A package played through a menu declares phases and
+its entry node usually offers no choices at all, so treating "no choices" as the
+end on its own would close the run before the first action could be taken
+(REQ-026). A package with a phase machine instead ends on a failure condition or
+on the turn limit, both of which §6.3 describes.
+
 Ledger values are clamped into their declared `min`/`max` after the action's
 effects and after the settlement rules, so no path — not a choice effect, not a
 rule, not a resumed save — can push a number outside its bounds. Clamping hides
@@ -395,6 +402,17 @@ worse than none. Scenes and choices absent from a table keep the package's own
 text, so a partial table is only allowed for a locale the manifest does not
 declare.
 
+### 11.3 The scene draws the menu
+
+A package that declares actions is played through the scene, not only through
+node choices. The scene draws one button per declared action; an action that
+cannot be taken stays visible, disabled, with its reason appended to the label,
+because a player who cannot see what is out of reach cannot plan around it. The
+readout carries the turn and the rank, both read from the session and never
+computed by the render layer. A run that ended shows the reason the phase machine
+gave and offers no action buttons; a package without actions renders exactly as
+it did before this section existed.
+
 
 ## 12. Requirement mapping
 
@@ -425,6 +443,7 @@ declare.
 | `REQ-023` | §3.3 data files (`actions.json`, `phases.json`, `checks.json`), §4.2 validation (`V-16`, `V-17`, `V-18`), §6.2 settlement and turns |
 | `REQ-024` | §3.3 data files (`pools.json`, `factions.json`), §4.2 validation (`V-19`, `V-20`, `W-02`) |
 | `REQ-025` | §3.2 manifest field (`clock`), §4.2 validation (`V-21`, `V-14`), §6.5 the clock |
+| `REQ-026` | §6.1 when a run ends, §11 the scene draws the menu |
 
 ## 13. Decisions and open questions
 

@@ -30,3 +30,6 @@ ui.failed_heading	That did not work
 ui.failed_hint	Nothing was installed. You can pick another pack.
 ui.slot_head	%s · Slot %d
 ui.steps	step %d/%d
+ui.turn_rank	turn %d · %s
+ui.blocked	%s — %s
+ui.run_over	The run ended: %s
