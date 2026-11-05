@@ -37,6 +37,17 @@
       "cwd": "."
     },
     {
+      "name": "language",
+      "command": [
+        "python",
+        ".agents/skills/nebula-bootstrap/scripts/check_language.py",
+        "--root",
+        ".",
+        "--strict"
+      ],
+      "cwd": "."
+    },
+    {
       "name": "stage",
       "command": [
         "python",

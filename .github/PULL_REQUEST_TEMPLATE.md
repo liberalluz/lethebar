@@ -1,23 +1,32 @@
-## 变更摘要
+## Summary
 
-<!-- 改了什么，为什么改 -->
+<!-- one sentence: what changed and why -->
 
-## 影响面
+## Impact
 
-<!-- 一个行为；列出主要文件 -->
+<!-- one behaviour; name the main files; a platform gap belongs here -->
 
-## 验证
+## Verification
 
-<!-- 执行过的命令与结果 -->
+**Environment**: E1 headless assertions / E2 Chrome / E3 device — say which evidence came from which layer.
 
-## 风险
+**Commands and output** — paste the command and the lines that decide the outcome, verbatim. Do not paraphrase, and do not keep this placeholder. Write "rest omitted" for long output.
 
-<!-- 回滚方式与已知缺口 -->
+```text
+$ <the command you ran>
+<paste the lines that decide the outcome>
+```
 
-## 自检
+**Test design** — which assertion, what made it red, what the red looked like, how it was restored. For a docs-only change say there is no behaviour change and why that is acceptable.
 
-- [ ] 一个批次 / 一个行为
-- [ ] 包含测试或证据
-- [ ] 没有密钥或构建产物
-- [ ] 行为变化时更新了文档
-- [ ] 每条提交的正文都有 `Why:` 与 `Batch:`（无批卡时写 `Batch: none`，`infra/checks/check_commit_body.py` 会检查）
+**Not verified** — what has no evidence here and why; a platform gap is named under Impact.
+
+## Risks
+
+<!-- what is most likely to break, and how to roll back -->
+
+## Self-check
+
+- One batch, one behaviour: <batch id, or none with the reason>
+- Commit bodies carry `Why:` and `Batch:`: <yes, or checked by check_commit_body.py>
+- No secret or build output is committed: <checked by check_tree.py>
