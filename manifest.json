@@ -10,7 +10,7 @@
   "locales": ["en"],
   "names": {"zh-CN": "三国", "en": "Three Kingdoms"},
   "protocol": "turn_based@1",
-  "capabilities": ["render.2d", "text"],
+  "capabilities": ["render.2d@1", "text@1"],
   "mechanics": ["power"],
   "entry": "n1",
   "saveSchema": 1,
