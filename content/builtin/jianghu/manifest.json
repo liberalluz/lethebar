@@ -1,0 +1,18 @@
+{
+  "id": "jianghu",
+  "version": "0.1.0",
+  "specVersion": "2.0.0",
+  "kind": "bundle",
+  "requires": [],
+  "engine": ">=4.7.0 <5.0.0",
+  "name": "江湖夜雨",
+  "defaultLocale": "zh-CN",
+  "locales": ["en"],
+  "names": {"zh-CN": "江湖夜雨", "en": "Rain over the Jianghu"},
+  "protocol": "linear@1",
+  "capabilities": ["text"],
+  "mechanics": [],
+  "entry": "inn",
+  "saveSchema": 1,
+  "assets": []
+}
