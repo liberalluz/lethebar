@@ -76,7 +76,15 @@ static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
 	session.rules = data.get("rules", []) if data.get("rules", null) is Array else []
 	session.actions = data.get("actions", []) if data.get("actions", null) is Array else []
 	session.checks = data.get("checks", []) if data.get("checks", null) is Array else []
-	session.phase = Phases.defines(data.get("phases", {}) if data.get("phases", null) is Dictionary else {})
+	# An absent phases file must stay absent: `Phases.defines({})` fills in the
+	# defaults, and `Phases.declares()` then reads every package as having a phase
+	# machine. Keeping `{}` here is what lets a node without choices end a run
+	# (REQ-026 while the scene learns to draw a menu).
+	var raw_phases: Variant = data.get("phases", {})
+	if raw_phases is Dictionary and not (raw_phases as Dictionary).is_empty():
+		session.phase = Phases.defines(raw_phases)
+	else:
+		session.phase = {}
 	session.pools = data.get("pools", []) if data.get("pools", null) is Array else []
 	session.pools_left = Pools.remaining(session.pools)
 	session.pools_shuffled = {}
@@ -125,7 +133,12 @@ func goto(next_id: String) -> Dictionary:
 	_step_rng()
 	apply_rules()
 	var node: Dictionary = nodes[current]
-	finished = choices_of(node).is_empty()
+	# A node with no choices used to end the run on its own. That is right for a
+	# node graph and wrong for a package played through actions: its entry node
+	# offers no choices by design, so the run would be over before the menu could
+	# be used (REQ-026). A declared phase keeps the run alive until a turn limit
+	# or a failure says otherwise.
+	finished = choices_of(node).is_empty() and not Phases.declares(phase)
 	return view()
 
 

@@ -60,6 +60,7 @@ func _initialize() -> void:
 	_case_pools()
 	_case_relations()
 	_case_clock()
+	_case_scene()
 	_case_assets()
 
 	print("")
@@ -2072,6 +2073,112 @@ func _case_clock() -> void:
 		String(refuses_write.get("code", "")) == "V-14",
 		"%s %s" % [String(refuses_write.get("code", "-")), String(refuses_write.get("message", ""))]
 	)
+
+
+func _case_scene() -> void:
+	# The engine could hand a package actions, turns, ranks and dice long before
+	# anything on screen showed them: only the assertions could see a menu. These
+	# five lines are the contract for drawing it, and each one is a separate fact
+	# so a regression names the part that broke.
+	_section("TC-SCENE-001 the scene draws the menu a package declares")
+	var nodes := {
+		"nodes": [
+			{"id": "s1", "text": "A hall with a long table.", "choices": []},
+		],
+	}
+	var ledger := {
+		"resources": [
+			{"id": "grain", "init": 10, "min": 0, "max": 100},
+			{"id": "pop", "init": 0, "min": 0, "max": 100},
+		],
+	}
+	var actions := {
+		"actions": [
+			{
+				"id": "feast",
+				"label": "Hold a feast",
+				"costs": {"grain": {"add": -20}},
+				"requires": [{"key": "grain", "op": "gte", "value": 20}],
+				"effects": [{"pop": {"add": 1}}],
+			},
+			{"id": "drill", "label": "Drill the guard", "effects": [{"pop": {"add": 1}}]},
+		],
+	}
+	var phases := {
+		"turns": 5,
+		"ranks": [{"at": 1, "title": "Captain"}, {"at": 2, "title": "Colonel"}],
+		"fail": [{"when": {"key": "pop", "op": "gte", "value": 3}, "reason": "Too many mouths to feed."}],
+	}
+	var built: PackedByteArray = _package(
+		"scene-menu",
+		{"id": "scene-menu", "entry": "s1"},
+		[],
+		[],
+		nodes,
+		{},
+		{
+			"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+			"data/actions.json": JSON.stringify(actions).to_utf8_buffer(),
+			"data/phases.json": JSON.stringify(phases).to_utf8_buffer(),
+		}
+	)
+	var shell := _shell()
+	shell.try_import(built)
+	_check("TC-SCENE-001: the package with a menu opens its scene", shell.screen_name() == "session", shell.screen_name())
+	var labels := _button_labels(shell)
+	_check(
+		"TC-SCENE-001: every declared action is a button",
+		labels.has("Drill the guard") and labels.any(func(label: String) -> bool: return label.begins_with("Hold a feast")),
+		str(labels)
+	)
+	var feast := _button_pressed_text(shell, "Hold a feast")
+	_check(
+		"TC-SCENE-001: an action that cannot be taken is disabled and says why",
+		feast != null and feast.disabled and feast.text.contains("grain"),
+		"disabled=%s text=%s" % [feast.disabled if feast != null else "no button", feast.text if feast != null else "-"]
+	)
+	var before := int(shell.session.turn)
+	shell.act("drill")
+	var after := int(shell.session.turn)
+	_check(
+		"TC-SCENE-001: taking an action advances the turn and shows the rank",
+		after == before + 1 and shell._status.text.contains("Colonel"),
+		"turn %d to %d, status %s" % [before, after, shell._status.text]
+	)
+	shell.act("drill")
+	shell.act("drill")
+	_check(
+		"TC-SCENE-001: an ended run shows why and offers no actions",
+		shell._sub.text.contains("Too many mouths") and not _button_labels(shell).has("Drill the guard"),
+		"%s %s" % [shell._sub.text, str(_button_labels(shell))]
+	)
+
+	var plain := _shell()
+	plain.start_plugin("sanguo")
+	var plain_labels := _button_labels(plain)
+	var turn_prefix := Locale.text("ui.turn_rank").get_slice("%d", 0)
+	_check(
+		"TC-SCENE-001: a package without actions looks exactly as before",
+		plain_labels.size() == 5 and not plain._status.text.contains(turn_prefix),
+		"%s %s" % [str(plain_labels), plain._status.text]
+	)
+
+
+func _button_labels(shell: Shell) -> Array:
+	var out: Array = []
+	for child in shell._options.get_children():
+		if child is Button:
+			out.append(String((child as Button).text))
+	return out
+
+
+func _button_pressed_text(shell: Shell, prefix: String) -> Button:
+	## The first button whose label starts with `prefix`, so a label that grows a
+	## reason suffix is still findable.
+	for child in shell._options.get_children():
+		if child is Button and String((child as Button).text).begins_with(prefix):
+			return child as Button
+	return null
 
 
 func _case_assets() -> void:

@@ -186,6 +186,15 @@ func choose(index: int) -> Dictionary:
 	return enter_session()
 
 
+func act(action_id: String) -> Dictionary:
+	## One turn of a declared menu (REQ-026). The session decides whether the
+	## action is allowed; the scene only redraws what the engine reports.
+	if session == null:
+		return current_view()
+	session.act(action_id)
+	return enter_session()
+
+
 func enter_session() -> Dictionary:
 	screen = SCREEN_SESSION
 	_heading.text = Locale.text("ui.playing")
@@ -197,6 +206,25 @@ func enter_session() -> Dictionary:
 	var choices: Array = view.get("choices", [])
 	for index in choices.size():
 		_options.add_child(_button(String(choices[index].get("label", "")), choose.bind(index)))
+	# A package played through actions declares a menu instead of (or beside) its
+	# choices. An action that cannot be taken stays visible: the player has to see
+	# what is out of reach and why, so the reason becomes part of the label and
+	# the button is disabled rather than hidden.
+	var actions: Array = view.get("actions", [])
+	var run_finished := bool(view.get("finished", false))
+	if not run_finished:
+		for action in actions:
+			var enabled := bool(action.get("enabled", false))
+			var label := String(action.get("label", ""))
+			var reason := String(action.get("reason", ""))
+			if not enabled and reason != "":
+				label = Locale.text("ui.blocked") % [label, reason]
+			var action_button := _button(label, act.bind(String(action.get("id", ""))))
+			action_button.disabled = not enabled
+			_options.add_child(action_button)
+	var fail_reason := String(view.get("failReason", ""))
+	if fail_reason != "":
+		_sub.text = Locale.text("ui.run_over") % fail_reason
 	if bool(view.get("finished", false)):
 		_heading.text = Locale.text("ui.the_end")
 		_options.add_child(_button(Locale.text("ui.saves"), open_saves))
@@ -859,6 +887,10 @@ func _readout(view: Dictionary) -> String:
 	if view.has("progress"):
 		var progress: Dictionary = view["progress"]
 		parts.append(Locale.text("ui.steps") % [int(progress.get("steps", 0)), int(progress.get("nodes", 0))])
+	if view.has("turn"):
+		# A package with a phase machine has a turn and a rank; both are the
+		# engine's numbers, the scene only reads them (REQ-026).
+		parts.append(Locale.text("ui.turn_rank") % [int(view.get("turn", 0)), String(view.get("rank", ""))])
 	if parts.is_empty():
 		return ""
 	return " · ".join(parts)

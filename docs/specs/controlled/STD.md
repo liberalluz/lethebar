@@ -416,3 +416,24 @@ path, so the case survives fixture renames.
   two; the `turn` clock does not move on a plain node advance while the `node`
   clock counts every advance; the resumed run reports the saved count;
   `clock-unread` is refused with `V-21` and `clock-write` with `V-14`.
+
+### `TC-SCENE-001`
+
+- Covers: `REQ-026`
+- Preconditions: an engine build with the menu, phase and ledger bricks, and a
+  fixture `scene-menu` whose entry node offers no choices, declares two actions
+  (`feast` costs grain the run cannot afford, `drill` is always available) and a
+  phase machine with two ranks and a failure condition on `pop`.
+- Steps:
+  1. Install `scene-menu` and open its scene; read the buttons the scene offers.
+  2. Find the button for `feast` and read whether it is disabled and what its
+     label says.
+  3. Press `drill` once; read the turn and the readout.
+  4. Press `drill` twice more so the failure condition fires; read the text and
+     the buttons.
+  5. Open the built-in `sanguo` and read its buttons and readout.
+- Exit: the scene opens at all — the run is not finished by the empty choice
+  list; both actions are buttons and `feast` is disabled with a reason naming
+  grain; the turn moves from one to two and the readout names the second rank;
+  the ended run shows the failure reason and offers no action buttons; `sanguo`
+  shows five buttons and no turn in its readout.
