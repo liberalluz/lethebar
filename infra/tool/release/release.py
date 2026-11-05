@@ -19,6 +19,8 @@ import sys
 from datetime import date
 from pathlib import Path
 
+TOOL_VERSION = "0.1.0"
+
 ROOT = Path(__file__).resolve().parents[3]
 CHANGELOG = "CHANGELOG.md"
 FRAGMENT_DIR = "changelog.d"
@@ -209,8 +211,13 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--render", action="store_true")
     group.add_argument("--write", action="store_true")
     parser.add_argument("--version", default="")
+    parser.add_argument("--tool-version", action="store_true", help="print the tool version and exit")
     parser.add_argument("--date", default=date.today().isoformat())
     args = parser.parse_args(argv)
+
+    if args.tool_version:
+        print(TOOL_VERSION)
+        return 0
 
     root = args.root.resolve()
     try:

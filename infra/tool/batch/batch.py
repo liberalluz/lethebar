@@ -29,12 +29,15 @@ from typing import Any, Sequence
 ROOT = Path(__file__).resolve().parents[3]
 STATE_DIR = ".batch"
 CONFIG_REL = Path("infra") / "tool" / "batch" / "config.json"
+SCAFFOLD_REL = Path(".nebula-scaffold.json")
 DEFAULT_CONFIG: dict[str, Any] = {
     "base": "main",
     "branch_prefix": "batch/",
+    "docs_root": "",
     "scope": {"ignore": [], "generated": []},
     "checks": [],
     "pr_create": [],
+    "translate": [],
     "merge": [],
 }
 ID_RE = re.compile(r"^(?:B[0-9]+[a-z]?|[0-9]{8}-[0-9a-f]{6})$")
@@ -43,6 +46,11 @@ CARD_ID_RE = re.compile(r"^B[0-9]+[a-z]?$")
 CARD_MARKER_RE = re.compile(r"<!--\s*batch-card\s*:\s*v1\s*-->")
 CARD_JSON_RE = re.compile(r"```json[ \t]*\r?\n(.*?)\r?\n```", re.DOTALL)
 CARD_TYPES = {"feat", "fix", "process", "docs"}
+DOCS_PROCESS = "process"
+DOCS_SDP = "sdp.md"
+DOCS_BATCHES = "batches"
+DOCS_RECORDS = "records"
+RECORD_ID_RE = re.compile(r"(?<![A-Za-z0-9])B[0-9]+[a-z]?(?![A-Za-z0-9])")
 STAGE_SKILLS = {
     "nebula-project",
     "nebula-bootstrap",
@@ -134,7 +142,7 @@ def load_config(root: Path) -> dict[str, Any]:
         config["scope"][key] = [str(item) for item in value]
     if not isinstance(config.get("checks"), list):
         raise SystemExit("config.checks must be a list")
-    for key in ("pr_create", "merge"):
+    for key in ("pr_create", "translate", "merge"):
         value = config.get(key)
         if value and not isinstance(value, list):
             raise SystemExit(f"config.{key} must be a command array")
@@ -184,11 +192,16 @@ def resolve_id(root: Path, value: str | None) -> str:
         raise SystemExit("no batch found; run 'plan' first")
     candidates = sorted(
         (path.name for path in state_root(root).iterdir() if path.is_dir()),
-        key=lambda name: (state_root(root) / name).stat().st_mtime,
+        key=batch_sort_key,
     )
     if not candidates:
         raise SystemExit("no batch found; run 'plan' first")
-    return candidates[-1]
+    if len(candidates) > 1:
+        raise SystemExit(
+            f"multiple batches found ({', '.join(candidates)}); "
+            "pass the batch id explicitly"
+        )
+    return candidates[0]
 
 
 def batch_sort_key(value: str) -> tuple[int, int, str]:
@@ -196,6 +209,12 @@ def batch_sort_key(value: str) -> tuple[int, int, str]:
     if match:
         return (0, int(match.group(1)), match.group(2))
     return (1, 0, value)
+
+
+def branch_slug(value: str, limit: int = 40) -> str:
+    """Turn a goal into a branch-name slug; empty when nothing ASCII is left."""
+    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return slug[:limit].strip("-")
 
 
 def new_id(root: Path) -> str:
@@ -354,6 +373,95 @@ def read_planned_card(path: Path) -> tuple[dict[str, Any], bytes]:
         raise ValueError(f"invalid card JSON: {exc}") from exc
     validate_planned_card(card, path)
     return card, data
+
+
+def docs_root_from_card(source: Path) -> Path | None:
+    """Return the docs root for a card at ``<docs>/process/batches/B<n>.md``."""
+    parent = source.parent
+    if parent.name == DOCS_BATCHES and parent.parent.name == DOCS_PROCESS:
+        return parent.parent.parent
+    return None
+
+
+def configured_docs_root(root: Path, config: dict[str, Any]) -> Path | None:
+    value = str(config.get("docs_root", "") or "").strip()
+    if not value:
+        return None
+    path = Path(value)
+    return path if path.is_absolute() else root / path
+
+
+def sdp_batch_ids(sdp: Path) -> set[str]:
+    """Read the ``| Batch |`` table and return the ids it lists."""
+    lines = sdp.read_text(encoding="utf-8", errors="replace").splitlines()
+    start = next(
+        (
+            index
+            for index, line in enumerate(lines)
+            if line.strip().startswith("| Batch |")
+        ),
+        None,
+    )
+    if start is None:
+        return set()
+    ids: set[str] = set()
+    for line in lines[start + 1:]:
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            break
+        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+        if not cells:
+            continue
+        ident = cells[0].strip("` ")
+        if CARD_ID_RE.fullmatch(ident):
+            ids.add(ident)
+    return ids
+
+
+def docs_batch_ids(docs_root: Path, exclude: Path | None = None) -> dict[str, Path]:
+    """Map every id already used in the docs repo to the path that uses it."""
+    taken: dict[str, Path] = {}
+    batches = docs_root / DOCS_PROCESS / DOCS_BATCHES
+    if batches.is_dir():
+        for path in sorted(batches.glob("B*.md")):
+            match = re.fullmatch(r"(B[0-9]+[a-z]?)\.md", path.name)
+            if match is None:
+                continue
+            if exclude is not None and path.resolve() == exclude:
+                continue
+            taken.setdefault(match.group(1), path)
+    records = docs_root / DOCS_RECORDS
+    if records.is_dir():
+        for path in sorted(records.rglob("*")):
+            match = RECORD_ID_RE.search(path.name)
+            if match:
+                taken.setdefault(match.group(0), path)
+    return taken
+
+
+def next_batch_id(ids: set[str]) -> str:
+    highest = 0
+    for value in ids:
+        match = re.fullmatch(r"B([0-9]+)[a-z]?", value)
+        if match:
+            highest = max(highest, int(match.group(1)))
+    return f"B{highest + 1}"
+
+
+def duplicate_id_error(
+    root: Path, card: dict[str, Any], config: dict[str, Any], batch_id: str
+) -> str:
+    """Return an error when another card or record already claims this id."""
+    source = card_source_path(root, card)
+    docs_root = configured_docs_root(root, config)
+    if docs_root is None and source is not None:
+        docs_root = docs_root_from_card(source)
+    if docs_root is None or not docs_root.is_dir():
+        return ""
+    taken = docs_batch_ids(docs_root, exclude=source)
+    if batch_id in taken:
+        return f"batch id {batch_id} is already used by {taken[batch_id]}"
+    return ""
 
 
 def read_state(root: Path, batch_id: str) -> dict[str, Any]:
@@ -566,13 +674,13 @@ def command_list(value: Any) -> list[str]:
 def run_hook(
     root: Path, command: Sequence[str], values: dict[str, str]
 ) -> tuple[int, str, str]:
+    merged = {"pr": "", **values}
     resolved = [
-        item.replace("{id}", values["id"])
-        .replace("{title}", values["title"])
-        .replace("{body}", values["body"])
-        .replace("{branch}", values["branch"])
-        .replace("{root}", values["root"])
-        .replace("{pr}", values.get("pr", ""))
+        re.sub(
+            r"\{([a-z]+)\}",
+            lambda match: str(merged.get(match.group(1), match.group(0))),
+            item,
+        )
         for item in command
     ]
     proc = subprocess.run(
@@ -696,6 +804,39 @@ def cmd_plan(args: argparse.Namespace) -> int:
         if target.exists():
             print(f"batch already exists: {batch_id}", file=sys.stderr)
             return 1
+        config = load_config(root)
+        docs_root = configured_docs_root(root, config) or docs_root_from_card(source)
+        if docs_root is None:
+            print(
+                "warning: docs repo not found; skipped SDP and duplicate-id checks",
+                file=sys.stderr,
+            )
+        else:
+            sdp = docs_root / DOCS_PROCESS / DOCS_SDP
+            if not sdp.is_file():
+                print(f"SDP not found: {sdp}", file=sys.stderr)
+                return 2
+            planned = sdp_batch_ids(sdp)
+            if not planned:
+                print(f"no '| Batch |' table in {sdp}", file=sys.stderr)
+                return 2
+            if batch_id not in planned:
+                print(
+                    f"card {batch_id} is not in the SDP batch table: {sdp}",
+                    file=sys.stderr,
+                )
+                return 1
+            taken = docs_batch_ids(docs_root, exclude=source)
+            if batch_id in taken:
+                print(
+                    f"batch id {batch_id} is already used by {taken[batch_id]}",
+                    file=sys.stderr,
+                )
+                print(
+                    f"next unused id: {next_batch_id(planned | set(taken))}",
+                    file=sys.stderr,
+                )
+                return 1
         snapshot = dict(card)
         snapshot["source"] = source_relative(root, source)
         snapshot["source_sha256"] = hashlib.sha256(raw).hexdigest()
@@ -804,7 +945,11 @@ def cmd_start(args: argparse.Namespace) -> int:
     if not base:
         print(f"base does not resolve to a commit: {base_ref}", file=sys.stderr)
         return 1
-    branch = args.branch or f"{config.get('branch_prefix', 'batch/')}{batch_id}"
+    slug = branch_slug(str(card.get("goal", "")))
+    default_branch = f"{config.get('branch_prefix', 'batch/')}{batch_id}"
+    if slug:
+        default_branch = f"{default_branch}-{slug}"
+    branch = args.branch or default_branch
     if not args.no_branch:
         code, _, err = run_git(root, ["switch", "-c", branch])
         if code != 0:
@@ -851,6 +996,15 @@ def cmd_check(args: argparse.Namespace) -> int:
         print(message, file=sys.stderr)
         return 1
     config = load_config(root)
+    conflict = duplicate_id_error(root, card, config, batch_id)
+    if conflict:
+        state["status"] = "check_failed"
+        state["id_error"] = conflict
+        state["checked_at"] = utc_now()
+        write_json(batch_dir(root, batch_id) / "state.json", state)
+        append_evidence(root, batch_id, f"id: FAIL ({conflict})")
+        print(conflict, file=sys.stderr)
+        return 1
     base_ref = state.get("base") or str(config.get("base", "main"))
     base = resolve_commit(root, base_ref)
     if not base:
@@ -969,6 +1123,125 @@ def pr_body(root: Path, batch_id: str) -> str:
     return "\n".join(lines)
 
 
+def scaffold_language(root: Path) -> dict[str, Any]:
+    """Resolve the language block used for PR body translations.
+
+    Mirrors ``nebula-bootstrap/scripts/language.py``: a ``language`` block wins,
+    legacy ``repoLocale``/``docsLocale`` blocks are mapped, and a missing or
+    invalid block falls back to zh-CN. PR translations are best effort, so this
+    only needs the primary, supported, and external values.
+    """
+    data = load_json(root / SCAFFOLD_REL) or {}
+    block = data.get("language")
+    if isinstance(block, dict) and isinstance(block.get("primary"), str):
+        primary = block["primary"].strip()
+        supported = [
+            str(item).strip()
+            for item in block.get("supported", [])
+            if isinstance(item, str) and item.strip()
+        ]
+        if primary:
+            supported = [primary, *[item for item in supported if item != primary]]
+        external = str(block.get("external") or primary).strip()
+        return {
+            "primary": primary or "zh-CN",
+            "supported": supported or ["zh-CN"],
+            "external": external if external in supported else (primary or "zh-CN"),
+        }
+    repo = data.get("repoLocale") if isinstance(data.get("repoLocale"), dict) else {}
+    docs = data.get("docsLocale") if isinstance(data.get("docsLocale"), dict) else {}
+    primary = str(repo.get("primary") or docs.get("primary") or "zh-CN").strip() or "zh-CN"
+    supported: list[str] = []
+    for source in (repo.get("supported"), docs.get("supported")):
+        for item in source or []:
+            value = str(item).strip()
+            if value and value not in supported:
+                supported.append(value)
+    if primary not in supported:
+        supported.insert(0, primary)
+    external = str(docs.get("external") or primary).strip()
+    return {
+        "primary": primary,
+        "supported": supported,
+        "external": external if external in supported else primary,
+    }
+
+
+def pr_translations(
+    root: Path,
+    batch_id: str,
+    body_path: Path,
+    digest: str,
+    config: dict[str, Any],
+    state: dict[str, Any],
+) -> list[str]:
+    """Write PR body translations through ``config.translate``; best effort."""
+    language = scaffold_language(root)
+    source_locale = language["external"]
+    targets = [item for item in language["supported"] if item != source_locale]
+    if not targets:
+        return []
+    command = config.get("translate")
+    if not command:
+        print(
+            "config.translate is empty; skipped PR body translations",
+            file=sys.stderr,
+        )
+        return []
+    card = read_card(root, batch_id)
+    directory = batch_dir(root, batch_id)
+    translations: list[dict[str, Any]] = []
+    for locale in targets:
+        out = directory / f"pr-body.{locale}.md"
+        out.unlink(missing_ok=True)
+        code, out_text, err_text = run_hook(
+            root,
+            command,
+            {
+                "id": batch_id,
+                "title": str(card.get("goal", batch_id)),
+                "body": str(body_path),
+                "branch": str(state.get("branch", "")),
+                "root": str(root),
+                "locale": locale,
+                "out": str(out),
+            },
+        )
+        if out_text:
+            print(out_text)
+        if code != 0:
+            print(f"translation {locale} failed (exit {code})", file=sys.stderr)
+            if err_text:
+                print(err_text, file=sys.stderr)
+            continue
+        if not out.exists() or not out.read_text(encoding="utf-8").strip():
+            print(f"translation {locale}: hook produced no output", file=sys.stderr)
+            continue
+        translations.append(
+            {
+                "locale": locale,
+                "file": out.relative_to(root).as_posix(),
+                "machine": True,
+                "authoritative": False,
+            }
+        )
+    if not translations:
+        return []
+    write_json(
+        directory / "pr-body.manifest.json",
+        {
+            "source": body_path.relative_to(root).as_posix(),
+            "source_sha256": digest,
+            "source_locale": source_locale,
+            "generated_at": utc_now(),
+            "tool": "batch.py",
+            "translations": translations,
+        },
+    )
+    print(f"translations: {', '.join(item['locale'] for item in translations)}")
+    return [item["locale"] for item in translations]
+
+
 def cmd_pr(args: argparse.Namespace) -> int:
     root = args.root.resolve()
     batch_id = resolve_id(root, args.id)
@@ -997,6 +1270,11 @@ def cmd_pr(args: argparse.Namespace) -> int:
     print(f"body hash: {digest[:8]}")
     state["status"] = "pr_ready"
     state["pr_body"] = str(body_path.relative_to(root))
+    state["pr_body_sha256"] = digest
+    config = load_config(root)
+    state["pr_translations"] = pr_translations(
+        root, batch_id, body_path, digest, config, state
+    )
     write_json(batch_dir(root, batch_id) / "state.json", state)
 
     if not args.create:
@@ -1004,7 +1282,6 @@ def cmd_pr(args: argparse.Namespace) -> int:
     if args.confirm != digest[:8]:
         print(f"confirm mismatch: expected {digest[:8]}", file=sys.stderr)
         return 1
-    config = load_config(root)
     command = config.get("pr_create")
     if not command:
         print("config.pr_create is empty; use --prepare only", file=sys.stderr)
