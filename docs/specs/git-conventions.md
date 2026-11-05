@@ -89,19 +89,27 @@ Scopes: pick exactly one from the closed list below.
 
 ## 6. Language
 
-Four kinds of output, four rules. The values live in `.nebula-scaffold.json`; change that file first, then this table.
+Four kinds of output, four rules. The values live in `.nebula-scaffold.json` under
+one `language` block; change that file first, then this table.
 
 | Output | Language | Config key |
 |---|---|---|
-| `README`, `CONTRIBUTING`, `SECURITY` | both, English first | `repoLocale` (`en-US` primary, `zh-CN` supported) |
-| `docs/specs/controlled/*` | English source plus `zh-CN` translation | `docsLocale` |
-| Out-of-repo documents (`lethebar-docs`) | English | `docsLocale.external` |
-| Pull request title and body | Chinese | `prLocale` (`zh-CN`) |
+| `README`, `CONTRIBUTING`, `SECURITY` | both, English first; the Chinese file carries a `translation-of` marker | `language` (`primary` `en-US`, `supported` `en-US` + `zh-CN`) |
+| `docs/specs/controlled/*` | English source plus `zh-CN` translation | `language` |
+| Out-of-repo documents (`lethebar-docs`) | English | `language.external` (`en-US`) |
+| Pull request title and body | English | `language.external` (`en-US`) |
 
-- A PR title keeps the `type(scope)` prefix in English and the text after the colon in Chinese: `docs(readme)：小节「目录」改名「项目结构」`.
-- A PR body uses the five template sections; do not invent another structure.
-- Commit messages stay English per §2, including the squashed commits on `main`. The subject of a squashed commit is the subject of the branch commit, so it is English as well; do not hand-translate it.
-- This rule applies from `v0.0.0`. Commits merged before it keep the language they were written in and are not rewritten.
+- A PR title keeps the `type(scope)` prefix and reads as one English sentence:
+  `docs(repo): write the v0.1.0 changelog and say what shipped`.
+- A PR body uses the five template sections; do not invent another structure. The
+  `Verification` section carries the command and its decisive output verbatim,
+  because a body that only says "it passed" is not evidence.
+- Commit messages stay English per §2, including the squashed commits on `main`.
+  The subject of a squashed commit is the subject of the branch commit, so it is
+  English as well; do not hand-translate it.
+- This rule applies to pull requests opened from now on. Pull requests `#1` to
+  `#61` were written in Chinese and are not rewritten; the same is true of the
+  commits merged before `v0.0.0`.
 
 ## 7. Generated files
 

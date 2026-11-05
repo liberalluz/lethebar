@@ -1,3 +1,4 @@
+<!-- translation-of: README.md -->
 # Lethebar
 
 [English](README.md) · 简体中文
