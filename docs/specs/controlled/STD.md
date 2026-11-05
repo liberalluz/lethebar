@@ -396,3 +396,23 @@ path, so the case survives fixture renames.
   5. Install `rel-ghost`: refused with `V-20` naming the unknown entity.
 - Exit: steps 1–5 pass; the engine invents no state names, assumes no symmetry
   and never rewrites a pair.
+
+### `TC-CLOCK-001`
+
+- Covers: `REQ-025`
+- Preconditions: an engine build with the clock brick, and four fixtures:
+  `clock-turn` (declares `per: turn`, one rule reads `tick` and sets `grown`),
+  `clock-node` (declares `per: node`), `clock-unread` (declares a clock no rule
+  reads) and `clock-write` (a rule writes `tick`).
+- Steps:
+  1. Install `clock-turn` and start a run; read `tick`, take the `wait` action
+     twice and read `tick` together with the value the rule sets.
+  2. Advance a node in the same run without taking an action, and read `tick`.
+  3. Install `clock-node`, start it and advance one node.
+  4. Save the turn run into slot 1, resume it and read `tick`.
+  5. Install `clock-unread` and then `clock-write`.
+- Exit: `tick` starts at zero, is one after the first action and two after the
+  second; the rule that reads `tick` writes its value once the count reaches
+  two; the `turn` clock does not move on a plain node advance while the `node`
+  clock counts every advance; the resumed run reports the saved count;
+  `clock-unread` is refused with `V-21` and `clock-write` with `V-14`.

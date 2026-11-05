@@ -11,8 +11,10 @@ extends RefCounted
 const OPS := ["eq", "ne", "gt", "gte", "lt", "lte"]
 
 
-static func apply(rules: Array, state: Dictionary) -> Dictionary:
-	return _run(rules, state)
+static func apply(rules: Array, state: Dictionary, scope: Dictionary = {}) -> Dictionary:
+	## `scope` is where the engine puts numbers a rule may read but the package
+	## does not own — today only the tick (engine-bricks §8).
+	return _run(rules, state, scope)
 
 
 static func apply_effects(effects: Array, state: Dictionary) -> Dictionary:
@@ -26,7 +28,7 @@ static func apply_effects(effects: Array, state: Dictionary) -> Dictionary:
 	return _run(ops, state)
 
 
-static func _run(ops: Array, state: Dictionary) -> Dictionary:
+static func _run(ops: Array, state: Dictionary, scope: Dictionary = {}) -> Dictionary:
 	var out := state.duplicate(true)
 	var warnings: Array = []
 	for item in ops:
@@ -34,16 +36,16 @@ static func _run(ops: Array, state: Dictionary) -> Dictionary:
 		if not rule.has("set"):
 			warnings.append(_warning("M-01", "rule without a set clause"))
 			continue
-		if rule.has("when") and not _matches(rule["when"], out, warnings):
+		if rule.has("when") and not _matches(rule["when"], out, warnings, scope):
 			continue
 		_apply_set(rule["set"], out, warnings)
 	return {"state": out, "warnings": warnings}
 
 
-static func _matches(when: Variant, state: Dictionary, warnings: Array) -> bool:
+static func _matches(when: Variant, state: Dictionary, warnings: Array, scope: Dictionary = {}) -> bool:
 	if when is Array:
 		for condition in when:
-			if not _matches(condition, state, warnings):
+			if not _matches(condition, state, warnings, scope):
 				return false
 		return true
 	if not when is Dictionary:
@@ -57,7 +59,8 @@ static func _matches(when: Variant, state: Dictionary, warnings: Array) -> bool:
 	if not OPS.has(op):
 		warnings.append(_warning("M-02", "unknown comparison %s" % op))
 		return false
-	var left: Variant = state.get(String(condition["key"]), null)
+	var key := String(condition["key"])
+	var left: Variant = scope[key] if scope.has(key) else state.get(key, null)
 	var right: Variant = condition.get("value", null)
 	return _compare(left, right, op)
 

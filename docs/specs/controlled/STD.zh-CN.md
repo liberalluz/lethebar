@@ -335,3 +335,20 @@
   4. 安装 `rel-lopsided`：能装，问题列表里对不一致的那一对给 `W-02`。
   5. 安装 `rel-ghost`：`V-20` 拒绝，点名未知势力。
 - 出口：步骤 1–5 通过；引擎不发明状态名、不假设对称、也不改写任何一对。
+
+### `TC-CLOCK-001`
+
+- Covers: `REQ-025`
+- 前置：带时钟积木的引擎构建，以及四个夹具：`clock-turn`（声明 `per: turn`，
+  一条规则读 `tick` 并写 `grown`）、`clock-node`（声明 `per: node`）、
+  `clock-unread`（声明了时钟却没有规则读它）、`clock-write`（规则写 `tick`）。
+- 步骤：
+  1. 安装 `clock-turn` 并开始一局；读 `tick`，连做两次 `wait` 动作，再读 `tick`
+     与规则写下的值。
+  2. 在同一局里推进一个节点、不做动作，再读 `tick`。
+  3. 安装 `clock-node`，开始并推进一个节点。
+  4. 把回合那一局存进槽位 1，恢复后读 `tick`。
+  5. 依次安装 `clock-unread` 与 `clock-write`。
+- 出口：`tick` 从零起，第一次动作后为 1、第二次后为 2；读 `tick` 的规则在数到 2 时写入
+  它的值；`turn` 时钟不因单纯的节点推进变化，`node` 时钟每次推进都加一；恢复后的运行报出
+  保存时的数；`clock-unread` 被 `V-21` 拒绝，`clock-write` 被 `V-14` 拒绝。

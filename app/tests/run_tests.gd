@@ -59,6 +59,7 @@ func _initialize() -> void:
 	_case_turn()
 	_case_pools()
 	_case_relations()
+	_case_clock()
 	_case_assets()
 
 	print("")
@@ -444,7 +445,7 @@ func _case_det_001() -> void:
 	)
 	var keys: Array = JSON.parse_string(first).keys()
 	keys.sort()
-	var expected := ["drawn", "finished", "node", "plugin", "pools", "protocol", "rng", "schema", "state", "turn", "used", "version", "visited"]
+	var expected := ["drawn", "finished", "node", "plugin", "pools", "protocol", "rng", "schema", "state", "tick", "turn", "used", "version", "visited"]
 	_check("TC-DET-001: the payload keeps its declared shape", str(keys) == str(expected), str(keys))
 
 
@@ -1924,6 +1925,152 @@ func _case_turn() -> void:
 		"TC-TURN-001: the same seed repeats the same roll",
 		int(second["roll"]) == int(rolled["roll"]),
 		"%s vs %s" % [str(second["roll"]), str(rolled["roll"])]
+	)
+
+
+func _case_clock() -> void:
+	_section("TC-CLOCK-001 the engine counts time and a rule can read it")
+	var nodes := {
+		"nodes": [
+			{"id": "c1", "text": "One.", "choices": [{"label": "Go", "next": "c2", "effects": []}]},
+			{"id": "c2", "text": "Two.", "choices": []},
+		],
+	}
+	var ledger := {
+		"resources": [
+			{"id": "grown", "label": "growth", "init": 0, "min": 0, "max": 99},
+		],
+	}
+	var actions := {"actions": [{"id": "wait", "label": "Wait", "effects": [{"grown": {"add": 0}}]}]}
+	# The rule names the tick, which is the engine's own count and never a
+	# resource: that is what V-21 asks for when a package declares a clock.
+	var per_turn := {"rules": [{"when": {"key": "tick", "op": "gte", "value": 2}, "set": {"grown": {"value": 7}}}]}
+
+	var turn_result: Dictionary = PackageLoader.new().import_bytes(
+		_package(
+			"clock-turn",
+			{"id": "clock-turn", "entry": "c1", "clock": {"per": "turn"}},
+			[],
+			[],
+			nodes,
+			{},
+			{
+				"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+				"data/actions.json": JSON.stringify(actions).to_utf8_buffer(),
+				"data/rules.json": JSON.stringify(per_turn).to_utf8_buffer(),
+			},
+		),
+		_context()
+	)
+	var turn_entry: Dictionary = turn_result.get("entry", {})
+	_check(
+		"TC-CLOCK-001: a package that declares a clock installs",
+		not turn_entry.is_empty(),
+		"%s %s" % [String(turn_result.get("code", "-")), String(turn_result.get("message", ""))]
+	)
+
+	var turn_run := Session.create(turn_entry)
+	turn_run.start()
+	_check("TC-CLOCK-001: the tick starts at zero", turn_run.tick == 0, str(turn_run.tick))
+	turn_run.act("wait")
+	_check("TC-CLOCK-001: one action advances the tick once", turn_run.tick == 1, str(turn_run.tick))
+	_check(
+		"TC-CLOCK-001: the rule has not fired before its number",
+		float(turn_run.state.get("grown", -1.0)) == 0.0,
+		str(turn_run.state)
+	)
+	turn_run.act("wait")
+	_check("TC-CLOCK-001: a second action reaches the number", turn_run.tick == 2, str(turn_run.tick))
+	_check(
+		"TC-CLOCK-001: a rule that reads the tick fires when it reaches the number",
+		float(turn_run.state.get("grown", -1.0)) == 7.0,
+		str(turn_run.state)
+	)
+
+	var node_only := Session.create(turn_entry)
+	node_only.start()
+	node_only.choose(0)
+	_check(
+		"TC-CLOCK-001: a per-turn clock does not count a plain node advance",
+		node_only.tick == 0,
+		str(node_only.tick)
+	)
+
+	var node_entry: Dictionary = PackageLoader.new().import_bytes(
+		_package(
+			"clock-node",
+			{"id": "clock-node", "entry": "c1", "clock": {"per": "node"}},
+			[],
+			[],
+			nodes,
+			{},
+			{
+				"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+				"data/actions.json": JSON.stringify(actions).to_utf8_buffer(),
+				"data/rules.json": JSON.stringify(per_turn).to_utf8_buffer(),
+			},
+		),
+		_context()
+	)["entry"]
+	var node_run := Session.create(node_entry)
+	node_run.start()
+	node_run.choose(0)
+	_check("TC-CLOCK-001: a per-node clock counts every node advance", node_run.tick == 2, str(node_run.tick))
+
+	var saved := SaveStore.new()
+	var written := saved.write(turn_entry, 1, turn_run.snapshot())
+	var payload: Dictionary = saved.read(turn_entry, 1)
+	var resumed := saved.resume(turn_entry, payload.get("payload", {}))
+	_check(
+		"TC-CLOCK-001: the tick survives a save and a resume",
+		bool(written["ok"]) and bool(payload["ok"]) and resumed != null and resumed.tick == 2,
+		"%s %s" % [str(written), str(resumed.tick if resumed != null else -1)]
+	)
+
+	var no_reader := {"rules": []}
+	var refuses_reader := PackageLoader.new().import_bytes(
+		_package(
+			"clock-unread",
+			{"id": "clock-unread", "entry": "c1", "clock": {"per": "turn"}},
+			[],
+			[],
+			nodes,
+			{},
+			{
+				"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+				"data/actions.json": JSON.stringify(actions).to_utf8_buffer(),
+				"data/rules.json": JSON.stringify(no_reader).to_utf8_buffer(),
+			},
+		),
+		_context()
+	)
+	_check(
+		"TC-CLOCK-001: a clock nobody reads is refused with V-21",
+		String(refuses_reader.get("code", "")) == "V-21",
+		"%s %s" % [String(refuses_reader.get("code", "-")), String(refuses_reader.get("message", ""))]
+	)
+
+	var writes_tick := {"rules": [{"when": {"key": "tick", "op": "gte", "value": 1}, "set": {"tick": {"value": 0}}}]}
+	var refuses_write := PackageLoader.new().import_bytes(
+		_package(
+			"clock-write",
+			{"id": "clock-write", "entry": "c1", "clock": {"per": "turn"}},
+			[],
+			[],
+			nodes,
+			{},
+			{
+				"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+				"data/actions.json": JSON.stringify(actions).to_utf8_buffer(),
+				"data/rules.json": JSON.stringify(writes_tick).to_utf8_buffer(),
+			},
+		),
+		_context()
+	)
+	_check(
+		"TC-CLOCK-001: a rule that writes the tick is refused at install time",
+		String(refuses_write.get("code", "")) == "V-14",
+		"%s %s" % [String(refuses_write.get("code", "-")), String(refuses_write.get("message", ""))]
 	)
 
 
