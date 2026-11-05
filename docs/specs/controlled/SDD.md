@@ -178,6 +178,8 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-24` | every `requires` entry is satisfied by an installed or built-in package whose version falls inside the declared range | reject |
 | `W-01` | `specVersion` is below `2.0.0`: readable now, refused from v0.2.0 | warn |
 | `V-21` | `clock.per` is `turn` or `node`, and a package that declares a clock also carries at least one rule whose `when` reads `tick` | reject |
+| `V-25` | a condition names a relation state declared in `factions.json`, or an item some pool contains | reject |
+| `V-26` | an action's `draw.pool` names a pool `pools.json` declares | reject |
 
 Every rejection names its code and the offending field; a rejection never
 disturbs already-installed plugins or their saves. `V-24` is checked at install
@@ -444,6 +446,7 @@ it did before this section existed.
 | `REQ-024` | §3.3 data files (`pools.json`, `factions.json`), §4.2 validation (`V-19`, `V-20`, `W-02`) |
 | `REQ-025` | §3.2 manifest field (`clock`), §4.2 validation (`V-21`, `V-14`), §6.5 the clock |
 | `REQ-026` | §6.1 when a run ends, §11 the scene draws the menu |
+| `REQ-027` | §3.3 data file (`actions.json`, `requires` and `draw`), §4.2 validation (`V-25`, `V-26`), `engine-bricks` §7 conditions |
 
 ## 13. Decisions and open questions
 

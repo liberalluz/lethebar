@@ -208,6 +208,16 @@ func act(action_id: String) -> Dictionary:
 		_absorb(done["warnings"])
 		scratch = done["state"]
 	scratch = _clamped(scratch)
+	var draws: Variant = action.get("draw", null)
+	if draws is Dictionary:
+		# Drawing is part of the action, not a second step: the validator already
+		# refused a pool the package never declared (V-26), so this only fails on
+		# a package that was built after install.
+		var pool_id := String(draws.get("pool", ""))
+		if Pools.by_id(pools, pool_id).is_empty():
+			reject("S-07", "pool %s does not exist" % pool_id)
+			return view()
+		draw(pool_id)
 	state = scratch
 	Menu.record_use(action, self)
 	_step_rng()
@@ -264,6 +274,16 @@ func draw(pool_id: String) -> Dictionary:
 	for item in result["items"]:
 		drawn.append({"pool": pool_id, "item": String(item)})
 	return result
+
+
+func drawn_ids() -> Array:
+	## The items a run has taken out of its pools, in the order they came, so a
+	## condition, a save and the scene all read the same list (engine-bricks §6).
+	var out: Array = []
+	for entry in drawn:
+		if entry is Dictionary:
+			out.append(String(entry.get("item", "")))
+	return out
 
 
 func relation(from_id: String, to_id: String) -> float:
@@ -340,6 +360,10 @@ func view() -> Dictionary:
 		out["progress"] = {"steps": visited.size(), "nodes": nodes.size()}
 	if not (pools as Array).is_empty():
 		out["pools"] = _pool_view()
+	if not (drawn as Array).is_empty():
+		# What has been drawn is part of what the player knows, so the scene can
+		# say it and an action can wait on it (REQ-027).
+		out["drawn"] = drawn_ids()
 	if Relations.declares(factions):
 		out["factions"] = faction_map()
 		out["thresholds"] = (factions.get("thresholds", {}) as Dictionary).duplicate(true)

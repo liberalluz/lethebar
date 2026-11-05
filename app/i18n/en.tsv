@@ -33,3 +33,4 @@ ui.steps	step %d/%d
 ui.turn_rank	turn %d · %s
 ui.blocked	%s — %s
 ui.run_over	The run ended: %s
+ui.drawn	drawn: %s
