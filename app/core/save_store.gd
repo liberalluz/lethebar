@@ -22,6 +22,16 @@ const CODE_NODE := "SAVE-08"
 
 var backend: SaveBackend
 
+## A backend that keeps `user://` in memory may fold it into durable storage later:
+## the browser writes through IndexedDB on a scheduled sync. `flush_request` asks
+## the platform to fold it now and `flush_probe` answers whether it is folded.
+## Both are optional; on a backend with nothing to flush a write is durable the
+## moment `write` returns, which is every backend except the browser one.
+var flush_request := Callable()
+var flush_probe := Callable()
+
+var _pending := false
+
 
 func _init(source: SaveBackend = null) -> void:
 	backend = source if source != null else MemoryBackend.new()
@@ -29,6 +39,29 @@ func _init(source: SaveBackend = null) -> void:
 
 static func key_for(plugin_id: String, slot: int) -> String:
 	return "save:%s:%d" % [plugin_id, slot]
+
+
+func mark_writing() -> void:
+	## A write that is not a save slot still needs the same gate: an installed
+	## package lives in `user://` too, and a reload before IndexedDB folds it in
+	## loses it exactly the same way.
+	if not flush_request.is_valid():
+		return
+	flush_request.call()
+	_pending = true
+
+
+func settled() -> bool:
+	## True when no write is waiting to become durable. Asking settles it: the
+	## probe is the platform's answer, not a guess, so there is no timer here.
+	if not _pending:
+		return true
+	if not flush_probe.is_valid():
+		_pending = false
+		return true
+	_pending = not bool(flush_probe.call())
+	return not _pending
+
 
 
 func write(entry: Dictionary, slot: int, snapshot: Dictionary, preview: String = "") -> Dictionary:
@@ -58,7 +91,11 @@ func write(entry: Dictionary, slot: int, snapshot: Dictionary, preview: String =
 	}
 	if not backend.write(key_for(plugin_id, slot), JSON.stringify(payload)):
 		return _problem(CODE_WRITE, "slot %d was not written" % slot, slot)
-	return {"ok": true, "code": "", "message": "", "slot": slot}
+	_pending = false
+	if flush_request.is_valid():
+		flush_request.call()
+		_pending = flush_probe.is_valid() and not bool(flush_probe.call())
+	return {"ok": true, "code": "", "message": "", "slot": slot, "pending": _pending}
 
 
 func read(entry: Dictionary, slot: int) -> Dictionary:

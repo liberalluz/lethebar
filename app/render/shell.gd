@@ -66,6 +66,18 @@ var _picker: FileDialog = null
 ## lets the engine collect it, and the bridge then exists but never calls back.
 var _import_callback: JavaScriptObject = null
 
+## The slot whose save is still being folded into durable storage, or zero.
+var _saving_slot := 0
+
+## True while a package install is still being folded into durable storage.
+var _writing := false
+
+## Frames the browser gets before a write may be called saved. The engine folds
+## `user://` into IndexedDB on a scheduled sync and does not expose it to the page,
+## so the shell holds the label instead of guessing in seconds.
+const FLUSH_MS := 1500
+var _flush_started := 0
+
 
 func _ready() -> void:
 	_build_chrome()
@@ -73,6 +85,7 @@ func _ready() -> void:
 	_fit_text()
 	_install_builtins()
 	_connect_import_bridge()
+	_connect_flush_bridge()
 	show_landing()
 
 
@@ -282,10 +295,40 @@ func save_to(slot: int) -> Dictionary:
 	var result := saves.write(entry, slot, session.snapshot(), preview)
 	open_saves()
 	if not bool(result.get("ok", false)):
+		_saving_slot = 0
 		_status.text = Locale.text("ui.slot_failed") % [slot, String(result.get("code", ""))]
 		return current_view()
+	if bool(result.get("pending", false)):
+		_saving_slot = slot
+		_status.text = Locale.text("ui.saving")
+		_announce()
+		return current_view()
+	_saving_slot = 0
 	_status.text = Locale.text("ui.saved_to") % slot
+	_announce()
 	return current_view()
+
+
+func poll_saves() -> void:
+	## Called every frame. A save that is still being folded into IndexedDB says
+	## so, then says it is saved; the slot list is not the place to guess, so the
+	## label only changes when the backend answers.
+	if _saving_slot < 1 and not _writing:
+		return
+	if not saves.settled():
+		return
+	if _writing:
+		_writing = false
+		_announce()
+	if _saving_slot < 1:
+		return
+	_status.text = Locale.text("ui.saved_to") % _saving_slot
+	_saving_slot = 0
+	_announce()
+
+
+func _process(_delta: float) -> void:
+	poll_saves()
 
 
 func load_from(slot: int) -> Dictionary:
@@ -323,6 +366,8 @@ func try_import(bytes: PackedByteArray) -> Dictionary:
 	if not builtin_ids.has(plugin_id):
 		builtin_ids.append(plugin_id)
 	packages.persist(record)
+	saves.mark_writing()
+	_writing = true
 	entry = record
 	session = Session.create(entry, {"start_counter": 1, "locale": Locale.current()})
 	session.start()
@@ -380,6 +425,23 @@ func _on_file_picked(arguments: Array) -> void:
 	if arguments.is_empty():
 		return
 	install_from_base64(String(arguments[0]))
+
+func _connect_flush_bridge() -> void:
+	## The browser keeps `user://` in memory and folds it into IndexedDB on a
+	## scheduled sync. The export does not expose that sync to the page, so the
+	## shell cannot ask for it; what it can do is stop claiming success until the
+	## engine has had time to run it. The wait is measured in wall time, not in
+	## frames, and it is bounded: a write never reports a slot as saved before
+	## the engine had a chance to fold it in.
+	if not OS.has_feature("web"):
+		return
+	saves.flush_request = func() -> void:
+		_flush_started = Time.get_ticks_msec()
+	saves.flush_probe = func() -> bool:
+		## Wall time, not frames: a headless browser draws far faster than sixty
+		## frames a second, so a frame budget would be a fraction of the window the
+		## storage layer actually needs.
+		return Time.get_ticks_msec() - _flush_started >= FLUSH_MS
 
 
 func install_from_base64(encoded: String) -> Dictionary:
@@ -472,6 +534,8 @@ func _announce() -> void:
 			"saves": _saves_index(),
 			"slots": slot_previews(),
 			"pictures": _picture_slots.duplicate(),
+			"status": "" if _status == null else _status.text,
+			"saving": _saving_slot > 0 or _writing,
 		}
 		JavaScriptBridge.eval("window.lethebarState = %s;" % JSON.stringify(state), true)
 	# Layout is only settled after the frame that added the buttons, so the hit
@@ -717,11 +781,26 @@ func _pack_title(plugin_id: String) -> String:
 
 func _story_list() -> Array:
 	## Published through `lethebarState` so a browser driver can click a story by
-	## the name a player reads instead of guessing at button order.
+	## the name a player reads instead of guessing at button order. `pictures`
+	## says how many pictures the pack declares, so a driver that wants to prove
+	## a picture was drawn opens a story that has one instead of whichever comes
+	## first (a story with no art draws no band, which is correct, not a defect).
 	var stories: Array = []
 	for plugin_id in builtin_ids:
-		stories.append({"id": plugin_id, "title": _pack_title(plugin_id)})
+		stories.append({
+			"id": plugin_id,
+			"title": _pack_title(plugin_id),
+			"pictures": _declared_pictures(loader.registry.entry(plugin_id)),
+		})
 	return stories
+
+
+func _declared_pictures(record: Dictionary) -> int:
+	var count := 0
+	for asset in record.get("manifest", {}).get("assets", []):
+		if asset is Dictionary and String(asset.get("type", "")) == "texture":
+			count += 1
+	return count
 
 
 func _saves_index() -> Array:
