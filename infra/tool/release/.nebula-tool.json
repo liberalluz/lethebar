@@ -1,0 +1,11 @@
+{
+  "tool": "nebula-release",
+  "version": "0.1.0",
+  "sha256": "fec4c673567373f0a5ae6cdbbb77693c224260c77c6742f0aed7a9275769033a",
+  "files": {
+    "release.py": "adc03c8ae01548d810adadf25de5c8bc8e36431d0245a5f89b472530f22139e2",
+    "publish.py": "1c016caa1dbd4c01933f5e76269d785e15c3465dcf8c4962b7a2787a7573f712",
+    "README.md": "faf012a6d050a15d4f59d0262bb7f6187906a898cfc4b6d69d1075084f873e1e"
+  },
+  "source_commit": "963ad35afa820334df30ad9129edcf064df6dc38"
+}

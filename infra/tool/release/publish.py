@@ -29,6 +29,7 @@ from urllib.parse import urlparse
 
 SCAFFOLD = ".nebula-scaffold.json"
 CHANGELOG = "CHANGELOG.md"
+TOOL_VERSION = "0.1.0"
 PROVIDERS = ("github", "gitlab", "none")
 VERSION_RE = re.compile(
     r"^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
@@ -535,10 +536,11 @@ def print_plan(plan: dict) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="publish a release body")
     parser.add_argument("--root", type=Path, default=Path("."))
-    parser.add_argument("--version", required=True)
+    parser.add_argument("--version", default="")
+    parser.add_argument("--tool-version", action="store_true", help="print the tool version and exit")
     parser.add_argument("--tag", default="")
     parser.add_argument("--body-file", default="")
-    parser.add_argument("--docs-root", type=Path, required=True)
+    parser.add_argument("--docs-root", type=Path, default=None)
     parser.add_argument("--repo", default="", help="OWNER/NAME; optional")
     parser.add_argument("--date", default=date.today().isoformat())
     parser.add_argument("--draft", action="store_true")
@@ -547,6 +549,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args(argv)
+    if args.tool_version:
+        print(TOOL_VERSION)
+        return 0
+    if not args.version:
+        print("--version is required", file=sys.stderr)
+        return 2
+    if args.docs_root is None:
+        print("--docs-root is required", file=sys.stderr)
+        return 2
     if args.check and args.apply:
         print("--check and --apply are mutually exclusive", file=sys.stderr)
         return 2

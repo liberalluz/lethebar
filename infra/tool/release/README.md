@@ -31,9 +31,35 @@ does not guess it.
 - `publish.py --apply` checks provider authentication (`gh auth status` or
   `glab auth status`), creates the provider Release, and writes evidence under
   `records/<YYYY-MM>-release-vX.Y.Z/`. It does not create or push tags.
+- `repository` in `release.json` is derived from `origin` (scp or HTTPS), not
+  left empty; pass `--repo OWNER/NAME` to override. GitHub/GitLab publish fails
+  when the origin has no derivable `OWNER/NAME`.
 
 `release.py --date` defaults to today. `--version` and `--date` are required for
 `--render` and `--write`. `publish.py` requires `--version` and `--docs-root`.
+Both tools report their own version with `--tool-version`.
+
+## Tool versioning
+
+The release tools are copied once into the project; do not fetch them from the
+Nebula checkout on every release. `bootstrap --with-release` writes
+`infra/tool/release/.nebula-tool.json` with the tool name, version, per-file
+hashes, aggregate `sha256`, and the source commit when available.
+
+Run the project copy on every release. Upgrade the copy separately:
+
+```bash
+python <nebula-skills-dev>/skills/nebula-bootstrap/scripts/sync_tools.py \
+  --root . --check
+python <nebula-skills-dev>/skills/nebula-bootstrap/scripts/sync_tools.py \
+  --root . --apply
+```
+
+`--check` is read-only and reports missing files, hash drift, and outdated
+versions. `--apply` replaces only `release.py`, `publish.py`, `README.md`, and
+`.nebula-tool.json`; it does not touch `CHANGELOG.md`, `changelog.d/`, tags, or
+the provider release. Commit the upgrade as its own change, before the release
+PR.
 
 ## Fragment format
 
