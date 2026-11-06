@@ -328,7 +328,10 @@ def layer_payload_caches(output: Path) -> dict[str, str]:
         "\t\t\t\t\t}\n"
         "\t\t\t\t\tconst fetched = await fetch(event.request);\n"
         "\t\t\t\t\tif (fetched.ok) {\n"
-        "\t\t\t\t\t\tstore.put(event.request, fetched.clone());\n"
+        # A refused write used to be silent; the page can now ask why (REQ-031).
+        "\t\t\t\t\t\tstore.put(event.request, fetched.clone()).catch((error) => {\n"
+        "\t\t\t\t\t\t\tself.lethebarCacheError = String((error && error.message) || error);\n"
+        "\t\t\t\t\t\t});\n"
         "\t\t\t\t\t}\n"
         "\t\t\t\t\treturn fetched;\n"
         "\t\t\t\t}"
@@ -343,6 +346,94 @@ def layer_payload_caches(output: Path) -> dict[str, str]:
     )
     worker.write_text(text, encoding="utf-8")
     return names
+
+
+CACHE_STATE_HANDLER = """
+// A page cannot read a worker's globals, so it asks. The answer says whether the
+// payload is really in its cache and what the browser said when a write failed;
+// the landing screen turns the second fact into a sentence (REQ-031).
+self.lethebarCacheError = self.lethebarCacheError || "";
+self.addEventListener("message", (event) => {
+\tif (!event.data || event.data.type !== "lethebar-cache-state") {
+\t\treturn;
+\t}
+\tconst reply = event.ports && event.ports[0];
+\t(async () => {
+\t\tconst stored = [];
+\t\tfor (const name of Object.keys(PAYLOAD)) {
+\t\t\tif ((await caches.has(PAYLOAD[name])) && (await (await caches.open(PAYLOAD[name])).match(name))) {
+\t\t\t\tstored.push(name);
+\t\t\t}
+\t\t}
+\t\tif (reply) {
+\t\t\treply.postMessage({
+\t\t\t\tcontrolled: true,
+\t\t\t\tstored,
+\t\t\t\terror: self.lethebarCacheError || "",
+\t\t\t});
+\t\t}
+\t})();
+});
+"""
+
+
+def patch_cache_state(output: Path) -> None:
+    """Teach the worker to answer "did you keep the payload?" (REQ-031)."""
+    worker = output / SERVICE_WORKER
+    if not worker.is_file():
+        raise SystemExit(f"{SERVICE_WORKER} is missing; run the export first")
+    text = worker.read_text(encoding="utf-8")
+    if "lethebar-cache-state" in text:
+        return
+    if "self.lethebarCacheError" not in text:
+        raise SystemExit("the guarded store.put is missing; patch the payload caches first")
+    worker.write_text(text + CACHE_STATE_HANDLER, encoding="utf-8")
+
+
+CACHE_SHIM = """
+<script>
+// The shell polls this object instead of waiting for the worker before the first
+// frame: the notice it feeds is text, so it can arrive one frame late (REQ-031).
+(function () {
+  var state = { controlled: false, stored: [], error: "", bytes: %d, ready: false };
+  window.lethebarCache = state;
+  function ask() {
+    var worker = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if (!worker) { return; }
+    var channel = new MessageChannel();
+    channel.port1.onmessage = function (event) {
+      var answer = event.data || {};
+      state.controlled = !!answer.controlled;
+      state.stored = answer.stored || [];
+      state.error = answer.error || "";
+      state.ready = true;
+    };
+    worker.postMessage({ type: "lethebar-cache-state" }, [channel.port2]);
+  }
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.ready.then(ask).catch(function () {});
+    navigator.serviceWorker.addEventListener("controllerchange", ask);
+    setTimeout(ask, 1500);
+  }
+})();
+</script>
+"""
+
+
+def inject_cache_probe(output: Path) -> None:
+    """Publish what the worker kept, and how big this build's payload is."""
+    page = output / "index.html"
+    if not page.is_file():
+        raise SystemExit("index.html is missing; run the export first")
+    text = page.read_text(encoding="utf-8")
+    if "lethebarCache" in text:
+        return
+    if "</body>" not in text:
+        raise SystemExit("index.html has no </body>; the shim cannot be placed")
+    total = sum((output / name).stat().st_size for name in PAYLOAD_FILES)
+    page.write_text(
+        text.replace("</body>", (CACHE_SHIM % total) + "</body>"), encoding="utf-8"
+    )
 
 
 IMPORT_BRIDGE = """
@@ -431,7 +522,9 @@ def main() -> int:
     precache_payload(args.output)
     payload = layer_payload_caches(args.output)
     patch_navigation_fallback(args.output)
+    patch_cache_state(args.output)
     inject_import_bridge(args.output)
+    inject_cache_probe(args.output)
     for name, cache in payload.items():
         print(f"  {name:32} cached as {cache}")
     return report(args.output)

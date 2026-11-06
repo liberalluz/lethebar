@@ -67,6 +67,7 @@ func _initialize() -> void:
 	_case_save_flush()
 	_case_capabilities()
 	_case_limits()
+	_case_boot()
 	_case_assets()
 
 	print("")
@@ -805,6 +806,9 @@ func _shell() -> Shell:
 	# Imported packs go to memory too: a file backend would carry the pack from
 	# this case into every later one that lists the installed packs.
 	shell.packages = PackageStore.new(MemoryBackend.new())
+	# The suite is not a first visit: a real `user://welcome.txt` would make the
+	# notice assertions depend on which case ran first.
+	shell._welcome_seen = true
 	shell._ready()
 	return shell
 
@@ -2623,6 +2627,62 @@ func _case_limits() -> void:
 		_context(),
 	)
 	_check("TC-SAFE-001: a package inside the envelope installs", fits["status"] == "installed", String(fits.get("code", "")))
+
+
+func _case_boot() -> void:
+	# B31. The shell reads the size and the cache answer from the page; these
+	# assertions feed that state in and check the sentence the player reads.
+	_section("TC-BOOT-001 the first visit names the download and a refused cache")
+	var shell := _shell()
+	shell._welcome_seen = false
+	shell._cache_state = {
+		"ready": true,
+		"controlled": true,
+		"stored": ["index.wasm", "index.pck"],
+		"bytes": 44040192,
+		"error": "",
+	}
+	var first := shell.notice_text()
+	_check(
+		"TC-BOOT-001: the first visit names the download size",
+		first.contains("42 MB"),
+		first
+	)
+	_check(
+		"TC-BOOT-001: the first visit asks the tab to stay open",
+		first.contains("Keep this tab open"),
+		first
+	)
+	shell._welcome_seen = true
+	_check("TC-BOOT-001: a later visit says nothing", shell.notice_text() == "", shell.notice_text())
+	shell._cache_state = {
+		"ready": true,
+		"controlled": true,
+		"stored": [],
+		"bytes": 44040192,
+		"error": "QuotaExceededError",
+	}
+	var failed := shell.notice_text()
+	_check(
+		"TC-BOOT-001: a refused cache write is named",
+		failed.contains("QuotaExceededError"),
+		failed
+	)
+	_check("TC-BOOT-001: the failure replaces the first-visit line", failed != first, failed)
+	Locale.set_current("zh-CN")
+	var chinese := shell.notice_text()
+	_check(
+		"TC-BOOT-001: the failure line is translated too",
+		chinese.contains("QuotaExceededError") and chinese != failed,
+		chinese
+	)
+	Locale.set_current("en")
+	_check(
+		"TC-BOOT-001: the page publishes the payload size",
+		shell.payload_label() == "42 MB",
+		shell.payload_label()
+	)
+	shell.queue_free()
 
 
 func _case_assets() -> void:

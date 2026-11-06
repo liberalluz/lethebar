@@ -527,3 +527,17 @@ path, so the case survives fixture renames.
 - Exit: the crowded, heavy, wide and long packages are refused with `V-28`,
   `V-28`, `V-30` and `V-30`; the two path packages with `V-29`; every message
   gives the measured value or the limit; the ordinary package installs.
+
+## TC-BOOT-001 — the first visit says what is coming
+
+- Covers: `REQ-031`.
+- Fixture: a fresh profile (no `user://welcome.txt`), then the same profile again.
+- Steps:
+  1. Open the landing screen in a fresh profile and read `notice`.
+  2. Read `window.lethebarCache` once the page has answered.
+  3. Reload in the same profile and read `notice` again.
+  4. Ask the shell for the notice text with a `QuotaExceededError` in the cache
+     state, then with no error.
+- Exit: the first read names the size and asks for the tab to stay open; the cache
+  state reports whether the worker stored the payload; the reload says nothing;
+  the failure text replaces the first-visit sentence and contains the reason.

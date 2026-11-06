@@ -47,6 +47,7 @@ second.
 | `REQ-028` | A save is durable before the interface says it is saved. | After the player presses Save, the slot screen says the save is being written and only then says it is saved; a reload at the moment the screen says saved finds the run; the wait is bounded and never blocks the interface; a backend that reports nothing to flush settles immediately. |
 | `REQ-029` | A package names the engine capabilities it needs, with a major version. | Every entry of `capabilities` is a capability id `name@major` that `docs/specs/capabilities.md` lists as provided; anything else is refused at install and the refusal names the capability; a format 1.0.0 package that names a capability without a major version still installs, with one warning. |
 | `REQ-030` | A package is held to a published install-time envelope. | The archive, its entry count, every entry path and every entry's unpacked bytes are inside the limits in `docs/decisions/0009-package-trust.md`; a picture past 4096 px on an edge and audio past 2 MB or 60 seconds are refused by name; the refusal says what was measured and what the limit was. |
+| `REQ-031` | A first visit says what it is downloading and whether the browser kept it. | The landing screen names the payload size once per profile and asks the player to keep the tab open; a cache write that fails is reported with its reason instead of being silent; a reload in the same profile does not repeat the sentence. |
 
 
 ## 3. Out of scope for v0.0.0

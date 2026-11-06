@@ -437,6 +437,23 @@ computed by the render layer. A run that ended shows the reason the phase machin
 gave and offers no action buttons; a package without actions renders exactly as
 it did before this section existed.
 
+### 11.4 A first visit says what is coming
+
+The payload is about 42 MB and it is cached by the generated service worker, not
+by the page. The landing screen therefore says the size once per profile, before
+any scene is opened, and asks the player to keep the tab open: switching tabs on
+iOS suspends the transfer and the browser may discard it. The sentence is stored
+in `user://welcome.txt` after it is shown, so a returning player never reads it
+again.
+
+Whether the payload actually landed is reported by the worker, not guessed by the
+page. The export injects a probe into `index.html`: it asks the worker for
+`lethebar-cache-state` over a `MessageChannel` and publishes `window.lethebarCache`
+(`controlled`, `stored`, `error`, `ready`). The shell reads that object on the
+landing screen and, when `error` is set, replaces the first-visit sentence with
+the failure and the reason the Cache API gave. A write that fails is therefore
+visible in the interface instead of only in a console nobody opens.
+
 
 ## 12. Requirement mapping
 
@@ -472,6 +489,7 @@ it did before this section existed.
 | `REQ-028` | §7.4 storage, §7.5 durability (`SaveStore` flush request and probe), `app/core/save_store.gd` |
 | `REQ-029` | §4.2 validation (`V-27`, `W-03`), `docs/specs/capabilities.md`, `PackageValidator.KNOWN_CAPABILITIES` |
 | `REQ-030` | §4.2 validation (`V-28`–`V-30`), `app/core/package_limits.gd`, loader envelope pass |
+| `REQ-031` | §11.4 first-visit notice, `infra/export_web.py` cache probe |
 
 ## 13. Decisions and open questions
 
