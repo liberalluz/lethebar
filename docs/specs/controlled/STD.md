@@ -550,6 +550,20 @@ path, so the case survives fixture renames.
   share of its range left; the line names all four and changes language; a turn
   past the budget reports 0; the bare package produces no situation section.
 
+## TC-I18N-002 - the labels a run is made of follow the locale
+
+- Covers: `REQ-035`.
+- Fixture: a package with one scene, two actions, a two-step rank ladder, a
+  labelled resource and one failure, plus an English table that covers the scene,
+  both actions, both ranks, the labelled values and the failure.
+- Steps: import it and read the view in English; read it in a language with no
+  table; play the losing action and read the reason; import a table with one
+  action key removed; empty a key by hand and open a session on it.
+- Exit: the menu, the rank, the labelled resource and the loss reason all read
+  English; a language with no table keeps the package text; the missing key is
+  refused by `V-22` with the key named; a session handed a gap anyway falls back
+  to the package text instead of blanking the label.
+
 ## TC-REL-002 - a rule moves a relation, and the save keeps it
 
 - Covers: `REQ-032`.

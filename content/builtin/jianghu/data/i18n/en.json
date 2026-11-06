@@ -2,5 +2,15 @@
   "inn": {
     "text": "The last lamp in the inn is still burning. You take off your soaked cloak; the innkeeper pushes a pot of cold tea across the table. \"The mountain has been restless these nights. Are you going up?\"",
     "choices": []
+  },
+  "strings": {
+    "action.train": "Practise the sword",
+    "action.rest": "Sit and breathe",
+    "action.search": "Search the back hill",
+    "action.wield": "Draw the old sword",
+    "rank.1": "new to the road",
+    "rank.5": "a name worth repeating",
+    "rank.9": "a name the province knows",
+    "failure.0": "You are spent and turn back."
   }
 }
