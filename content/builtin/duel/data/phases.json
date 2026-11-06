@@ -1,0 +1,11 @@
+{
+  "turns": 10,
+  "ranks": [
+    {"at": 1, "title": "初出茅庐"},
+    {"at": 4, "title": "小有名气"},
+    {"at": 7, "title": "名动一时"}
+  ],
+  "fail": [
+    {"when": {"key": "guard", "op": "lte", "value": 0}, "reason": "阵脚已乱"}
+  ]
+}

@@ -50,6 +50,17 @@ Scopes: pick exactly one from the closed list below.
 - The body is plain text. A commit message is never rendered, so backticks, `**bold**` and
   `__bold__` reach the reader as characters: write `kind`, not `` `kind` ``. `check_commit_body.py`
   refuses all three outside a fenced block. `0bf59cd` carried ten backticks until it was amended.
+- Every paragraph is wrapped at 72 columns. A message is read in a terminal, in `git log` and in
+  the commit list of a pull request, and none of them re-flow a line: `63862c7` carried one
+  880-character line because `pr_merge.py --body-only` copied a rendered pull-request body.
+  The same command now flattens what it writes: inline code and bold lose their markers and every
+  paragraph is filled at 72 columns before it reaches `gh pr merge --body-file`.
+- A squash merge makes a commit that no branch precedes, so the range check above cannot see it:
+  the commit sits on the default branch and `origin/main..HEAD` is empty. After merging, judge that
+  one commit directly with
+  `python infra/checks/check_commit_body.py --ref origin/main` and
+  `python infra/tool/merge/pr_merge.py --verify-only --ref origin/main`. Both read a single commit
+  and apply the same rules, which is the only way the gate can see what history actually says.
 - Detail like the above belongs in this file, not in `CONTRIBUTING.md`: that file is the door, and a
   rule copied into two places drifts in one of them.
 

@@ -28,6 +28,7 @@ import json
 import re
 import subprocess
 import sys
+import textwrap
 from typing import Any
 
 TYPES = ("feat", "fix", "docs", "test", "refactor", "chore", "ci")
@@ -36,6 +37,13 @@ SUBJECT = re.compile(r"^(feat|fix|docs|test|refactor|chore|ci)\([a-z0-9-]+\): \S
 NUMBERED = re.compile(r"\(#\d+\)$")
 BATCH_VALUE = re.compile(r"^(B\d+[a-z]?|none)$")
 KEY_LINE = re.compile(r"^[A-Z][A-Za-z]*:")
+INLINE_CODE = re.compile(r"`([^`\n]*)`")
+BOLD = re.compile(r"\*\*([^*\n]+)\*\*")
+FENCE = re.compile(r"^```")
+# A commit message is read in a terminal and in `git log`, not rendered: a
+# paragraph that arrives as one 700-character line is unreadable there, which is
+# what `#80` did. Everything this tool emits is wrapped at this width.
+BODY_WIDTH = 72
 
 
 class MessageError(Exception):
@@ -78,6 +86,82 @@ def _field(body: str, name: str, multiline: bool = True) -> str | None:
                 value.append(follow.strip())
         return "\n".join(part for part in value if part).strip()
     return None
+
+
+def plain_body(body: str) -> str:
+    """Turn a rendered pull-request body into a commit-message body.
+
+    Inline code and bold arrive as literal backticks and asterisks, and one long
+    source line stays one long line in `git log`. Fenced blocks are data and are
+    left exactly as they are.
+    """
+    paragraphs: list[str] = []
+    current: list[str] = []
+    in_fence = False
+    fence_lines: list[str] = []
+    for line in body.replace("\r\n", "\n").split("\n"):
+        if FENCE.match(line):
+            if current:
+                paragraphs.append(_wrap(" ".join(current)))
+                current = []
+            in_fence = not in_fence
+            fence_lines.append(line)
+            if not in_fence:
+                paragraphs.append("\n".join(fence_lines))
+                fence_lines = []
+            continue
+        if in_fence:
+            fence_lines.append(line)
+            continue
+        if not line.strip():
+            if current:
+                paragraphs.append(_wrap(" ".join(current)))
+                current = []
+            continue
+        if KEY_LINE.match(line) and current:
+            # `Why:` and `Batch:` are fields, not prose. Joining them into one
+            # paragraph would hide the second one from the reader and from the
+            # gate that looks for it at the start of a line.
+            paragraphs.append(_wrap(" ".join(current)))
+            current = []
+        current.append(line.strip())
+    if current:
+        paragraphs.append(_wrap(" ".join(current)))
+    if fence_lines:
+        paragraphs.append("\n".join(fence_lines))
+    return "\n\n".join(paragraphs).strip("\n")
+
+
+def _wrap(paragraph: str) -> str:
+    """Strip the two inline markers and fill to `BODY_WIDTH`."""
+    text = INLINE_CODE.sub(r"\1", paragraph)
+    text = BOLD.sub(r"\1", text)
+    return textwrap.fill(text, width=BODY_WIDTH) if text.strip() else ""
+
+
+def _markdown_in_prose(body: str) -> list[str]:
+    """Name the markers that survived into the prose."""
+    outside: list[str] = []
+    in_fence = False
+    for line in body.replace("\r\n", "\n").split("\n"):
+        if FENCE.match(line):
+            in_fence = not in_fence
+            continue
+        if not in_fence:
+            outside.append(line)
+    prose = "\n".join(outside)
+    problems: list[str] = []
+    if INLINE_CODE.search(prose):
+        problems.append("the body uses backticks; a commit message is plain text")
+    if BOLD.search(prose):
+        problems.append("the body uses bold markers; a commit message is plain text")
+    long_lines = [line for line in outside if len(line) > BODY_WIDTH + 20]
+    if long_lines:
+        problems.append(
+            f"the body has a line of {max(len(line) for line in long_lines)} characters; "
+            f"wrap the prose at {BODY_WIDTH}"
+        )
+    return problems
 
 
 def message_problems(
@@ -127,6 +211,8 @@ def message_problems(
                 "'Batch:' must read 'B<number>', 'B<number><letter>' or 'none', "
                 f"optionally followed by a parenthetical note; got {batch!r}"
             )
+
+    problems.extend(_markdown_in_prose(body))
 
     return problems
 
@@ -417,6 +503,34 @@ def _self_test() -> int:
     except MessageError:
         check("a cut headline with no matching local commit is refused", "error", "error")
 
+    rich = "Why: the engine reads `data/cards.json` and **never** shuffles.\nBatch: B42"
+    flat = plain_body(rich)
+    check("plain body drops backticks", "`" in flat, False)
+    check("plain body drops bold markers", "**" in flat, False)
+    check("plain body keeps the words", "data/cards.json" in flat and "never" in flat, True)
+    check("plain body keeps the rule lines",
+          flat.startswith("Why: the engine reads data/cards.json"), True)
+
+    wide = "Why: " + "word " * 40 + "\nBatch: none"
+    wrapped = plain_body(wide)
+    check("plain body wraps a long paragraph",
+          max(len(line) for line in wrapped.splitlines()) <= BODY_WIDTH, True)
+
+    fenced = "Why: see below\n\n```\nlet a = `template`;\n```\n\nBatch: none"
+    check("a fenced block is left alone", "`template`" in plain_body(fenced), True)
+
+    check("backticks are reported",
+          any("backticks" in problem for problem in
+              message_problems("feat(app): x (#1)", "Why: `code`\nBatch: B42", 1)), True)
+    check("bold markers are reported",
+          any("bold" in problem for problem in
+              message_problems("feat(app): x (#1)", "Why: **loud**\nBatch: B42", 1)), True)
+    check("a long line is reported",
+          any("characters" in problem for problem in
+              message_problems("feat(app): x (#1)", "Why: " + "word " * 40 + "\nBatch: B42", 1)), True)
+    check("a plain body passes",
+          message_problems("feat(app): x (#1)", plain_body(rich), 1), [])
+
     print(f"\n{failures} failure(s)")
     return 1 if failures else 0
 
@@ -452,15 +566,10 @@ def _show_body(
     """Print only the body, for `gh pr merge --body-file`.
 
     A merge takes the subject through `--subject` and the body through
-    `--body-file`. Handing it the whole message puts the subject into the body
-    as well, which is what happened to #38 to #45: every one of those commits
-    repeats its own subject on the first body line. This prints the body alone so
-    that mistake is not available.
-
-    `--out` writes the file here instead of through a shell pipe. Piping this
-    output into a PowerShell redirect decodes UTF-8 as the local code page and
-    turns every character outside ASCII into U+FFFD; that is how `#46` lost its
-    em dash. Writing from Python keeps the bytes as they are.
+    `--body-file`; handing it the whole message puts the subject into the body as
+    well, which is what happened to #38 to #45. `--out` writes the file here
+    instead of through a shell pipe, which decodes UTF-8 as the local code page and
+    is how `#46` lost its em dash.
     """
     commits = _gh_commits(pr_number)
     try:
@@ -471,6 +580,7 @@ def _show_body(
         print(f"cannot build a message: {exc}", file=sys.stderr)
         return 1
     _, body = split_message(message)
+    body = plain_body(body)
     text = body if body.endswith("\n") else body + "\n"
     if out:
         with open(out, "w", encoding="utf-8", newline="\n") as handle:

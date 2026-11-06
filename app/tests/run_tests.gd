@@ -14,6 +14,7 @@ const FIXTURE_DIR := "res://.test-tmp"
 const BUILTIN_PACKAGE := "res://builtin/sanguo.zip"
 const BUILTIN_XIUXIAN := "res://builtin/xiuxian.zip"
 const BUILTIN_JIANGHU := "res://builtin/jianghu.zip"
+const BUILTIN_DUEL := "res://builtin/duel.zip"
 
 var _failures: Array = []
 var _checks := 0
@@ -38,6 +39,7 @@ func _initialize() -> void:
 	_case_builtin_001()
 	_case_builtin_002()
 	_case_builtin_003()
+	_case_builtin_004()
 	_case_det_001()
 	_case_save_001()
 	_case_save_002()
@@ -2720,6 +2722,99 @@ func _case_builtin_003() -> void:
 		String(english_view.get("text", "")).contains("last lamp in the inn"),
 		String(english_view.get("text", "")),
 	)
+
+
+func _case_builtin_004() -> void:
+	# A fourth story, and the first one played with cards: the hand, the deck
+	# order, the discard pile and the refill all come from the package, and
+	# nothing under app/core knows a card exists beyond the brick it declares.
+	_section("TC-BUILTIN-004 Duel is played from a hand the package declares")
+	var package := FileAccess.get_file_as_bytes(BUILTIN_DUEL)
+	if package.is_empty():
+		_failures.append("staged package missing at %s; run infra/stage_builtin.py" % BUILTIN_DUEL)
+		return
+	var loader := PackageLoader.new()
+	var result := loader.import_bytes(package, _context())
+	_check(
+		"TC-BUILTIN-004: the package installs",
+		result["status"] == "installed",
+		"%s %s" % [String(result.get("code", "-")), String(result.get("message", ""))],
+	)
+	if result["status"] != "installed":
+		return
+	var shell := _shell()
+	shell.start_plugin("duel")
+	_check("TC-BUILTIN-004: the scene opens", shell.screen_name() == "session", shell.screen_name())
+	var opening := _hand_ids(shell.session)
+	_check(
+		"TC-BUILTIN-004: the hand opens with the size the package declares, in its deck order",
+		opening == ["heavy", "strike", "breathe", "feint"],
+		str(opening),
+	)
+	shell.play_card("heavy")
+	_check(
+		"TC-BUILTIN-004: playing a card spends its cost and applies its effect in one step",
+		int(shell.session.state.get("guard", -1)) == 8 and int(shell.session.state.get("edge", -1)) == 5,
+		"guard=%s edge=%s" % [str(shell.session.state.get("guard")), str(shell.session.state.get("edge"))],
+	)
+	_check(
+		"TC-BUILTIN-004: the played card is discarded and the hand is refilled",
+		shell.session.discard.has("heavy") and _hand_ids(shell.session).size() == 4 and _hand_ids(shell.session).has("charge"),
+		"discard=%s hand=%s" % [str(shell.session.discard), str(_hand_ids(shell.session))],
+	)
+	_check(
+		"TC-BUILTIN-004: playing a card advances the turn",
+		int(shell.session.turn) == 2,
+		"turn=%s" % str(shell.session.turn),
+	)
+	var before := _hand_ids(shell.session)
+	var refusals_before := shell.session.warnings.size()
+	shell.play_card("charge")
+	var said := ""
+	for warning in shell.session.warnings.slice(refusals_before):
+		said += String(warning.get("message", ""))
+	_check(
+		"TC-BUILTIN-004: a card whose cost the run cannot pay is refused by name",
+		shell.session.warnings.size() > refusals_before and said.contains("edge"),
+		said if said != "" else "no refusal recorded",
+	)
+	_check(
+		"TC-BUILTIN-004: a refused card stays in the hand",
+		_hand_ids(shell.session) == before,
+		"%s vs %s" % [str(before), str(_hand_ids(shell.session))],
+	)
+	_check(
+		"TC-BUILTIN-004: the rank is the package's word, not the engine's",
+		shell._status.text.contains("untried"),
+		shell._status.text,
+	)
+	var saved := shell.session.snapshot()
+	var entry := loader.registry.entry("duel")
+	var store := SaveStore.new()
+	store.write(entry, 1, saved, "duel")
+	var loaded := store.read(entry, 1)
+	var resumed: Session = null
+	if bool(loaded.get("ok", false)):
+		resumed = store.resume(entry, loaded.get("payload", {}), {"locale": "en"})
+	_check(
+		"TC-BUILTIN-004: a save keeps the hand, the deck order and the discard pile",
+		resumed != null and resumed.hand == shell.session.hand and resumed.deck == shell.session.deck and resumed.discard == shell.session.discard,
+		"%s hand=%s deck=%s discard=%s" % [
+			"no session" if resumed == null else "resumed",
+			str(resumed.hand if resumed != null else []),
+			str(resumed.deck if resumed != null else []),
+			str(resumed.discard if resumed != null else []),
+		],
+	)
+
+
+func _hand_ids(session: Session) -> Array:
+	## The hand holds card ids, not card dictionaries: the deck is a list of ids
+	## and `Hand.card()` looks the definition up in the package's table.
+	var ids := []
+	for card in session.hand:
+		ids.append(String(card))
+	return ids
 
 
 func _case_capabilities() -> void:

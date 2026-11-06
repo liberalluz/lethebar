@@ -629,3 +629,24 @@ leaves coin 2 and grain 14, moves the card to the discard pile, draws a replacem
 the turn to 2; an unaffordable card is refused with `S-08`, the message names `coin`, and the hand
 is unchanged; the saved payload carries `hand`, `deck` and `discard`, and the resumed run holds the
 same three piles; the three bad packages are refused with `V-38`, `V-37` and `V-36`.
+
+## TC-BUILTIN-004 - a fourth story is played with cards
+
+- Covers: `TC-BUILTIN-001`, `TC-CARDS-001`
+- Fixture: the built-in `duel` package as it ships, without any edit: `linear@1`, capabilities
+  `cards.hand@1`, `ledger@1`, `phases@1` and `text@1`, two resources (`guard`, `edge`), ten turns
+  with three ranks, one failure on `guard lte 0`, two plain actions and a hand of four cards drawn
+  from a deck of eight.
+
+1. Install the shipped package and open its first scene.
+2. Read the hand and the buttons the scene shows.
+3. Play `Heavy blow`, then read the resources and the turn.
+4. Try to play `Charge`, whose cost the run cannot pay.
+5. Play until the guard reaches zero and read the ending.
+6. Save to slot 1, reload and resume.
+
+Exit criteria: the opening hand is `["heavy", "strike", "breathe", "feint"]`; playing `heavy`
+leaves guard 8 and edge 5, moves the card to the discard pile and draws a replacement, and the turn
+reads 2; `Charge` is refused with a message naming `edge` and the hand is unchanged; the rank reads
+`untried` and the ending names `阵脚已乱`; the resumed session carries the same three piles; and
+`git diff --stat -- app` is empty afterwards.

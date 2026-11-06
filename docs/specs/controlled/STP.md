@@ -100,6 +100,7 @@ claims: if they fail, the architecture claim fails, not just a feature.
 | `TC-REL-002` | `REQ-032` | A rule moves a relation the package declared, the moved value survives a save and a resume, a package that writes no relation behaves as before, and a rule naming an undeclared entity or a non-numeric change is refused with `V-31`. |
 | `TC-BOOT-001` | `REQ-031` | A first visit names the payload size and asks for the tab to stay open, the page reports whether the worker kept the payload, and a reload does not repeat the notice. |
 | `TC-BUILTIN-003` | `TC-BUILTIN-001`, `TC-WIRE-001` | A third shipped story, written only as data, installs and is played to an ending: the scene draws one button per declared action, the first turn shows the declared rank, drawing from the pool unlocks the action waiting on the item, playing on ends the run with the declared failure reason, and an English session reads the English table, all without a change under `app/core`. |
+| `TC-BUILTIN-004` | `TC-CARDS-001`, `TC-BUILTIN-001` | A fourth shipped package, written only as data, plays a hand of declared cards: the scene shows the opening hand in the package's deck order, playing a card spends its cost, applies its effect and advances the turn, a card the run cannot pay stays in the hand and names the short resource, the rank and the failure reason are the package's words, and a save keeps the hand, the deck order and the discard pile, all without a change under `app/core` or `app/render`. |
 
 ## Gaps
 
