@@ -528,6 +528,20 @@ path, so the case survives fixture renames.
   `V-28`, `V-30` and `V-30`; the two path packages with `V-29`; every message
   gives the measured value or the limit; the ordinary package installs.
 
+## TC-SITUATION-001 - the scene states how the run stands
+
+- Covers: `REQ-033`.
+- Fixture: a package with two resources bounded 0..10 and 0..100, three
+  entities whose relations sum to a clear lean and a clear friction, and a phase
+  machine with six turns.
+- Steps: import it and read the view; read the readout line; switch the language
+  and read the line again; move the turn past the budget and read again; import a
+  package that declares neither factions nor phases.
+- Exit: the view carries `turnsLeft` 6, `leaning` is the entity with the highest
+  incoming sum, `friction` the lowest, `tight` the resource with the smallest
+  share of its range left; the line names all four and changes language; a turn
+  past the budget reports 0; the bare package produces no situation section.
+
 ## TC-REL-002 - a rule moves a relation, and the save keeps it
 
 - Covers: `REQ-032`.

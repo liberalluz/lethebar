@@ -38,3 +38,7 @@ ui.saving	正在保存…
 ui.first_visit	第一次访问要下载大约 %s，请保持这个页面开着，直到它下载完。
 ui.install_hint	在 iPhone 上，把这个页面加到主屏幕，就能离线打开。
 ui.cache_failed	浏览器没能保存住这次下载（%s），下次打开会重新下载。
+ui.turns_left	剩余回合：%d
+ui.leaning	最受拥护：%s
+ui.friction	最受敌视：%s
+ui.tight	最紧：%s

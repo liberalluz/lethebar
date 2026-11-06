@@ -400,7 +400,75 @@ func view() -> Dictionary:
 		out["rank"] = rank()
 		out["actions"] = menu()
 		out["failReason"] = fail_reason
+	var reading := situation()
+	if not reading.is_empty():
+		out["situation"] = reading
 	return out
+
+
+func situation() -> Dictionary:
+	## How the run stands, read once for the scene (REQ-033). Every number comes
+	## from what the package declared: the turn budget from phases, the pair
+	## values from factions, the floors and ceilings from the ledger. A story that
+	## declares none of them gets no reading rather than a made-up one.
+	var out := {}
+	if not (Phases.declares(phase) or Relations.declares(factions)):
+		return out
+	if Phases.declares(phase):
+		var turns := int(phase.get("turns", Phases.DEFAULT_TURNS))
+		out["turnsLeft"] = maxi(turns - turn + 1, 0)
+	if Relations.declares(factions):
+		var leaning := _standing(true)
+		var friction := _standing(false)
+		if leaning != "":
+			out["leaning"] = leaning
+		if friction != "":
+			out["friction"] = friction
+	if Phases.declares(phase):
+		var tight := _tightest()
+		if tight != "":
+			out["tight"] = tight
+	return out
+
+
+func _standing(high: bool) -> String:
+	## Sums the relations each entity receives, so "everyone leans toward Wu" is
+	## the total of what the other entities feel, not one direction picked by the
+	## engine. Ties keep the declaration order, so the answer is stable.
+	var order: Array = factions.get("order", [])
+	var best := ""
+	var best_score := 0.0
+	var found := false
+	for entity_id in order:
+		var score := 0.0
+		for other in order:
+			if other == entity_id:
+				continue
+			score += relation(String(other), String(entity_id))
+		if not found or (score > best_score if high else score < best_score):
+			best = String(entity_id)
+			best_score = score
+			found = true
+	return best
+
+
+func _tightest() -> String:
+	## The resource closest to its declared floor, measured as the fraction of
+	## the range still above it: 1 of 10 is tighter than 20 of 100.
+	var best := ""
+	var best_fraction := 0.0
+	for id in ledger_defs:
+		var low: float = ledger_defs[id]["min"]
+		var high: float = ledger_defs[id]["max"]
+		var span := high - low
+		if span <= 0.0:
+			continue
+		var value := float(state.get(id, low))
+		var fraction := clampf((value - low) / span, 0.0, 1.0)
+		if best == "" or fraction < best_fraction:
+			best = String(id)
+			best_fraction = fraction
+	return best
 
 
 func snapshot() -> Dictionary:

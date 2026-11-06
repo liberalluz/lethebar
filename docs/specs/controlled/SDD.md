@@ -456,6 +456,20 @@ the failure and the reason the Cache API gave. A write that fails is therefore
 visible in the interface instead of only in a console nobody opens.
 
 
+### 11.5 The scene states how the run stands
+
+Three numbers decide a turn and the scene showed none of them. `Session.situation()`
+reads them once: `turnsLeft` from `phases.turns` and the current turn, `leaning`
+and `friction` from the sum of the relations each entity receives, and `tight`
+from the fraction of each resource's declared range still above its floor. The
+engine names no threshold, no turn budget and no resource: every number comes
+from the package, and a section whose source is not declared is left out rather
+than filled with a zero.
+
+The scene prints the reading as one more segment of the readout line, through
+`ui.turns_left`, `ui.leaning`, `ui.friction` and `ui.tight`, so the line follows
+the interface language like the rest of the screen.
+
 ## 12. Requirement mapping
 
 | REQ | Design |
@@ -492,6 +506,7 @@ visible in the interface instead of only in a console nobody opens.
 | `REQ-030` | §4.2 validation (`V-28`–`V-30`), `app/core/package_limits.gd`, loader envelope pass |
 | `REQ-031` | §11.4 first-visit notice, `infra/export_web.py` cache probe |
 | `REQ-032` | §4.2 `V-31`, `app/core/mechanics.gd` relation changes, `app/core/session.gd` writer and payload field |
+| `REQ-033` | §11.5 situation reading, `app/core/session.gd` `situation()`, `app/render/shell.gd` readout |
 
 ## 13. Decisions and open questions
 

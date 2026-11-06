@@ -65,6 +65,7 @@ func _initialize() -> void:
 	_case_scene()
 	_case_wire()
 	_case_writable_relations()
+	_case_situation()
 	_case_save_flush()
 	_case_capabilities()
 	_case_limits()
@@ -2688,6 +2689,116 @@ func _case_writable_relations() -> void:
 		"TC-REL-002: a write whose change is not a number is refused at install",
 		refused_change["status"] == "rejected" and String(refused_change.get("code", "")) == "V-31",
 		"%s / %s" % [refused_change.get("code", ""), refused_change.get("message", "")],
+	)
+
+
+func _case_situation() -> void:
+	# The player has to weigh three things every turn: the time left, who stands
+	# with them, and which number is about to run out. The engine knew all three
+	# and said none of them. These assertions are the contract for saying it once,
+	# in one place, from what the package declared.
+	_section("TC-SITUATION-001 the scene states how the run stands")
+	var nodes := {"nodes": [{"id": "t1", "text": "A hall before dawn.", "choices": []}]}
+	var ledger := {
+		"resources": [
+			{"id": "grain", "init": 3, "min": 0, "max": 10},
+			{"id": "coin", "init": 60, "min": 0, "max": 100},
+		],
+	}
+	var factions := {
+		"thresholds": {"ally": 60, "hostile": -60},
+		"entities": [
+			{"id": "wei", "label": "Wei", "relations": {"shu": -10}},
+			{"id": "shu", "label": "Shu", "relations": {"wei": 70}},
+			{"id": "wu", "label": "Wu", "relations": {"wei": 20, "shu": -40}},
+		],
+	}
+	var phases := {"turns": 6, "ranks": [{"at": 1, "title": "Captain"}], "fail": []}
+	var built: PackedByteArray = _package(
+		"situation-run",
+		{"id": "situation-run", "entry": "t1"},
+		[],
+		[],
+		nodes,
+		{},
+		{
+			"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+			"data/factions.json": JSON.stringify(factions).to_utf8_buffer(),
+			"data/phases.json": JSON.stringify(phases).to_utf8_buffer(),
+		}
+	)
+	var shell := _shell()
+	shell.try_import(built)
+	var view: Dictionary = shell.session.view()
+	var situation: Dictionary = view.get("situation", {})
+	_check(
+		"TC-SITUATION-001: the view carries a situation section",
+		not situation.is_empty(),
+		str(situation),
+	)
+	_check(
+		"TC-SITUATION-001: turnsLeft counts down from the declared turn budget",
+		int(situation.get("turnsLeft", -1)) == 6,
+		str(situation.get("turnsLeft", "absent")),
+	)
+	_check(
+		"TC-SITUATION-001: leaning is the entity others lean toward",
+		String(situation.get("leaning", "")) == "wei",
+		str(situation.get("leaning", "absent")),
+	)
+	_check(
+		"TC-SITUATION-001: friction is the entity others push against",
+		String(situation.get("friction", "")) == "shu",
+		str(situation.get("friction", "absent")),
+	)
+	_check(
+		"TC-SITUATION-001: tight is the resource closest to its floor",
+		String(situation.get("tight", "")) == "grain",
+		str(situation.get("tight", "absent")),
+	)
+	_check(
+		"TC-SITUATION-001: the scene says it in one line",
+		shell._status.text.contains("Wei") and shell._status.text.contains("Shu") and shell._status.text.contains("6"),
+		shell._status.text,
+	)
+	# The line has to come from the catalog: switching the language switches it.
+	shell.toggle_language()
+	_check(
+		"TC-SITUATION-001: the line follows the interface language",
+		shell._status.text.contains("最受拥护") and shell._status.text.contains("最紧"),
+		shell._status.text,
+	)
+	shell.toggle_language()
+	# A run that is over reports no time left rather than a negative count.
+	shell.session.turn = 9
+	var late: Dictionary = shell.session.view().get("situation", {})
+	_check(
+		"TC-SITUATION-001: turnsLeft never goes below zero",
+		int(late.get("turnsLeft", -1)) == 0,
+		str(late.get("turnsLeft", "absent")),
+	)
+	# A package that declares neither faction nor phases gets no invented sections.
+	var bare: PackedByteArray = _package(
+		"situation-bare",
+		{"id": "situation-bare", "entry": "t1"},
+		[],
+		[],
+		nodes,
+		{},
+		{"data/state.json": JSON.stringify(ledger).to_utf8_buffer()}
+	)
+	var bare_shell := _shell()
+	bare_shell.try_import(bare)
+	var bare_situation: Dictionary = bare_shell.session.view().get("situation", {})
+	_check(
+		"TC-SITUATION-001: a section whose source is undeclared is left out",
+		bare_situation.is_empty(),
+		str(bare_situation),
+	)
+	_check(
+		"TC-SITUATION-001: a story with no run state reads as it did before",
+		not bare_shell._status.text.contains("turnsLeft"),
+		bare_shell._status.text,
 	)
 
 
