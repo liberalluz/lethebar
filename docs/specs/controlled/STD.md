@@ -731,3 +731,21 @@ reads 2; `Charge` is refused with a message naming `edge` and the hand is unchan
 - Exit criteria: the deck is shuffled from the run's seed, so the same seed deals
   the same order, another seed does not, and a resumed run keeps the order its
   save carried.
+## TC-ASSEMBLY-001 — a run can be opened from more than one package
+
+- Covers: `REQ-041`
+- Fixture: two packages built by `_assembly_package()`; the base declares `grain`, one node and the action `farm`, the addition declares `troops` and the action `drill`; a third fixture declares `grain` again for the warning
+
+Steps:
+
+1. Install both packages and resolve them with `PackageLoader.assemble()`.
+2. Open a session from the first entry with the rest as `options.assembly`.
+3. Read the view and the menu.
+4. Save to slot 1 and resume with the same assembly.
+5. Resolve an assembly that names a package nothing installed.
+6. Open a session whose second package declares `grain` again.
+
+Exit: the view carries `grain` and `troops`; the menu lists `farm` then `drill`;
+the snapshot records both ids; the resumed run still carries `troops`; the
+missing package is refused with `V-33` naming it; the duplicate leaves exactly
+one `W-05` and keeps the first value.

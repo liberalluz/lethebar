@@ -204,6 +204,26 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 	}
 
 
+func assemble(ids: Array) -> Dictionary:
+	## Resolves the ordered package list a run is built from (ADR-0013). A name
+	## nothing installed is refused here rather than half-opened later, and the
+	## refusal names the package so an author can act on it (V-33).
+	var entries: Array = []
+	for raw in ids:
+		var plugin_id := String(raw)
+		if not registry.has(plugin_id):
+			return {
+				"ok": false,
+				"code": "V-33",
+				"message": "the assembly names %s, which is not installed" % plugin_id,
+				"entries": [],
+			}
+		entries.append(registry.entry(plugin_id))
+	if entries.is_empty():
+		return {"ok": false, "code": "V-33", "message": "the assembly names no package", "entries": []}
+	return {"ok": true, "code": "", "message": "", "entries": entries}
+
+
 func _envelope_problem(bytes: PackedByteArray, files: Array, reader: ZIPReader) -> Dictionary:
 	## The envelope in `PackageLimits` applied to a real archive: the zip itself,
 	## how many entries it holds, the shape of every path, and the bytes each entry

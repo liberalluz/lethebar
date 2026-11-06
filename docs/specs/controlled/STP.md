@@ -4,7 +4,7 @@ English · [简体中文](STP.zh-CN.md)
 
 ## Scope
 
-Covers the forty P1 requirements of `SRS.md` (v0.0.0) against the design in
+Covers the forty-one P1 requirements of `SRS.md` (v0.0.0) against the design in
 `SDD.md`. Does not cover the plugin market, the plugin editor, 3D, multiplayer,
 accounts, cloud saves, or the native iOS build; those are out of scope for
 v0.0.0 and have no tests here by design.
@@ -83,6 +83,7 @@ claims: if they fail, the architecture claim fails, not just a feature.
 | `TC-ASSET-001` | `REQ-019` | A package declaring a picture and a sound shows the picture in a band above the text at a non-zero size and plays the sound on entry; a package declaring no picture leaves no empty band; a declared-but-missing file leaves a placeholder and one `R-01` warning without aborting. |
 | `TC-I18N-002` | `REQ-035` | The menu label, the rank title, a labelled resource and the reason a run ended all read from the package table for the locale, a locale with no table keeps the package text, a key the table leaves out falls back instead of blanking, and a table that covers the scene but not the menu is refused by `V-22`. |
 | `TC-COLLECTION-001` | `REQ-040` | Two packs that name the same world offer one world and the world screen sits between landing and packs; a shell with one world opens the pack list directly; a world title follows the interface locale; a shell with no pack offers no world; the fallback world is titled by the interface; a second spelling of the same world installs with exactly one `W-04`; a world id that is not a slug and a world without a title are both refused with `V-32`. |
+| `TC-ASSEMBLY-001` | `REQ-041` | Two packages in one session show both sets of resources, the menu carries both sets of actions, a missing package is refused, a shared key keeps the first value with one warning, and a resume rebuilds both |
 | `TC-CARDS-001` | `REQ-036` | A package that declares a hand deals it, a card spends its cost and applies its effect as one turn, an unaffordable card is refused by name and stays in the hand, the three piles survive a save and a resume, and a deck naming an undeclared card, a card naming an undeclared resource and a claimed `cards.hand@1` without a deck file are refused at install with `V-38`, `V-37` and `V-36`. |
 | `TC-CARDS-002` | `REQ-037` | A card that names a texture its package declares shows that picture beside its label and reports it in the view, a card that names none is drawn without a picture, a declared texture whose bytes do not decode keeps the label and leaves one warning, and a card naming an icon no texture asset declares is refused at install with `V-39` naming the missing path. |
 | `TC-HAND-001` | `REQ-038` | A hand of eight wraps into rows inside the window, every card is laid out once, a wider window needs fewer rows, and a short hand keeps its whole label. |
