@@ -238,6 +238,16 @@ def main() -> int:
     if report.get("ok") and not interaction.get("savingSeen"):
         report["ok"] = False
         report["interactionFailure"] = "the save screen never said it was writing"
+    # REQ-031: the sentence a first visit reads, the cache answer, and no repeat.
+    if report.get("ok") and not str(interaction.get("notice") or "").strip():
+        report["ok"] = False
+        report["interactionFailure"] = "a first visit did not say what it was downloading"
+    if report.get("ok") and interaction.get("cacheControlled") is not True:
+        report["ok"] = False
+        report["interactionFailure"] = "the page never learned whether the worker kept the payload"
+    if report.get("ok") and str(interaction.get("noticeAfterReload") or "").strip():
+        report["ok"] = False
+        report["interactionFailure"] = "the first-visit notice came back after a reload"
     # TC-ASSET-001: the browser decodes the picture itself. The desktop suite can
     # only say that a texture exists; this says the first scene filled a slot.
     if report.get("ok") and "scene" not in (interaction.get("pictures") or []):

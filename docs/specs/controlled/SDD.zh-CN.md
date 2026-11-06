@@ -376,6 +376,19 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 的一局显示阶段机给出的原因，并且不再给任何动作按钮；没有动作的包与本节出现之前
 渲染得一模一样。
 
+### 11.4 首次访问说明将要下载什么
+
+载荷约 42 MB，由生成的 service worker 缓存，而不是页面自己缓存。落地页因此
+在每个 profile 上只说一次体量，而且是在打开任何场景之前：它要求玩家保持标签页
+开着——在 iOS 上切走标签页会暂停传输，浏览器可能把它丢掉。这句话出现之后写进
+`user://welcome.txt`，回头的玩家不会再读一遍。
+
+载荷到底有没有落地，由 worker 报告，页面不猜。导出时往 `index.html` 注入一段探针：
+它通过 `MessageChannel` 向 worker 询问 `lethebar-cache-state`，并把结果发布为
+`window.lethebarCache`（`controlled`、`stored`、`error`、`ready`）。渲染层在落地页读取
+这个对象；当 `error` 非空时，它用失败信息替换首访那句话，并带上 Cache API 给出的原因。
+写入失败于是会出现在界面里，而不是只出现在没人打开的 console 里。
+
 ## 12. 需求映射
 
 | REQ | 设计 |
@@ -410,6 +423,7 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 | `REQ-028` | §7.4 存储、§7.5 落盘（`SaveStore` 的落盘请求与探针）、`app/core/save_store.gd` |
 | `REQ-029` | §4.2 校验（`V-27`、`W-03`）、`docs/specs/capabilities.md`、`PackageValidator.KNOWN_CAPABILITIES` |
 | `REQ-030` | §4.2 校验（`V-28`–`V-30`）、`app/core/package_limits.gd`、加载器的信封检查 |
+| `REQ-031` | §11.4 首访提示、`infra/export_web.py` 的缓存探针 |
 
 ## 13. 决策与待定
 

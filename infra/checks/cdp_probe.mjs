@@ -166,12 +166,19 @@ async function settle() {
 }
 
 const bootSamples = [];
+// The notice belongs to the first visit only, so it has to be read on the first
+// load. The later reloads are the evidence that it does not come back.
+let firstNotice = "";
 for (let run = 0; run < reloads; run += 1) {
   loaded = false;
   await onSession("Page.navigate", { url });
   for (let attempt = 0; attempt < 80 && !loaded; attempt += 1) await sleep(250);
   const settled = loaded ? await settle() : null;
   if (settled !== null) bootSamples.push(settled);
+  if (run === 0) {
+    await waitState((state) => state.screen === "landing" && typeof state.notice === "string", 240);
+    firstNotice = String((((await appState()) || {}).notice) || "");
+  }
   trace(`run ${run + 1}/${reloads}: ${settled === null ? "no settled frame" : `${settled} ms`}`);
 }
 
@@ -327,9 +334,21 @@ const interaction = {
   offline: false,
   pictures: [],
   hitsInside: false,
+  notice: "",
+  cacheControlled: false,
 };
 
 if (landingScreen === "landing") {
+  // A first visit has to say what is being downloaded; the same profile must not
+  // say it twice. Both facts are read from the shell's own state, so a rebuild
+  // that drops the sentence fails here rather than passing quietly (REQ-031).
+  await waitState((state) => typeof state.notice === "string", 240);
+  interaction.notice = firstNotice;
+  const cacheReady = await waitState(
+    (state) => Boolean(state.cache && state.cache.controlled),
+    480
+  );
+  interaction.cacheControlled = Boolean(cacheReady);
   const stories = ((await appState()) || {}).stories || [];
   interaction.plugins = stories.length > 0;
   // A story may declare no pictures at all, and then the band is empty on
@@ -463,6 +482,9 @@ let language = { attempted: false, switched: false, persisted: false, restored: 
     await onSession("Page.navigate", { url });
     await waitState((state) => state.screen === "landing");
     language.persisted = ((await appState()) || {}).locale === after;
+    // The first visit is over once the browser has seen the notice; a reload in
+    // the same profile must not show it again (REQ-031).
+    interaction.noticeAfterReload = String((((await appState()) || {}).notice) || "");
 
     if (await pressSwitch()) {
       language.restored = ((await appState()) || {}).locale === before;
@@ -625,6 +647,13 @@ const importOk = importZip ? interaction.imported && offline.importedRestored ==
 // A download link must reach the network. When the document fallback answered
 // every navigation, `/lethebar/test-pack.zip` opened the game instead of the file.
 const directFileOk = directFile.servedGame === false;
+// REQ-031: the first visit says what is coming and the browser told the page it
+// kept the payload; the reload that proves the language choice also proves the
+// notice does not come back.
+const bootOk =
+  String(interaction.notice || "").length > 0 &&
+  interaction.cacheControlled === true &&
+  String(interaction.noticeAfterReload || "") === "";
 
 const ok =
   loaded &&
@@ -638,6 +667,7 @@ const ok =
   offlineOk &&
   importOk &&
   directFileOk &&
+  bootOk &&
   language.attempted &&
   language.switched &&
   language.persisted &&

@@ -78,6 +78,17 @@ var _writing := false
 const FLUSH_MS := 1500
 var _flush_started := 0
 
+## The browser's answer to "did you keep the payload": the page shim publishes
+## it on `window.lethebarCache`, the shell polls it the way it polls the locale.
+var _cache_state: Dictionary = {}
+
+## The notice is shown once per browser; a cleared profile shows it again.
+const WELCOME_PATH := "user://welcome.txt"
+var _welcome_seen := false
+
+## What the landing screen shows, mirrored into `lethebarState` for the probe.
+var _visible_notice := ""
+
 
 func _ready() -> void:
 	_build_chrome()
@@ -86,6 +97,7 @@ func _ready() -> void:
 	_install_builtins()
 	_connect_import_bridge()
 	_connect_flush_bridge()
+	_read_welcome()
 	show_landing()
 
 
@@ -113,8 +125,69 @@ func show_landing() -> String:
 	# The interface is translated, so the player needs a way to say "not my
 	# language" without changing the browser.
 	_options.add_child(_button(_language_label(), toggle_language))
+	var fresh := notice_text()
+	if fresh != "":
+		_visible_notice = fresh
+		# One line, above the buttons, never a modal: a first visit needs to know
+		# that 42 MB is arriving and that switching tabs may waste it (REQ-031).
+		_sub.text = "%s\n%s" % [_sub.text, fresh]
+		_remember_welcome()
+	elif _visible_notice != "":
+		# The page answers the cache question a frame or two after the first
+		# paint; the sentence it replaces must stay until the player leaves this
+		# screen, or the notice would blink away in front of them.
+		_sub.text = "%s\n%s" % [_sub.text, _visible_notice]
 	_announce()
 	return screen
+
+
+func notice_text() -> String:
+	## A failed cache write first (the player can act on it), then the size, once.
+	var error := String(_cache_state.get("error", ""))
+	if error != "":
+		return Locale.text("ui.cache_failed") % error
+	if _welcome_seen:
+		return ""
+	var text := Locale.text("ui.first_visit") % payload_label()
+	if _is_ios_safari():
+		text = "%s %s" % [text, Locale.text("ui.install_hint")]
+	return text
+
+
+func payload_label() -> String:
+	## The page publishes this build's exact size; a build without the shim keeps
+	## the measured fallback rather than guessing small.
+	var bytes := int(_cache_state.get("bytes", 0))
+	if bytes <= 0:
+		return "42 MB"
+	return "%.0f MB" % (float(bytes) / (1024.0 * 1024.0))
+
+
+func _is_ios_safari() -> bool:
+	## Only the iPhone and iPad need the home-screen hint; a browser that is
+	## already installed runs in standalone mode and has nothing to add.
+	if not OS.has_feature("web"):
+		return false
+	var answer := str(JavaScriptBridge.eval(
+		"(/iPhone|iPad/.test(navigator.userAgent) && !navigator.standalone) ? 1 : 0", true
+	))
+	return answer == "1"
+
+
+func _remember_welcome() -> void:
+	if _welcome_seen:
+		return
+	_welcome_seen = true
+	var file := FileAccess.open(WELCOME_PATH, FileAccess.WRITE)
+	if file != null:
+		file.store_string("seen\n")
+		file.close()
+
+
+func _read_welcome() -> void:
+	if _welcome_seen:
+		return
+	_welcome_seen = FileAccess.file_exists(WELCOME_PATH)
 
 
 func show_loads() -> String:
@@ -329,6 +402,25 @@ func poll_saves() -> void:
 
 func _process(_delta: float) -> void:
 	poll_saves()
+	_poll_cache_state()
+
+
+func _poll_cache_state() -> void:
+	## The shim answers once per load; until it does, the notice cannot know
+	## whether the browser kept the payload, so the shell keeps asking rather than
+	## blocking the first frame on a round trip to the worker.
+	if bool(_cache_state.get("ready", false)) or not OS.has_feature("web"):
+		return
+	var raw := str(JavaScriptBridge.eval("JSON.stringify(window.lethebarCache || null)", true))
+	if raw.is_empty() or raw == "null":
+		return
+	var parsed: Variant = JSON.parse_string(raw)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	_cache_state = parsed
+	_cache_state["ready"] = true
+	if screen == SCREEN_LANDING:
+		show_landing()
 
 
 func load_from(slot: int) -> Dictionary:
@@ -536,6 +628,12 @@ func _announce() -> void:
 			"pictures": _picture_slots.duplicate(),
 			"status": "" if _status == null else _status.text,
 			"saving": _saving_slot > 0 or _writing,
+			"notice": _visible_notice if screen == SCREEN_LANDING else "",
+			"cache": {
+				"controlled": bool(_cache_state.get("controlled", false)),
+				"stored": _cache_state.get("stored", []),
+				"error": String(_cache_state.get("error", "")),
+			},
 		}
 		JavaScriptBridge.eval("window.lethebarState = %s;" % JSON.stringify(state), true)
 	# Layout is only settled after the frame that added the buttons, so the hit
