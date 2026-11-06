@@ -4,7 +4,7 @@ English · [简体中文](STP.zh-CN.md)
 
 ## Scope
 
-Covers the thirty-four P1 requirements of `SRS.md` (v0.0.0) against the design in
+Covers the thirty-five P1 requirements of `SRS.md` (v0.0.0) against the design in
 `SDD.md`. Does not cover the plugin market, the plugin editor, 3D, multiplayer,
 accounts, cloud saves, or the native iOS build; those are out of scope for
 v0.0.0 and have no tests here by design.
@@ -74,7 +74,7 @@ claims: if they fail, the architecture claim fails, not just a feature.
 | `TC-PROTO-002` | `REQ-010` | A plugin declaring a power-supply and a progress mechanic shows both effects in the session readout; a plugin declaring none shows neither. |
 | `TC-SAVE-001` | `REQ-012` | Three slots are writable and independently readable; saving to slot 2 then loading slot 1 returns slot 1's node, and vice versa. |
 | `TC-SAVE-002` | `REQ-013` | A save payload with `schema: 2.0.0` is refused with a visible message; the slot is not overwritten and the game stays playable. |
-| `TC-BUILTIN-001` | `REQ-014` | The built-in Sanguo plugin starts, completes all three decision turns, reaches its end node, and can be saved and resumed at the recorded node. Every Chinese string it renders is drawn as glyphs, not boxes, and the font covers every character the package uses. |
+| `TC-BUILTIN-001` | `REQ-014`, `REQ-034` | The built-in Sanguo plugin installs and starts a run budgeted at twenty-four turns over four resources, shows the five ranks as the turn number passes them, offers its five actions, loses three declared ways (the case plays a run to the grain loss and reads the reason), moves a relation by rule, saves and resumes mid-run with the turn, the resources and the relation intact, and reads English in an English session. Every Chinese string it renders is drawn as glyphs, not boxes, and the font covers every character the package uses. |
 | `TC-BUILTIN-002` | `REQ-015` | The built-in Xiuxian plugin starts, reaches its end node, and can be saved and resumed; if cut per `SRS.md` §4 this row records "not delivered", not "failed". |
 | `TC-DET-001` | `REQ-016` | The same choice sequence with the same seed produces a byte-identical session snapshot on two runs, and a different seed produces a different one. |
 | `TC-PERF-001` | `REQ-008` | From plugin selection to the first interactive scene is ≤ 5 s on E2 with a warm cache, measured as the median of three runs. |

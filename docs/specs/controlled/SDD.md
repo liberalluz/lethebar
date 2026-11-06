@@ -382,8 +382,10 @@ Both are authored as ordinary plugin packages, with no engine-side special case.
 
 ### 10.1 三国 (`sanguo`)
 
-Protocol `turn_based@1`. One segment: entry scene, three decision rounds, one
-mechanic (power supply), save/resume at any node boundary.
+Protocol `turn_based@1`. One run over twenty-four turns with four resources
+(grain, troops, coin, standing), five ranks, three ways to lose and a menu of
+five actions; rules move the relations between three neighbours. Save/resume at
+any turn boundary (REQ-034).
 
 ### 10.2 修仙 (`xiuxian`)
 
@@ -507,6 +509,7 @@ the interface language like the rest of the screen.
 | `REQ-031` | §11.4 first-visit notice, `infra/export_web.py` cache probe |
 | `REQ-032` | §4.2 `V-31`, `app/core/mechanics.gd` relation changes, `app/core/session.gd` writer and payload field |
 | `REQ-033` | §11.5 situation reading, `app/core/session.gd` `situation()`, `app/render/shell.gd` readout |
+| `REQ-034` | §10.1 the Sanguo run, `content/builtin/sanguo/**` data only |
 
 ## 13. Decisions and open questions
 

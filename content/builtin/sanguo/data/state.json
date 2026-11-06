@@ -1,13 +1,15 @@
 {
   "resources": [
-    {"id": "power", "label": "power", "init": 0, "min": 0, "max": 10},
+    {"id": "grain", "label": "粮草", "init": 40, "min": 0, "max": 100},
+    {"id": "troops", "label": "兵员", "init": 30, "min": 0, "max": 100},
+    {"id": "coin", "label": "金帛", "init": 12, "min": 0, "max": 60},
     {
       "id": "standing",
-      "label": "standing",
-      "init": 0,
+      "label": "声望",
+      "init": 1,
       "min": 0,
-      "max": 2,
-      "labels": {"0": "兵微将寡", "1": "初露锋芒", "2": "名动诸侯"}
+      "max": 4,
+      "labels": {"0": "众叛亲离", "1": "兵微将寡", "2": "初露锋芒", "3": "名动诸侯", "4": "号令天下"}
     }
   ]
 }

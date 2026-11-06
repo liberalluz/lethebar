@@ -179,15 +179,23 @@ path, so the case survives fixture renames.
 
 ### `TC-BUILTIN-001`
 
-- Covers: `REQ-014`
+- Covers: `REQ-014`, `REQ-034`
 - Preconditions: Sanguo listed as a built-in plugin; fresh session.
 - Steps:
-  1. Start Sanguo.
-  2. Make the three decision turns, recording each chosen option.
-  3. Reach the end node.
-  4. Save to slot 1, reload, load slot 1.
-- Exit: all three turns are playable, the end node is reached and shows its text,
-  and the resumed session starts at the saved end node.
+  1. Start Sanguo and read the view: four resources, the turn budget, the rank
+     and the menu.
+  2. Take `farm`; read the grain and the turn number.
+  3. Take `envoys` twice; read the standing and the relation between Cao and
+     Shao.
+  4. Save to slot 1, reload, load slot 1; compare the turn, the grain and the
+     relation.
+  5. Start a second run and take `recruit` until the run ends; read the reason.
+  6. Start an English session and read the opening text.
+- Exit: the run is budgeted at twenty-four turns over four resources and five
+  ranks, `farm` feeds the army and spends a turn, the relation moves once the
+  standing crosses the declared threshold, the resumed run keeps the turn, the
+  resources and the relation, the second run ends by running out of grain and
+  says so, and the English session reads English.
 
 ### `TC-BUILTIN-002`
 
