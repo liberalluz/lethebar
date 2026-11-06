@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.2.1 - 2026-11-06
+
+### Changed
+- `SaveStore.resume()` takes the locale as an option. The save keeps the run, not the preference, so a payload written before this change still resumes — in the package's text.
+
+### Fixed
+- A run resumed from a save slot reads in the locale of the interface instead of falling back to the package's own text, so an English interface no longer opens a Chinese scene after `Continue`.
+
 ## v0.2.0 - 2026-11-06
 
 ### Added
