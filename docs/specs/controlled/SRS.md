@@ -49,6 +49,7 @@ second.
 | `REQ-030` | A package is held to a published install-time envelope. | The archive, its entry count, every entry path and every entry's unpacked bytes are inside the limits in `docs/decisions/0009-package-trust.md`; a picture past 4096 px on an edge and audio past 2 MB or 60 seconds are refused by name; the refusal says what was measured and what the limit was. |
 | `REQ-031` | A first visit says what it is downloading and whether the browser kept it. | The landing screen names the payload size once per profile and asks the player to keep the tab open; a cache write that fails is reported with its reason instead of being silent; a reload in the same profile does not repeat the sentence. |
 | `REQ-032` | A rule can move a relation, and a save keeps the result. | A rule names a pair the package declared and an `add` or `value` change; the session is the only writer of the faction map; the moved value survives a save and a resume; a rule that names an undeclared entity or a non-numeric change is refused at install with `V-31`. |
+| `REQ-033` | The scene states how the run stands. | The view carries the turns left, the entity the others lean toward, the entity they push against, and the resource closest to its declared floor; each section appears only when its source is declared; the scene draws one line from the catalog. |
 
 
 ## 3. Out of scope for v0.0.0

@@ -1076,9 +1076,37 @@ func _readout(view: Dictionary) -> String:
 		for item in items:
 			names.append(String(item))
 		parts.append(Locale.text("ui.drawn") % ", ".join(names))
+	if view.has("situation"):
+		# How the run stands, read from the same view the buttons use (REQ-033):
+		# the time left, who is leaned toward, who is pushed against, what is
+		# close to its floor. Every number came from the package, not from here.
+		var reading: Dictionary = view["situation"]
+		var entity_labels := _entity_labels(view)
+		if reading.has("turnsLeft"):
+			parts.append(Locale.text("ui.turns_left") % int(reading["turnsLeft"]))
+		if reading.has("leaning"):
+			var leaned := String(reading["leaning"])
+			parts.append(Locale.text("ui.leaning") % String(entity_labels.get(leaned, leaned)))
+		if reading.has("friction"):
+			var pushed := String(reading["friction"])
+			parts.append(Locale.text("ui.friction") % String(entity_labels.get(pushed, pushed)))
+		if reading.has("tight"):
+			var tight := String(reading["tight"])
+			parts.append(Locale.text("ui.tight") % String(labels.get(tight, tight)))
 	if parts.is_empty():
 		return ""
 	return " · ".join(parts)
+
+
+func _entity_labels(view: Dictionary) -> Dictionary:
+	## The scene shows the label a package gave an entity, and falls back to the
+	## id so a missing label is still something the player can read.
+	var out := {}
+	for entity in view.get("factions", []):
+		if not (entity is Dictionary):
+			continue
+		out[String(entity.get("id", ""))] = String(entity.get("label", entity.get("id", "")))
+	return out
 
 
 func _context() -> Dictionary:

@@ -4,7 +4,7 @@ English · [简体中文](STP.zh-CN.md)
 
 ## Scope
 
-Covers the thirty-three P1 requirements of `SRS.md` (v0.0.0) against the design in
+Covers the thirty-four P1 requirements of `SRS.md` (v0.0.0) against the design in
 `SDD.md`. Does not cover the plugin market, the plugin editor, 3D, multiplayer,
 accounts, cloud saves, or the native iOS build; those are out of scope for
 v0.0.0 and have no tests here by design.
@@ -93,6 +93,7 @@ claims: if they fail, the architecture claim fails, not just a feature.
 | `TC-SAVE-003` | `REQ-028` | A save is reported finished only after storage says it has nothing left to flush, and the slot screen shows the wait. |
 | `TC-CAP-001` | `REQ-029` | A package that names a capability the engine does not provide is refused, the refusal names it, and a 1.0.0 package with a bare name still installs with one warning. |
 | `TC-SAFE-001` | `REQ-030` | A package outside the envelope is refused by code (V-28 size or count, V-29 path, V-30 asset) with the measured value named, and a package inside it still installs. |
+| `TC-SITUATION-001` | `REQ-033` | The view carries turns left, the entity others lean toward, the entity they push against and the resource closest to its floor; each section disappears when its source is not declared; the scene draws one line that follows the interface language, and a finished run reports zero turns left. |
 | `TC-REL-002` | `REQ-032` | A rule moves a relation the package declared, the moved value survives a save and a resume, a package that writes no relation behaves as before, and a rule naming an undeclared entity or a non-numeric change is refused with `V-31`. |
 | `TC-BOOT-001` | `REQ-031` | A first visit names the payload size and asks for the tab to stay open, the page reports whether the worker kept the payload, and a reload does not repeat the notice. |
 | `TC-BUILTIN-003` | `TC-BUILTIN-001`, `TC-WIRE-001` | A third shipped story, written only as data, installs and is played to an ending: the scene draws one button per declared action, the first turn shows the declared rank, drawing from the pool unlocks the action waiting on the item, playing on ends the run with the declared failure reason, and an English session reads the English table, all without a change under `app/core`. |

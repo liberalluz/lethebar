@@ -390,6 +390,17 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 这个对象；当 `error` 非空时，它用失败信息替换首访那句话，并带上 Cache API 给出的原因。
 写入失败于是会出现在界面里，而不是只出现在没人打开的 console 里。
 
+### 11.5 场景说明这一局现在是什么局势
+
+决定一回合的有三个数，场景一个都没显示。`Session.situation()` 把它们读一次：
+`turnsLeft` 来自 `phases.turns` 与当前回合；`leaning` 与 `friction` 来自每个实体
+收到的关系之和；`tight` 来自每个资源在其声明区间里还剩的比例。引擎不点名任何
+阈值、回合上限或资源：所有数都来自包裹，来源未被声明的小节直接不出现，而不是
+填一个零。
+
+场景把这份读数作为读数行的又一段打印出来，走 `ui.turns_left`、`ui.leaning`、
+`ui.friction`、`ui.tight`，所以这一行和界面其余部分一样跟随界面语言。
+
 ## 12. 需求映射
 
 | REQ | 设计 |
@@ -425,6 +436,7 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 | `REQ-029` | §4.2 校验（`V-27`、`W-03`）、`docs/specs/capabilities.md`、`PackageValidator.KNOWN_CAPABILITIES` |
 | `REQ-030` | §4.2 校验（`V-28`–`V-30`）、`app/core/package_limits.gd`、加载器的信封检查 |
 | `REQ-032` | §4.2 `V-31`、`app/core/mechanics.gd` 的关系变化、`app/core/session.gd` 的唯一写入点与载荷字段 |
+| `REQ-033` | §11.5 局势读数、`app/core/session.gd` 的 `situation()`、`app/render/shell.gd` 的读数行 |
 | `REQ-031` | §11.4 首访提示、`infra/export_web.py` 的缓存探针 |
 
 ## 13. 决策与待定

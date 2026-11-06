@@ -38,3 +38,7 @@ ui.saving	Saving…
 ui.first_visit	First visit downloads about %s. Keep this tab open until it finishes.
 ui.install_hint	On an iPhone, add this page to your home screen to keep it offline.
 ui.cache_failed	This browser did not keep the download (%s), so the next visit fetches it again.
+ui.turns_left	turns left: %d
+ui.leaning	leaning: %s
+ui.friction	friction: %s
+ui.tight	tightest: %s
