@@ -76,6 +76,7 @@ func _initialize() -> void:
 	_case_card_art()
 	_case_hand_layout()
 	_case_shuffle()
+	_case_collection()
 	_case_limits()
 	_case_boot()
 	_case_assets()
@@ -2823,6 +2824,103 @@ func _case_shuffle() -> void:
 		"TC-SHUFFLE-001: the resume keeps the deck order the save carries",
 		resumed != null and str(resumed.deck) == str(first.deck),
 		"save %s, resume %s" % [str(first.deck), str(resumed.deck) if resumed != null else "none"],
+	)
+
+
+func _case_collection() -> void:
+	# A repository is cut by world, and a world holds several packs. The screen
+	# has to say so before the player picks a story; a single world keeps the
+	# one-click path a repository with one theme has today (ADR-0012).
+	_section("TC-COLLECTION-001 a package says which world it belongs to")
+	var shell := _shell()
+	shell.builtin_ids = ["sanguo", "jianghu"]
+	_check(
+		"TC-COLLECTION-001: packs that share a world offer one world",
+		shell.worlds().size() == 2,
+		str(shell.worlds()),
+	)
+	_check(
+		"TC-COLLECTION-001: two worlds put the world screen between landing and packs",
+		shell.start_game() == "worlds",
+		shell.screen_name(),
+	)
+	Locale.set_current("en")
+	_check(
+		"TC-COLLECTION-001: a world title comes from the package that declares it",
+		shell.world_title("three-kingdoms") == "Three Kingdoms",
+		shell.world_title("three-kingdoms"),
+	)
+	Locale.set_current("zh-CN")
+	_check(
+		"TC-COLLECTION-001: a world title follows the interface locale",
+		shell.world_title("three-kingdoms") == "三国",
+		shell.world_title("three-kingdoms"),
+	)
+	Locale.set_current("en")
+
+	var one := _shell()
+	one.builtin_ids = ["sanguo"]
+	_check(
+		"TC-COLLECTION-001: one world skips the world screen",
+		one.worlds().size() == 1 and one.start_game() == "plugins",
+		"%d, %s" % [one.worlds().size(), one.screen_name()],
+	)
+	var none := _shell()
+	none.builtin_ids = []
+	_check(
+		"TC-COLLECTION-001: a shell with no pack offers no world",
+		none.worlds().is_empty() and none.start_game() == "plugins",
+		"%d, %s" % [none.worlds().size(), none.screen_name()],
+	)
+	_check(
+		"TC-COLLECTION-001: the fallback world is titled by the interface",
+		none.world_title("") == "Other stories",
+		none.world_title(""),
+	)
+
+	# Two packages that describe the same world differently are one world, and the
+	# title is stable: the pack whose id sorts first supplies it.
+	var first := _package("world-a", {
+		"id": "world-a",
+		"name": "World A",
+		"collection": {"id": "three-kingdoms", "names": {"en": "Three Kingdoms", "zh-CN": "三国"}},
+	})
+	var second := _package("world-b", {
+		"id": "world-b",
+		"name": "World B",
+		"collection": {"id": "three-kingdoms", "names": {"en": "The Three Kingdoms"}},
+	})
+	var loader := PackageLoader.new()
+	var installed: Dictionary = loader.import_bytes(first, _context())
+	var again: Dictionary = loader.import_bytes(second, _context())
+	var w04 := 0
+	for warning in again.get("warnings", []):
+		if String(warning.get("code", "")) == "W-04":
+			w04 += 1
+	_check("TC-COLLECTION-001: the second package installs", again["status"] == "installed", str(again.get("code", "")))
+	_check("TC-COLLECTION-001: two spellings leave one W-04", w04 == 1, str(again.get("warnings", [])))
+
+	var off := _package("world-off", {
+		"id": "world-c",
+		"name": "World C",
+		"collection": {"id": "Three Kingdoms", "names": {"en": "Three Kingdoms"}},
+	})
+	var refusal: Dictionary = loader.import_bytes(off, _context())
+	_check(
+		"TC-COLLECTION-001: an id that is not a slug is refused with V-32",
+		String(refusal.get("code", "")) == "V-32",
+		str(refusal.get("code", "")),
+	)
+	var empty := _package("world-empty", {
+		"id": "world-d",
+		"name": "World D",
+		"collection": {"id": "three-kingdoms", "names": {}},
+	})
+	var blank: Dictionary = loader.import_bytes(empty, _context())
+	_check(
+		"TC-COLLECTION-001: a world without a title is refused with V-32",
+		String(blank.get("code", "")) == "V-32",
+		str(blank.get("code", "")),
 	)
 
 

@@ -180,6 +180,7 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 	check_context["factions"] = data["factions"]
 	check_context["hand"] = data["hand"]
 	check_context["installed"] = registry.versions()
+	check_context["collections"] = registry.collections()
 	if not check_context.has("protocols"):
 		check_context["protocols"] = ProtocolRegistry.known_ids()
 

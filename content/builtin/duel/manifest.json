@@ -7,19 +7,60 @@
   "engine": ">=4.7.0 <5.0.0",
   "name": "校场决斗",
   "defaultLocale": "zh-CN",
-  "locales": ["en"],
-  "names": {"zh-CN": "校场决斗", "en": "Duel at the drill ground"},
+  "locales": [
+    "en"
+  ],
+  "names": {
+    "zh-CN": "校场决斗",
+    "en": "Duel at the drill ground"
+  },
   "protocol": "linear@1",
-  "capabilities": ["cards.hand@1", "ledger@1", "phases@1", "text@1"],
+  "capabilities": [
+    "cards.hand@1",
+    "ledger@1",
+    "phases@1",
+    "text@1"
+  ],
   "mechanics": [],
   "entry": "table",
   "saveSchema": 1,
   "assets": [
-    {"type": "texture", "path": "assets/card-heavy.png", "slot": "card"},
-    {"type": "texture", "path": "assets/card-strike.png", "slot": "card"},
-    {"type": "texture", "path": "assets/card-feint.png", "slot": "card"},
-    {"type": "texture", "path": "assets/card-breathe.png", "slot": "card"},
-    {"type": "texture", "path": "assets/card-charge.png", "slot": "card"},
-    {"type": "texture", "path": "assets/card-parry.png", "slot": "card"}
-  ]
+    {
+      "type": "texture",
+      "path": "assets/card-heavy.png",
+      "slot": "card"
+    },
+    {
+      "type": "texture",
+      "path": "assets/card-strike.png",
+      "slot": "card"
+    },
+    {
+      "type": "texture",
+      "path": "assets/card-feint.png",
+      "slot": "card"
+    },
+    {
+      "type": "texture",
+      "path": "assets/card-breathe.png",
+      "slot": "card"
+    },
+    {
+      "type": "texture",
+      "path": "assets/card-charge.png",
+      "slot": "card"
+    },
+    {
+      "type": "texture",
+      "path": "assets/card-parry.png",
+      "slot": "card"
+    }
+  ],
+  "collection": {
+    "id": "three-kingdoms",
+    "names": {
+      "en": "Three Kingdoms",
+      "zh-CN": "三国"
+    }
+  }
 }

@@ -47,5 +47,12 @@
   ],
   "clock": {
     "per": "turn"
+  },
+  "collection": {
+    "id": "three-kingdoms",
+    "names": {
+      "en": "Three Kingdoms",
+      "zh-CN": "三国"
+    }
   }
 }

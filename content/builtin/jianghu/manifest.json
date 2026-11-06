@@ -7,12 +7,26 @@
   "engine": ">=4.7.0 <5.0.0",
   "name": "江湖夜雨",
   "defaultLocale": "zh-CN",
-  "locales": ["en"],
-  "names": {"zh-CN": "江湖夜雨", "en": "Rain over the Jianghu"},
+  "locales": [
+    "en"
+  ],
+  "names": {
+    "zh-CN": "江湖夜雨",
+    "en": "Rain over the Jianghu"
+  },
   "protocol": "linear@1",
-  "capabilities": ["text@1"],
+  "capabilities": [
+    "text@1"
+  ],
   "mechanics": [],
   "entry": "inn",
   "saveSchema": 1,
-  "assets": []
+  "assets": [],
+  "collection": {
+    "id": "jianghu",
+    "names": {
+      "en": "The Jianghu",
+      "zh-CN": "江湖"
+    }
+  }
 }

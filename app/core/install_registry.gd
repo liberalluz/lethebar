@@ -25,6 +25,20 @@ func versions() -> Dictionary:
 	return out
 
 
+func collections() -> Dictionary:
+	## The worlds the installed packages declare, keyed by package id. V-32 and
+	## W-04 look at this instead of at `versions()`, which only keeps numbers.
+	var out: Dictionary = {}
+	for plugin_id in _entries:
+		var manifest: Variant = _entries[plugin_id].get("manifest", {})
+		if not (manifest is Dictionary):
+			continue
+		var row := ManifestSchema.collection_of(manifest as Dictionary)
+		if not row.is_empty():
+			out[plugin_id] = row
+	return out
+
+
 func count() -> int:
 	return _entries.size()
 

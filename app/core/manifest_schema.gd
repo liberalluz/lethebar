@@ -49,6 +49,25 @@ const ID_PATTERN := "^[a-z0-9-]+$"
 const SEMVER_PATTERN := "^(\\d+)\\.(\\d+)\\.(\\d+)$"
 const ENGINE_RANGE_PATTERN := "^>=(\\d+\\.\\d+\\.\\d+) <(\\d+\\.\\d+\\.\\d+)$"
 
+## A world id is a slug, and its titles are locale -> text. A package that names
+## the world it belongs to lets the landing screen offer worlds first
+## (ADR-0012); a package that names none belongs to the fallback world.
+const COLLECTION_ID_PATTERN := "^[a-z0-9-]+$"
+
+
+static func is_collection_id(value: Variant) -> bool:
+	## A world id uses the same alphabet as a package id.
+	return value is String and is_id(value as String)
+
+
+static func collection_of(manifest: Dictionary) -> Dictionary:
+	## The shape alone: an empty dictionary means the package declares no world,
+	## and a malformed one is left for V-32 to name.
+	var row: Variant = manifest.get("collection", null)
+	if row is Dictionary:
+		return row
+	return {}
+
 const ASSET_TYPES := ["texture", "audio", "text"]
 
 ## A capability id is `name@major` (ADR-0008): a lowercase dotted name and a
