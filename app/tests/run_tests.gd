@@ -74,6 +74,7 @@ func _initialize() -> void:
 	_case_capabilities()
 	_case_cards()
 	_case_card_art()
+	_case_hand_layout()
 	_case_limits()
 	_case_boot()
 	_case_assets()
@@ -2588,6 +2589,111 @@ func _case_card_art() -> void:
 			if entry is Dictionary and entry.has("icon"):
 				icons[String(entry["icon"])] = true
 		_check("TC-CARDS-002: the shipped duel deck has one picture per card", icons.size() == 6, str(icons.keys()))
+
+
+func _long_hand_package(name: String) -> PackedByteArray:
+	## A hand deep enough to matter: eight cards with labels long enough that the
+	## extra width has to come from somewhere. The short-hand case reuses
+	## `_cards_package`, which holds two.
+	var cards: Array = []
+	var deck: Array = []
+	for index in 8:
+		cards.append({
+			"id": "card-%d" % index,
+			"label": "Order number %d, a long instruction the player has to read" % index,
+			"cost": {"coin": {"add": -1}},
+			"effects": [{"grain": {"add": 1}}],
+		})
+		deck.append("card-%d" % index)
+	var files := {
+		"data/state.json": JSON.stringify({
+			"resources": [
+				{"id": "grain", "init": 10, "min": 0, "max": 20},
+				{"id": "coin", "init": 9, "min": 0, "max": 9},
+			],
+		}).to_utf8_buffer(),
+		"data/phases.json": JSON.stringify({
+			"turns": 12,
+			"ranks": [{"at": 1, "title": "Captain"}],
+			"fail": [],
+		}).to_utf8_buffer(),
+		"data/cards.json": JSON.stringify({
+			"hand": {"size": 8, "draw_per_turn": 1, "reshuffle": true},
+			"cards": cards,
+			"deck": deck,
+		}).to_utf8_buffer(),
+	}
+	return _package(
+		name,
+		{"id": name, "entry": "c1", "capabilities": ["cards.hand@1", "ledger@1", "phases@1"], "mechanics": ["cards", "ledger", "phases"]},
+		[],
+		[],
+		{"nodes": [{"id": "c1", "text": "Eight orders wait on the table.", "choices": []}]},
+		{},
+		files,
+	)
+
+
+func _case_hand_layout() -> void:
+	# B41 drew one card per line; B43 added a face to each. A deck of eight — the
+	# duel deck is already eight — then carried the action buttons and the save
+	# row off the bottom of a narrow window. The property asserted here is that
+	# the hand wraps, and that wrapping is measured from the width rather than
+	# declared as a constant.
+	_section("TC-HAND-001 a long hand wraps into rows that stay inside the window")
+	var shell := _shell()
+	shell.set_layout_width(600.0)
+	shell.try_import(_long_hand_package("long-hand-run"))
+	if shell.session == null:
+		_check("TC-HAND-001: the long-hand package installs", false, str(shell.notice))
+		return
+	_check("TC-HAND-001: all eight cards are in hand", (shell.card_rows() as Array).size() == 8, str(shell.card_rows().size()))
+	var columns := shell.hand_columns()
+	_check("TC-HAND-001: a 600 px window fits more than one card per row", columns >= 2, "%d column(s)" % columns)
+	var rows := shell.hand_row_count()
+	_check("TC-HAND-001: the hand takes more than one row", rows > 1, "%d row(s)" % rows)
+	var drawn := 0
+	var widest := 0.0
+	for child in shell._hand_box.get_children():
+		var row := child as HBoxContainer
+		drawn += row.get_child_count()
+		_check(
+			"TC-HAND-001: a row holds no more cards than the window fits",
+			row.get_child_count() <= columns,
+			"%d card(s) in a row of %d columns" % [row.get_child_count(), columns]
+		)
+		widest = maxf(widest, row.get_combined_minimum_size().x)
+	_check("TC-HAND-001: every card is laid out once", drawn == 8, "%d card(s) drawn" % drawn)
+	_check("TC-HAND-001: a wrapped row fits the window", widest <= 600.0, "widest row asks %.1f px" % widest)
+	# A wider window has to re-wrap the same cards into fewer rows; a constant
+	# column count would pass the assertions above and fail this one.
+	shell.set_layout_width(1200.0)
+	_check(
+		"TC-HAND-001: a wider window needs fewer rows",
+		shell.hand_row_count() < rows,
+		"%d row(s) at 1200 px, %d at 600 px" % [shell.hand_row_count(), rows]
+	)
+	# The action menu and the save row still follow the hand, one column like
+	# before; the hand is the only thing that wrapped.
+	var options := shell._options.get_children()
+	_check(
+		"TC-HAND-001: the menu still follows the hand",
+		options.size() > 0 and options[options.size() - 1] is Button,
+		"%d child(ren) after the hand" % options.size()
+	)
+	# A hand that fits on one row keeps its whole label: the clip is a
+	# consequence of wrapping, not a property of cards.
+	shell.set_layout_width(600.0)
+	shell.try_import(_cards_package("short-hand-run"))
+	if shell.session != null:
+		_check("TC-HAND-001: a short hand stays on one row", shell.hand_row_count() == 1, "%d row(s)" % shell.hand_row_count())
+		var first: Button = shell._cell_button(shell._hand_cells[0] as Control)
+		_check(
+			"TC-HAND-001: a short hand keeps the whole label",
+			first != null and first.text == "Raid the stores",
+			first.text if first != null else "no button"
+		)
+
 
 
 func _case_wire() -> void:

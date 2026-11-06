@@ -14,6 +14,14 @@ const SLOT_COUNT := 3
 const SLOT_BUTTONS_WIDTH := 152.0
 ## Slot previews are stored with the save, so they are clipped at write time.
 const PREVIEW_CHARS := 24
+# The narrowest a card cell may get before the label turns into a column of one
+# word. The hand asks the window how many of these fit, which is the whole point
+# of the layout: the number is measured, never declared.
+const CARD_COLUMN_MIN := 190.0
+# A card that shares a row has less width for its label, so the label is cut at
+# this many characters once the hand wraps. A hand that fits on one row keeps
+# the whole label.
+const HAND_LABEL_CHARS := 18
 ## A card face is drawn beside its label, so it stays small enough for a
 ## narrow window to hold a hand of four (REQ-037).
 const CARD_ICON_SIZE := 48.0
@@ -52,6 +60,16 @@ var _heading: Label
 var _sub: RichTextLabel
 var _options: VBoxContainer
 var _card_rows: Array = []
+# A hand is laid out in rows of as many cards as the window fits, so a long hand
+# wraps instead of pushing the menu below the fold (REQ-038). The cells are kept
+# apart from the rows that hold them, because the rows are rebuilt whenever the
+# width changes.
+var _hand_box: VBoxContainer = null
+var _hand_cells: Array = []
+var _hand_columns := 0
+# Zero means "ask the viewport"; a headless shell has no viewport, so the case
+# hands the layout a width instead of guessing.
+var _layout_width := 0.0
 var _status: RichTextLabel
 var _margin: MarginContainer
 var _box: VBoxContainer
@@ -296,6 +314,8 @@ func play_card(card_id: String) -> Dictionary:
 
 func enter_session() -> Dictionary:
 	_card_rows.clear()
+	_hand_cells.clear()
+	_hand_box = null
 	screen = SCREEN_SESSION
 	_heading.text = Locale.text("ui.playing")
 	_clear_options()
@@ -324,6 +344,7 @@ func enter_session() -> Dictionary:
 				card_label = Locale.text("ui.blocked") % [card_label, card_reason]
 			var card_button := _button(card_label, play_card.bind(String(card.get("id", ""))))
 			card_button.disabled = not card_enabled
+			card_button.set_meta("label", card_label)
 			var icon_path := String(card.get("icon", ""))
 			var face := _card_texture(icon_path, view) if icon_path != "" else null
 			if face != null:
@@ -337,14 +358,22 @@ func enter_session() -> Dictionary:
 				row.add_child(picture)
 				card_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				row.add_child(card_button)
-				_options.add_child(row)
+				row.set_meta("full_label", card_label)
+				_hand_cells.append(row)
 			else:
-				_options.add_child(card_button)
+				card_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				card_button.set_meta("full_label", card_label)
+				_hand_cells.append(card_button)
 			_card_rows.append({
 				"id": String(card.get("id", "")),
 				"has_icon": face != null,
 				"path": icon_path,
 			})
+		if not _hand_cells.is_empty():
+			_hand_box = VBoxContainer.new()
+			_hand_box.add_theme_constant_override("separation", 6)
+			_options.add_child(_hand_box)
+			_fill_hand_rows()
 		for action in actions:
 			var enabled := bool(action.get("enabled", false))
 			var label := String(action.get("label", ""))
@@ -694,6 +723,10 @@ func _fit_text() -> void:
 	## grows the whole column far past the window (the probe caught every button
 	## sitting below the fold). Pinning the minimum width to the window solves it:
 	## the labels then measure their height against the width they really have.
+	# A resized window changes how many cards fit a row, so the hand is re-wrapped
+	# before anything is measured against it.
+	if _hand_box != null and hand_columns() != _hand_columns:
+		_fill_hand_rows()
 	var width := maxf(get_viewport_rect().size.x - 48.0, 120.0)
 	# The picture band takes a share of the window instead of a fixed 180 px: at
 	# 484 px that fixed height pushed the last button below the fold (the probe's
@@ -1023,6 +1056,81 @@ func card_rows() -> Array:
 	## a picture was drawn, and the path the card named (REQ-037). The headless
 	## smoke test reads it because a decoded texture has no text to assert on.
 	return _card_rows
+
+
+func set_layout_width(width: float) -> void:
+	## A headless shell has a viewport of zero, so geometry that reads the window
+	## would measure nothing. The case hands the layout a width instead; the game
+	## never calls this and keeps reading the viewport.
+	_layout_width = maxf(width, 0.0)
+	_fill_hand_rows()
+
+
+func hand_columns() -> int:
+	## How many cards a row holds at the current width. Measured, not declared:
+	## a narrow window keeps one card per row, a wide one takes several.
+	var width := _layout_width_available()
+	return clampi(int(floor(width / CARD_COLUMN_MIN)), 1, 12)
+
+
+func hand_row_count() -> int:
+	## Rows the hand currently occupies. Zero when no hand is drawn.
+	if _hand_box == null:
+		return 0
+	return _hand_box.get_child_count()
+
+
+func _layout_width_available() -> float:
+	if _layout_width > 0.0:
+		return _layout_width
+	return maxf(get_viewport_rect().size.x - 48.0, CARD_COLUMN_MIN)
+
+
+func _fill_hand_rows() -> void:
+	## Rebuilds the rows from the cells. Called when the scene is drawn and again
+	## whenever the width changes, so a resized window re-wraps the same cards in
+	## the same order instead of keeping yesterday's columns.
+	if _hand_box == null:
+		return
+	for child in _hand_box.get_children():
+		_hand_box.remove_child(child)
+		child.queue_free()
+	var columns := hand_columns()
+	var rows := int(ceil(float(_hand_cells.size()) / float(columns)))
+	var row: HBoxContainer = null
+	_hand_columns = columns
+	for index in _hand_cells.size():
+		if index % columns == 0:
+			row = HBoxContainer.new()
+			row.add_theme_constant_override("separation", 8)
+			_hand_box.add_child(row)
+		var cell := _hand_cells[index] as Control
+		if cell == null:
+			continue
+		# Every cell shares the row evenly, so a long label wraps inside its own
+		# column instead of taking width from its neighbours.
+		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var full := String(cell.get_meta("full_label", ""))
+		var button := _cell_button(cell)
+		if button != null and full != "":
+			button.text = _clip(full, HAND_LABEL_CHARS) if rows > 1 else full
+		# A cell that was never parented cannot be reparented, and a re-wrap has
+		# to work from either state: the first draw adds, a resize reparents.
+		if cell.get_parent() == null:
+			row.add_child(cell)
+		else:
+			cell.reparent(row)
+
+
+func _cell_button(cell: Control) -> Button:
+	## The button a hand cell holds, whether the cell is the button itself or a
+	## row of a picture and the button.
+	if cell is Button:
+		return cell as Button
+	for part in cell.get_children():
+		if part is Button:
+			return part as Button
+	return null
 
 
 func _card_texture(path: String, view: Dictionary) -> Texture2D:

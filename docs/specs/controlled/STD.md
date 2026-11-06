@@ -669,3 +669,22 @@ reads 2; `Charge` is refused with a message naming `edge` and the hand is unchan
   the second without; `art-broken` keeps both labels and leaves one warning that
   contains `card icon`; `art-bad` is refused with `V-39` and the message names
   `card-ghost.png`; every card in `duel` carries its own face.
+
+## TC-HAND-001 — a long hand wraps inside the window
+
+- Covers: `REQ-038`.
+- Fixture: `long-hand-run`, two resources, no phases beyond a rank, eight cards
+  in hand, every label long enough to need wrapping. `cards-run` supplies the
+  short hand.
+- Steps:
+
+1. Build a shell, tell it the window is 600 px wide, import `long-hand-run`.
+2. Read `hand_columns()`, `hand_row_count()` and the rows the hand built.
+3. Widen the shell to 1200 px and read the row count again.
+4. Import `cards-run` at 600 px and read the first card's label.
+5. Read the last child of the options column.
+
+- Exit: the columns are at least two at 600 px; the rows are more than one and
+  hold every card exactly once; no row asks for more than 600 px; the wider
+  window needs fewer rows; the short hand stays on one row with its whole label;
+  the last child of the options column is still a button.
