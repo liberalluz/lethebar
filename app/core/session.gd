@@ -331,11 +331,33 @@ func play_card(card_id: String) -> Dictionary:
 
 
 func _refill_hand() -> void:
-	## One turn takes one card out, so one comes back in; an empty deck deals nothing.
-	var filled := Hand.draw_into({"hand": hand, "deck": deck, "discard": discard}, hand_spec, int(hand_spec.get("draw", 0)))
+	## One turn takes one card out; a reshuffle asks this session for the order,
+	## because it has to use the run's seeded generator (REQ-039).
+	var filled := Hand.draw_into(
+		{"hand": hand, "deck": deck, "discard": discard},
+		hand_spec,
+		int(hand_spec.get("draw", 0)),
+		Callable(self, "_shuffle_cards"),
+	)
 	hand = filled["hand"]
 	deck = filled["deck"]
 	discard = filled["discard"]
+
+
+func _shuffle_cards(cards: Array) -> Array:
+	## Fisher-Yates through the run's generator: one seed, one order.
+	var out := cards.duplicate()
+	for index in range(out.size() - 1, 0, -1):
+		var swap := _next_rng() % (index + 1)
+		var held: Variant = out[index]
+		out[index] = out[swap]
+		out[swap] = held
+	return out
+
+
+func _next_rng() -> int:
+	_step_rng()
+	return rng
 
 
 func hand_view() -> Array:

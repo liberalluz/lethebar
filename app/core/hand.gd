@@ -57,9 +57,10 @@ static func deals(spec: Dictionary) -> Dictionary:
 	return draw_into(piles, spec, int(spec.get("size", 0)))
 
 
-static func draw_into(piles: Dictionary, spec: Dictionary, count: int) -> Dictionary:
-	## Takes up to `count` cards off the deck; the discard pile goes back under it
-	## in play order when the package asks for it. Still no shuffle.
+static func draw_into(piles: Dictionary, spec: Dictionary, count: int, order: Callable = Callable()) -> Dictionary:
+	## Takes up to `count` cards off the deck. When the deck runs out and the
+	## package allows it, the discard pile comes back as the deck in the order the
+	## caller passes, or in play order when no order is given.
 	var out := {
 		"hand": (piles.get("hand", []) as Array).duplicate(),
 		"deck": (piles.get("deck", []) as Array).duplicate(),
@@ -71,7 +72,12 @@ static func draw_into(piles: Dictionary, spec: Dictionary, count: int) -> Dictio
 		if (out["deck"] as Array).is_empty():
 			if not reshuffle or (out["discard"] as Array).is_empty():
 				break
-			out["deck"] = (out["discard"] as Array).duplicate()
+			var refill: Array = (out["discard"] as Array).duplicate()
+			if order.is_valid():
+				var arranged: Variant = order.call(refill)
+				if arranged is Array:
+					refill = arranged
+			out["deck"] = refill
 			out["discard"] = []
 		var top: Variant = (out["deck"] as Array).pop_front()
 		(out["hand"] as Array).append(String(top))
