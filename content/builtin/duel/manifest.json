@@ -14,5 +14,12 @@
   "mechanics": [],
   "entry": "table",
   "saveSchema": 1,
-  "assets": []
+  "assets": [
+    {"type": "texture", "path": "assets/card-heavy.png", "slot": "card"},
+    {"type": "texture", "path": "assets/card-strike.png", "slot": "card"},
+    {"type": "texture", "path": "assets/card-feint.png", "slot": "card"},
+    {"type": "texture", "path": "assets/card-breathe.png", "slot": "card"},
+    {"type": "texture", "path": "assets/card-charge.png", "slot": "card"},
+    {"type": "texture", "path": "assets/card-parry.png", "slot": "card"}
+  ]
 }

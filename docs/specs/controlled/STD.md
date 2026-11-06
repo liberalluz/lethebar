@@ -650,3 +650,22 @@ leaves guard 8 and edge 5, moves the card to the discard pile and draws a replac
 reads 2; `Charge` is refused with a message naming `edge` and the hand is unchanged; the rank reads
 `untried` and the ending names `阵脚已乱`; the resumed session carries the same three piles; and
 `git diff --stat -- app` is empty afterwards.
+
+## TC-CARDS-002 — a card shows the picture its package declares
+
+- Covers: REQ-037
+- Fixture: `art-run`, a hand of two cards where `raid` names
+  `assets/card-raid.png` and `feast` names nothing; `art-broken`, where the
+  declared bytes are not a picture; `art-bad`, where a card names
+  `assets/card-ghost.png` that the manifest never declares.
+- Steps:
+  1. Install `art-run` and open its scene.
+  2. Read the hand and the rows the scene built.
+  3. Install `art-broken` and read the warnings.
+  4. Install `art-bad`.
+  5. Open the shipped `duel` package and count the faces it declares.
+- Exit criteria: the view reports `assets/card-raid.png` for `raid` and no
+  `icon` key for `feast`; the scene builds two rows, the first with a picture and
+  the second without; `art-broken` keeps both labels and leaves one warning that
+  contains `card icon`; `art-bad` is refused with `V-39` and the message names
+  `card-ghost.png`; every card in `duel` carries its own face.

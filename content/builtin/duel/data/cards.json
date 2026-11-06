@@ -5,12 +5,12 @@
     "reshuffle": true
   },
   "cards": [
-    {"id": "heavy", "label": "力劈", "cost": {"guard": {"add": -4}}, "effects": [{"edge": {"add": 5}}]},
-    {"id": "strike", "label": "快斩", "cost": {"guard": {"add": -2}}, "effects": [{"edge": {"add": 3}}]},
-    {"id": "feint", "label": "虚招", "cost": {"guard": {"add": -1}}, "effects": [{"edge": {"add": 2}}]},
-    {"id": "breathe", "label": "调息", "cost": {}, "effects": [{"guard": {"add": 3}}]},
-    {"id": "charge", "label": "蓄势", "cost": {"edge": {"add": -9}}, "effects": [{"guard": {"add": 5}}]},
-    {"id": "parry", "label": "稳守", "cost": {}, "effects": [{"guard": {"add": 2}}]}
+    {"id": "heavy", "label": "力劈", "cost": {"guard": {"add": -4}}, "effects": [{"edge": {"add": 5}}], "icon": "assets/card-heavy.png"},
+    {"id": "strike", "label": "快斩", "cost": {"guard": {"add": -2}}, "effects": [{"edge": {"add": 3}}], "icon": "assets/card-strike.png"},
+    {"id": "feint", "label": "虚招", "cost": {"guard": {"add": -1}}, "effects": [{"edge": {"add": 2}}], "icon": "assets/card-feint.png"},
+    {"id": "breathe", "label": "调息", "cost": {}, "effects": [{"guard": {"add": 3}}], "icon": "assets/card-breathe.png"},
+    {"id": "charge", "label": "蓄势", "cost": {"edge": {"add": -9}}, "effects": [{"guard": {"add": 5}}], "icon": "assets/card-charge.png"},
+    {"id": "parry", "label": "稳守", "cost": {}, "effects": [{"guard": {"add": 2}}], "icon": "assets/card-parry.png"}
   ],
   "deck": ["heavy", "strike", "breathe", "feint", "charge", "parry", "heavy", "strike"]
 }

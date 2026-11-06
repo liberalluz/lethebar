@@ -94,6 +94,15 @@ static func take(piles: Dictionary, card_id: String) -> Dictionary:
 	return out
 
 
+static func icon_of(spec: Dictionary, card_id: String) -> String:
+	## The picture a card names, or an empty string when it names none. The
+	## manifest decides whether that path exists; the hand only reports it.
+	var entry := card(spec, card_id)
+	if not entry.has("icon"):
+		return ""
+	return String(entry.get("icon", ""))
+
+
 static func label_of(spec: Dictionary, card_id: String) -> String:
 	var entry := card(spec, card_id)
 	return String(entry.get("label", card_id))

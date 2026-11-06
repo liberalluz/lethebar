@@ -307,6 +307,26 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 					"deck names card %s, which the package never declares" % card_id,
 					true,
 				))
+		var textures := {}
+		var declared_assets: Variant = manifest.get("assets", [])
+		if declared_assets is Array:
+			for asset in declared_assets:
+				if asset is Dictionary and String(asset.get("type", "")) == "texture":
+					textures[String(asset.get("path", ""))] = true
+		# V-39 — a card naming a picture the manifest never declares (REQ-037).
+		# A card that silently loses its face is the same defect as one that
+		# never had a face, only slower to notice.
+		for card_id in cards:
+			var pictured: Dictionary = cards[card_id]
+			if not pictured.has("icon"):
+				continue
+			var icon := String(pictured.get("icon", ""))
+			if not textures.has(icon):
+				issues.append(_issue(
+					"V-39", "cards.json",
+					"card %s names an icon no texture in the manifest provides: %s" % [card_id, icon],
+					true,
+				))
 		for card_id in cards:
 			var entry: Dictionary = cards[card_id]
 			var touches: Array = []

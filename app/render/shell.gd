@@ -14,6 +14,9 @@ const SLOT_COUNT := 3
 const SLOT_BUTTONS_WIDTH := 152.0
 ## Slot previews are stored with the save, so they are clipped at write time.
 const PREVIEW_CHARS := 24
+## A card face is drawn beside its label, so it stays small enough for a
+## narrow window to hold a hand of four (REQ-037).
+const CARD_ICON_SIZE := 48.0
 
 const SCREEN_LANDING := "landing"
 const SCREEN_PLUGINS := "plugins"
@@ -48,6 +51,7 @@ var work_dir := "user://pkg"
 var _heading: Label
 var _sub: RichTextLabel
 var _options: VBoxContainer
+var _card_rows: Array = []
 var _status: RichTextLabel
 var _margin: MarginContainer
 var _box: VBoxContainer
@@ -291,6 +295,7 @@ func play_card(card_id: String) -> Dictionary:
 
 
 func enter_session() -> Dictionary:
+	_card_rows.clear()
 	screen = SCREEN_SESSION
 	_heading.text = Locale.text("ui.playing")
 	_clear_options()
@@ -319,7 +324,27 @@ func enter_session() -> Dictionary:
 				card_label = Locale.text("ui.blocked") % [card_label, card_reason]
 			var card_button := _button(card_label, play_card.bind(String(card.get("id", ""))))
 			card_button.disabled = not card_enabled
-			_options.add_child(card_button)
+			var icon_path := String(card.get("icon", ""))
+			var face := _card_texture(icon_path, view) if icon_path != "" else null
+			if face != null:
+				var row := HBoxContainer.new()
+				row.add_theme_constant_override("separation", 8)
+				var picture := TextureRect.new()
+				picture.texture = face
+				picture.custom_minimum_size = Vector2(CARD_ICON_SIZE, CARD_ICON_SIZE)
+				picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				row.add_child(picture)
+				card_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				row.add_child(card_button)
+				_options.add_child(row)
+			else:
+				_options.add_child(card_button)
+			_card_rows.append({
+				"id": String(card.get("id", "")),
+				"has_icon": face != null,
+				"path": icon_path,
+			})
 		for action in actions:
 			var enabled := bool(action.get("enabled", false))
 			var label := String(action.get("label", ""))
@@ -993,6 +1018,30 @@ func _hide_pictures() -> void:
 		_audio.stop()
 
 
+func card_rows() -> Array:
+	## What the last scene drew for the hand, one entry per card: the id, whether
+	## a picture was drawn, and the path the card named (REQ-037). The headless
+	## smoke test reads it because a decoded texture has no text to assert on.
+	return _card_rows
+
+
+func _card_texture(path: String, view: Dictionary) -> Texture2D:
+	## A card picture is drawn beside its label and never on the scene band.
+	## Missing or undecodable bytes keep the label and leave one warning; a card
+	## that names a picture nobody declared never gets this far (V-39).
+	var data: Dictionary = entry.get("data", {})
+	var stored: Dictionary = data.get("assets", {}) if data.get("assets", {}) is Dictionary else {}
+	var bytes: Variant = stored.get(path, null)
+	if not bytes is PackedByteArray or (bytes as PackedByteArray).is_empty():
+		_warn(view, "R-01", "card icon has no bytes: %s" % path)
+		return null
+	var image := Image.new()
+	if image.load_png_from_buffer(bytes) != OK and image.load_jpg_from_buffer(bytes) != OK:
+		_warn(view, "R-01", "card icon did not decode: %s" % path)
+		return null
+	return ImageTexture.create_from_image(image)
+
+
 func _show_assets(view: Dictionary) -> void:
 	## Fills the picture slots a scene declares. A slot with no bytes, an unknown
 	## slot name, or bytes that do not decode all end the same way: the slot keeps
@@ -1014,6 +1063,10 @@ func _show_assets(view: Dictionary) -> void:
 			_set_slot(_portrait, stored, path, slot, view)
 		elif slot == "audio":
 			_set_audio(stored, path, view)
+		elif slot == "card":
+			# A card face belongs beside its label in the hand, not in the scene
+			# band, so the band skips it instead of warning (REQ-037).
+			continue
 		else:
 			_warn(view, "R-01", "unknown asset slot skipped: %s" % slot)
 

@@ -360,12 +360,16 @@ func hand_view() -> Array:
 				if float(state.get(name, 0.0)) + delta < floor:
 					enabled = false
 					reason = String(name)
-		out.append({
+		var entry := {
 			"id": id,
 			"label": Hand.label_of(hand_spec, id),
 			"enabled": enabled,
 			"reason": reason,
-		})
+		}
+		var icon := Hand.icon_of(hand_spec, id)
+		if icon != "":
+			entry["icon"] = icon
+		out.append(entry)
 	return out
 
 
