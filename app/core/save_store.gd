@@ -179,10 +179,12 @@ func slots(entry: Dictionary) -> Array:
 	return rows
 
 
-func resume(entry: Dictionary, payload: Dictionary) -> Session:
+func resume(entry: Dictionary, payload: Dictionary, options: Dictionary = {}) -> Session:
 	## Rebuilds a session from a payload that already passed `read`. The RNG and
-	## the visited list travel with the save, so the run stays reproducible.
-	var session := Session.create(entry)
+	## the visited list travel with the save, so the run stays reproducible. The
+	## locale does not travel with the save: it belongs to the interface, and the
+	## caller passes the one it is currently reading in (REQ-028).
+	var session := Session.create(entry, options)
 	if session == null:
 		return null
 	var node := String(payload.get("node", ""))

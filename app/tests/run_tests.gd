@@ -68,6 +68,7 @@ func _initialize() -> void:
 	_case_writable_relations()
 	_case_situation()
 	_case_save_flush()
+	_case_save_locale()
 	_case_capabilities()
 	_case_limits()
 	_case_boot()
@@ -1796,6 +1797,80 @@ func _case_i18n_labels() -> void:
 			and String(refused.get("code", "")) == "V-22"
 			and String(refused.get("message", "")).contains("action.burn"),
 		"%s %s" % [String(refused.get("code", "-")), String(refused.get("message", ""))],
+	)
+
+
+func _case_save_locale() -> void:
+	_section("TC-SAVE-004 a resumed run reads in the locale of the interface")
+	MemoryBackend.reset()
+	var strings := {
+		"action.farm": "Farm the fields",
+		"action.burn": "Burn the stores",
+		"rank.1": "Captain",
+		"rank.4": "General",
+		"failure.0": "The granaries are empty.",
+		"resource.standing.0": "barely heeded",
+		"resource.standing.2": "named across the land",
+	}
+	var entry: Dictionary = PackageLoader.new().import_bytes(
+		_labels_package("resume-locale", strings), _context()
+	)["entry"]
+	var session := Session.create(entry, {"locale": "zh-CN"})
+	session.start()
+	var opening := session.view()
+	session.act("farm")
+	MemoryBackend.reset()
+	var store := SaveStore.new()
+	var written := store.write(entry, 1, session.snapshot(), "一")
+	_check("TC-SAVE-004: the run saves", written["ok"], String(written["message"]))
+	var payload: Dictionary = store.read(entry, 1)["payload"]
+
+	var english := SaveStore.new().resume(entry, payload, {"locale": "en"})
+	_check("TC-SAVE-004: an English resume rebuilds the run", english != null, "null session")
+	if english != null:
+		var view := english.view()
+		_check(
+			"TC-SAVE-004: the resumed run reads the translated scene",
+			String(view.get("text", "")) == "Opening.",
+			String(view.get("text", "")),
+		)
+		var labels := []
+		for action in view.get("actions", []):
+			labels.append(String(action.get("label", "")))
+		_check(
+			"TC-SAVE-004: the resumed menu reads the translated labels",
+			labels.has("Farm the fields") and not labels.has("屯田"),
+			str(labels),
+		)
+		_check(
+			"TC-SAVE-004: the resumed rank follows the interface locale",
+			String(view.get("rank", "")) == "Captain",
+			String(view.get("rank", "")),
+		)
+		var standing_label := String(view.get("labels", {}).get("standing", ""))
+		_check(
+			"TC-SAVE-004: a labelled resource follows the interface locale",
+			standing_label == "named across the land",
+			standing_label,
+		)
+
+	var chinese := SaveStore.new().resume(entry, payload, {"locale": "zh-CN"})
+	_check(
+		"TC-SAVE-004: a Chinese resume keeps the package text",
+		chinese != null and String(chinese.view().get("text", "")) == "开场。",
+		"null session" if chinese == null else String(chinese.view().get("text", "")),
+	)
+
+	var bare := SaveStore.new().resume(entry, payload)
+	_check(
+		"TC-SAVE-004: a resume with no locale falls back to the package text",
+		bare != null and String(bare.view().get("text", "")) == "开场。",
+		"null session" if bare == null else String(bare.view().get("text", "")),
+	)
+	_check(
+		"TC-SAVE-004: the opening view is still the declared one",
+		String(opening.get("text", "")) != "",
+		str(opening.get("text", "")),
 	)
 
 

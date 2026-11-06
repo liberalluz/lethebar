@@ -4,7 +4,7 @@ English · [简体中文](STP.zh-CN.md)
 
 ## Scope
 
-Covers the thirty-six P1 requirements of `SRS.md` (v0.0.0) against the design in
+Covers the thirty-seven P1 requirements of `SRS.md` (v0.0.0) against the design in
 `SDD.md`. Does not cover the plugin market, the plugin editor, 3D, multiplayer,
 accounts, cloud saves, or the native iOS build; those are out of scope for
 v0.0.0 and have no tests here by design.
@@ -92,6 +92,7 @@ claims: if they fail, the architecture claim fails, not just a feature.
 | `TC-SCENE-001` | `REQ-026` | A package that declares actions opens its scene and is not finished by an empty choice list; each action is a button, an unavailable one is disabled with its reason, an action advances the turn and the readout shows the rank, an ended run shows the reason and no actions, and a package without actions renders as before. |
 | `TC-WIRE-001` | `REQ-027` | An action waits on a relation state and on a drawn item; taking a drawing action draws in the same step and unlocks the action waiting on the item; the drawn item and the relation survive a resume; a condition naming an undeclared state is refused with `V-25` and a draw naming an undeclared pool with `V-26`. |
 | `TC-SAVE-003` | `REQ-028` | A save is reported finished only after storage says it has nothing left to flush, and the slot screen shows the wait. |
+| `TC-SAVE-004` | `REQ-028` | A run resumed from a slot reads in the locale of the interface: scene text, menu labels, rank and labelled resources follow the interface, and a payload without the field falls back to the package text. |
 | `TC-CAP-001` | `REQ-029` | A package that names a capability the engine does not provide is refused, the refusal names it, and a 1.0.0 package with a bare name still installs with one warning. |
 | `TC-SAFE-001` | `REQ-030` | A package outside the envelope is refused by code (V-28 size or count, V-29 path, V-30 asset) with the measured value named, and a package inside it still installs. |
 | `TC-SITUATION-001` | `REQ-033` | The view carries turns left, the entity others lean toward, the entity they push against and the resource closest to its floor; each section disappears when its source is not declared; the scene draws one line that follows the interface language, and a finished run reports zero turns left. |
