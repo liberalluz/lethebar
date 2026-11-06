@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.1.1 - 2026-11-06
+
+### Added
+- `infra/tool/merge/translate_body.py`: translate a prepared pull request body and mark the result as a machine translation; `LETHEBAR_TRANSLATION_FILE` supplies the translation where no API key is available.
+- `infra/checks/check_translation.py`: refuse a batch whose prepared body has no translation, or whose translation predates the last edit.
+- `V-27`: a package that asks for a capability this engine does not provide is refused at install, and the refusal names the capability (ADR-0008).
+- `W-03`: a format 1.0.0 package that still names a capability without its major version installs with one warning, so nothing published before this batch stops working.
+- `docs/specs/capabilities.md` now lists the twenty ids this build accepts, and the table is read back by the test instead of being copied.
+- `V-28`, `V-29` and `V-30`: a package is held to an install-time envelope before the manifest is read, and every refusal names the value it measured.
+- `app/core/package_limits.gd`: the limits and the pure helpers that read a PNG or JPEG header and a WAV duration, so the numbers live in one place.
+- `TC-SAFE-001`: entries, paths, per-entry bytes, the unpacked total, picture edges and audio length are all exercised, and a package inside the envelope still installs.
+- The landing screen says how large the first download is, once per profile, and asks the player to keep the tab open until it finishes (`REQ-031`).
+- The page asks the generated service worker whether it kept the payload and publishes the answer as `window.lethebarCache` (`controlled`, `stored`, `error`, `ready`), so a failed cache write is visible in the interface.
+
+### Changed
+- `infra/tool/batch/config.json`: `translate` runs the new hook, and `translation` joins the gate as an eighth check.
+- The `capabilities` field is versioned: `text` became `text@1`, `render.2d` became `render.2d@1` in the three built-in packages and in every test fixture.
+- ADR-0009 now carries the numbers instead of promising them, and `SECURITY.md` says what the envelope is.
+- The shell draws the first-visit sentence from the cache state rather than from a constant, so a build whose payload size changes says the new size.
+
+### Fixed
+- `infra/tool/merge/pr_merge.py`: a single-commit pull request whose subject is longer than the seventy characters GitHub keeps in `messageHeadline` began its body with the cut remainder; the message now comes from the local commit, and a payload that cannot be repaired is refused instead of used.
+
 ## v0.1.0 - 2026-11-05
 
 ### Added
