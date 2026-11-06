@@ -9,25 +9,22 @@ English · [简体中文](README.zh-CN.md)
 
 ## Status
 
-**v0.1.1 is out and playable in a browser.**
+**v0.2.0 is out and playable in a browser.**
 
-- Packs now name the engine capabilities they need (`text@1`, `render.2d@1`, …); a pack
-  that asks for something this build does not provide is refused at install, and the
-  refusal names the capability instead of failing somewhere inside the story
-- A package is held to a published install-time envelope before its manifest is read:
-  8 MB archive, 500 entries, 4 MB per entry, 32 MB unpacked, a path charset, 4096 px
-  pictures and 60 seconds of audio; every refusal names the value it measured
-- The first visit says how large the download is (about 42 MB) and asks for the tab to
-  stay open, once per browser; a cache write the browser refused is reported in the
-  interface with the browser's own reason
-- The pull request body of every batch carries a machine translation next to it, and a
-  stale or missing translation fails the gate
-- Eight content bricks remain the pack format from `v0.1.0`; three built-in stories ship,
-  one of them written only as data
+- Sanguo is a run, not a short story: twenty-four turns over four resources (grain,
+  troops, coin, standing), five ranks from 校尉 to 大将军, three declared ways to lose and
+  a menu of five actions — every number lives in the pack
+- A rule can move a relation between factions, and the save keeps it; the readout says
+  who is leaning toward the run and who is pushing against it
+- An English run reads English in the menu, the ranks, the labelled resources and the
+  reason a run ended, because the pack table now names those labels too
+- Still true from `v0.1.1`: capability declarations are enforced at install, a package
+  meets a published size and asset envelope, and the first visit says what it is
+  downloading
 - Verified on desktop Chrome and on iOS Safari, online and with the network off
 - Known gaps: only PNG, JPEG and WAV; one picture band and one portrait column; CJK
-  extension B still draws as boxes; relations cannot be changed by a rule yet
-- Next: `v0.2.0` makes `sanguo` deep — 24 turns, four resources, five ranks, three ways to lose
+  extension B still draws as boxes; a run's clock is turns or nodes, never wall time
+- Next: `v0.3.0` adds card battle as a second kind of pack, with no change to `app/core`
 
 This repository is public now because the plugin spec should be seen and challenged early.
 

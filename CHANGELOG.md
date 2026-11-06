@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.2.0 - 2026-11-06
+
+### Added
+- A rule may carry `relations`, a list of `{from, to, add|value}` entries: the mechanics layer collects them and the session applies them, so the faction map still has one writer (`REQ-032`).
+- `V-31`: a relation change that names an entity the package never declared, or carries something that is not a number, is refused at install.
+- The save payload carries `factions`, so a moved relation survives a save and a resume.
+- `Session.situation()` reads how a run stands: the turns left from the declared budget, the entity the others lean toward and the one they push against from the sum of the relations each receives, and the resource closest to its declared floor (`REQ-033`).
+- The scene prints that reading as one more segment of the readout line, through `ui.turns_left`, `ui.leaning`, `ui.friction` and `ui.tight`, in both languages.
+- Sanguo is a run now: twenty-four turns, four resources (grain, troops, coin, standing), five ranks from 校尉 to 大将军, three declared ways to lose and a menu of five actions, all as package data.
+- The story declares three neighbours and rules that move the relation between them once the standing crosses a threshold, which is the first shipped use of `REQ-032`.
+- The English table covers the opening scene, so an English session reads English from the first screen.
+- A package table may now carry a `strings` section that names the labels a run is made of: `action.<id>`, `rank.<turn>`, `resource.<id>.<value>` and `failure.<index>`.
+- The session looks those keys up when it builds the view, so an English run reads English in the menu, the rank, the labelled resources and the reason a run ended. The render layer did not change.
+- Sanguo and Jianghu ship the new section, so both English runs are complete.
+
+### Changed
+- `Mechanics.apply()` returns a `relations` list next to `state` and `warnings`; packages that write no relation behave exactly as before.
+- A section whose source is not declared is left out instead of being filled with a zero, so a story without factions or phases reads exactly as it did before.
+- `SDD.md` §10.1 describes Sanguo as a run rather than a three-step sketch, and `TC-BUILTIN-001` now asserts the budget, the ranks, the menu, the relation, the mid-run save and one of the three losses.
+- `V-22` measures the same keys. A package that ships a table for a locale must translate every action, rank, labelled value and failure it declares, because a table that covers the scene and forgets the menu is the half-translation the check already refused.
+
 ## v0.1.1 - 2026-11-06
 
 ### Added
