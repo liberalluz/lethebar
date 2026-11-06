@@ -4,7 +4,7 @@ English · [简体中文](STP.zh-CN.md)
 
 ## Scope
 
-Covers the thirty-seven P1 requirements of `SRS.md` (v0.0.0) against the design in
+Covers the thirty-six P1 requirements of `SRS.md` (v0.0.0) against the design in
 `SDD.md`. Does not cover the plugin market, the plugin editor, 3D, multiplayer,
 accounts, cloud saves, or the native iOS build; those are out of scope for
 v0.0.0 and have no tests here by design.
@@ -82,6 +82,7 @@ claims: if they fail, the architecture claim fails, not just a feature.
 | `TC-LANG-001` | `REQ-018` | With the browser pinned to each language the interface strings come from that language's catalogue, the landing switch changes the language and keeps it across a reload, and no Chinese literal is left in `app/render`. |
 | `TC-ASSET-001` | `REQ-019` | A package declaring a picture and a sound shows the picture in a band above the text at a non-zero size and plays the sound on entry; a package declaring no picture leaves no empty band; a declared-but-missing file leaves a placeholder and one `R-01` warning without aborting. |
 | `TC-I18N-002` | `REQ-035` | The menu label, the rank title, a labelled resource and the reason a run ended all read from the package table for the locale, a locale with no table keeps the package text, a key the table leaves out falls back instead of blanking, and a table that covers the scene but not the menu is refused by `V-22`. |
+| `TC-CARDS-001` | `REQ-036` | A package that declares a hand deals it, a card spends its cost and applies its effect as one turn, an unaffordable card is refused by name and stays in the hand, the three piles survive a save and a resume, and a deck naming an undeclared card, a card naming an undeclared resource and a claimed `cards.hand@1` without a deck file are refused at install with `V-38`, `V-37` and `V-36`. |
 | `TC-I18N-001` | `REQ-020` | A package with an English table shows English text and English choice labels when the reader's language is English, keeps its own text in the undeclared language, and a package whose table drops a scene or a choice is refused by `V-22`. |
 | `TC-FMT-001` | `REQ-021` | A `2.0.0` bundle with no requirements installs; a package whose `kind`/`layer`/`requires` are malformed is refused with `V-23`; one whose requirement is missing or outside its range is refused with `V-24` naming the package and the installed version; a satisfiable requirement installs; a `1.0.0` package still installs and carries exactly one `W-01` warning. |
 | `TC-LEDGER-001` | `REQ-022` | A declared resource starts at its `init` value; an effect above `max` is clamped rather than refused; a rule that names a resource `state.json` never declares is refused with `V-14` naming it; a rule that reads a value the same choice changed sees the new value; a labelled resource shows its label while the number is unchanged; the values survive a save and a resume. |

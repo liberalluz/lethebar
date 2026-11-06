@@ -186,6 +186,9 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-29` | every entry path is relative, lowercase and inside the charset whitelist | reject |
 | `V-30` | a declared picture is at most 4096 px on an edge and a declared sound is at most 2 MB and 60 seconds | reject |
 | `V-31` | a rule's relation change names entities the package declared and carries an `add` or `value` number | reject |
+| `V-36` | a package that names `cards.hand@1` ships a `data/cards.json` with a `hand` and a `deck` | reject |
+| `V-37` | every card's `cost` and `effects` name resources the ledger declares | reject |
+| `V-38` | every card id in the deck is declared in the package's `cards` table | reject |
 
 Every rejection names its code and the offending field; a rejection never
 disturbs already-installed plugins or their saves. `V-24` is checked at install
@@ -500,6 +503,30 @@ declares, because a table that covers the scene and forgets the menu is the same
 half-translation the check already refused.
 
 
+### 11.7 A run can be played with cards
+
+A run that declares a hand plays like a table: the scene shows the cards it can
+play, keeps the ones it cannot pay for on screen with the reason, and treats
+playing a card as a turn.
+
+`app/core/hand.gd` reads the declaration — `hand.size`, `hand.draw_per_turn`,
+`hand.reshuffle`, the `cards` table and the initial `deck` — and deals the
+opening hand when the session starts. A card carries a `cost` and `effects` in
+the same shape a rule uses, so the ledger is the only place a resource name is
+checked. Playing one spends the cost, applies the effects through the same
+clamping the rules use, discards the card, draws a replacement (returning the
+discard pile only when the package asks for it) and advances the turn by one; a
+card that cannot be paid for is refused with `S-08`, which names the resource
+that is short, and stays in the hand.
+
+The three piles belong to the run, not to the view: `snapshot()` carries
+`hand`, `deck` and `discard` only when the package declares a hand, and
+`save_store.resume()` puts them back before the scene is drawn. A deck that
+names a card the package never declares (`V-38`), a card that names a resource
+the ledger never declares (`V-37`) and a claimed `cards.hand@1` without a deck
+file (`V-36`) are refused at install, so the scene never deals from a broken
+deck.
+
 ## 12. Requirement mapping
 
 | REQ | Design |
@@ -539,6 +566,7 @@ half-translation the check already refused.
 | `REQ-033` | §11.5 situation reading, `app/core/session.gd` `situation()`, `app/render/shell.gd` readout |
 | `REQ-034` | §10.1 the Sanguo run, `content/builtin/sanguo/**` data only |
 | `REQ-035` | §11.6 the labels a run is made of, `Session.localise()`, `V-22` |
+| `REQ-036` | §11.7 the hand, `app/core/hand.gd`, `V-36`–`V-38` |
 
 ## 13. Decisions and open questions
 

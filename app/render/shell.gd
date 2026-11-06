@@ -281,6 +281,15 @@ func act(action_id: String) -> Dictionary:
 	return enter_session()
 
 
+func play_card(card_id: String) -> Dictionary:
+	## One turn played from the hand (REQ-036). The session decides whether the
+	## cost can be paid; the scene only redraws what the engine reports.
+	if session == null:
+		return current_view()
+	session.play_card(card_id)
+	return enter_session()
+
+
 func enter_session() -> Dictionary:
 	screen = SCREEN_SESSION
 	_heading.text = Locale.text("ui.playing")
@@ -299,6 +308,18 @@ func enter_session() -> Dictionary:
 	var actions: Array = view.get("actions", [])
 	var run_finished := bool(view.get("finished", false))
 	if not run_finished:
+		# A hand is drawn like the menu: a card that cannot be paid for stays
+		# visible with the reason, because the player has to see what is out of
+		# reach (REQ-036).
+		for card in view.get("hand", []):
+			var card_enabled := bool(card.get("enabled", false))
+			var card_label := String(card.get("label", ""))
+			var card_reason := String(card.get("reason", ""))
+			if not card_enabled and card_reason != "":
+				card_label = Locale.text("ui.blocked") % [card_label, card_reason]
+			var card_button := _button(card_label, play_card.bind(String(card.get("id", ""))))
+			card_button.disabled = not card_enabled
+			_options.add_child(card_button)
 		for action in actions:
 			var enabled := bool(action.get("enabled", false))
 			var label := String(action.get("label", ""))

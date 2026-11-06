@@ -70,6 +70,7 @@ func _initialize() -> void:
 	_case_save_flush()
 	_case_save_locale()
 	_case_capabilities()
+	_case_cards()
 	_case_limits()
 	_case_boot()
 	_case_assets()
@@ -2780,6 +2781,162 @@ func _case_capabilities() -> void:
 			broken.append(capability)
 	_check("TC-CAP-001: every known capability parses", broken.is_empty(), str(broken))
 	_check("TC-CAP-001: the table covers the bricks", known_ids.size() >= 17, str(known_ids.size()))
+
+
+func _cards_package(name: String, variant: String = "") -> PackedByteArray:
+	## A run whose options are held in a hand instead of a menu: two cards in
+	## hand, one drawn per turn, and a deck that repeats. The variants build the
+	## refusals: a deck naming a card that does not exist, a cost key the ledger
+	## never declared, and a package that claims the capability but brings no hand.
+	var hand := {"size": 2, "draw_per_turn": 1, "reshuffle": true}
+	var cards := [
+		{"id": "raid", "label": "Raid the stores", "cost": {"coin": {"add": -3}}, "effects": [{"grain": {"add": 4}}]},
+		{"id": "feast", "label": "Hold a feast", "cost": {"grain": {"add": -1}}, "effects": [{"coin": {"add": 2}}]},
+	]
+	var deck := ["raid", "feast", "raid"]
+	if variant == "bad-deck":
+		deck = ["raid", "ghost"]
+	if variant == "bad-cost":
+		cards[0]["cost"] = {"silver": {"add": -3}}
+	var files := {
+		"data/state.json": JSON.stringify({
+			"resources": [
+				{"id": "grain", "init": 10, "min": 0, "max": 20},
+				{"id": "coin", "init": 5, "min": 0, "max": 10},
+			],
+		}).to_utf8_buffer(),
+		"data/phases.json": JSON.stringify({
+			"turns": 8,
+			"ranks": [{"at": 1, "title": "Captain"}],
+			"fail": [],
+		}).to_utf8_buffer(),
+		"data/cards.json": JSON.stringify({"hand": hand, "cards": cards, "deck": deck}).to_utf8_buffer(),
+	}
+	if variant == "no-hand":
+		files["data/cards.json"] = JSON.stringify({"cards": cards, "deck": deck}).to_utf8_buffer()
+	return _package(
+		name,
+		{"id": name, "entry": "c1", "capabilities": ["cards.hand@1", "ledger@1", "phases@1"], "mechanics": ["cards", "ledger", "phases"]},
+		[],
+		[],
+		{"nodes": [{"id": "c1", "text": "A hall before the council.", "choices": []}]},
+		{},
+		files,
+	)
+
+
+func _case_cards() -> void:
+	# A hand is not a differently drawn menu: it is state that has to be held,
+	# paid for, refilled and carried through a save. The menu could not hold an
+	# option that disappears when used, so a card battle had nothing to stand on.
+	_section("TC-CARDS-001 a package declares a deck and a hand, and the save keeps them")
+	var shell := _shell()
+	var installed := shell.try_import(_cards_package("cards-run"))
+	_check("TC-CARDS-001: a package with a hand installs", shell.session != null, str(installed.get("code", "")))
+	if shell.session == null:
+		return
+	var session: Session = shell.session
+	var opening: Dictionary = session.view()
+	_check(
+		"TC-CARDS-001: the hand opens at its declared size",
+		(session.hand as Array).size() == 2,
+		str(session.hand),
+	)
+	_check(
+		"TC-CARDS-001: the hand holds the front of the deck in order",
+		str(session.hand) == '["raid", "feast"]',
+		str(session.hand),
+	)
+	_check(
+		"TC-CARDS-001: the view offers the hand as cards",
+		(opening.get("hand", []) as Array).size() == 2,
+		str(opening.get("hand", [])),
+	)
+	# Playing a card is one turn: it pays, it lands, and the clock moves.
+	session.play_card("raid")
+	_check(
+		"TC-CARDS-001: playing a card pays its cost",
+		float(session.state.get("coin", -1.0)) == 2.0,
+		str(session.state.get("coin", "absent")),
+	)
+	_check(
+		"TC-CARDS-001: playing a card applies its effects in the same step",
+		float(session.state.get("grain", -1.0)) == 14.0,
+		str(session.state.get("grain", "absent")),
+	)
+	_check(
+		"TC-CARDS-001: the played card leaves the hand and reaches the discard pile",
+		not (session.hand as Array).has("raid") or (session.discard as Array).has("raid"),
+		"hand %s · discard %s" % [session.hand, session.discard],
+	)
+	_check(
+		"TC-CARDS-001: the hand refills by the declared draw per turn",
+		(session.hand as Array).size() == 2 and (session.discard as Array).has("raid"),
+		"hand %s · discard %s" % [session.hand, session.discard],
+	)
+	_check("TC-CARDS-001: the turn advanced", session.turn == 2, str(session.turn))
+	# A card the run cannot pay for stays put, and the refusal names the resource.
+	var before_hand: Array = (session.hand as Array).duplicate()
+	session.play_card("raid")
+	var refusals: Array = []
+	for warning in session.warnings:
+		if String(warning.get("code", "")) == "S-08":
+			refusals.append(warning)
+	_check("TC-CARDS-001: an unaffordable card is refused", refusals.size() == 1, str(refusals))
+	_check(
+		"TC-CARDS-001: the refusal names the resource that is short",
+		refusals.size() == 1 and String(refusals[0].get("message", "")).contains("coin"),
+		str(refusals),
+	)
+	_check(
+		"TC-CARDS-001: an unaffordable card stays in the hand",
+		str(session.hand) == str(before_hand),
+		"%s vs %s" % [session.hand, before_hand],
+	)
+	# The hand, the deck order and the discard pile are part of the save.
+	var payload: Dictionary = session.snapshot()
+	_check(
+		"TC-CARDS-001: the payload carries the hand, the deck and the discard pile",
+		payload.has("hand") and payload.has("deck") and payload.has("discard"),
+		str(payload.keys()),
+	)
+	var store := SaveStore.new()
+	var written := store.write(shell.entry, 1, payload, "Cards")
+	var read_back := store.read(shell.entry, 1)
+	var resumed: Session = null
+	if bool(written.get("ok", false)) and bool(read_back.get("ok", false)):
+		resumed = store.resume(shell.entry, read_back["payload"])
+	_check(
+		"TC-CARDS-001: the hand, the deck and the discard pile survive a resume",
+		resumed != null and str(resumed.hand) == str(payload["hand"]) and str(resumed.deck) == str(payload["deck"]) and str(resumed.discard) == str(payload["discard"]),
+		"" if resumed == null else "hand %s · deck %s · discard %s" % [resumed.hand, resumed.deck, resumed.discard],
+	)
+
+	# Three refusals, each naming what is wrong rather than saying "bad package".
+	var loader := PackageLoader.new()
+	var ghost := loader.import_bytes(_cards_package("cards-ghost", "bad-deck"), _context())
+	_check(
+		"TC-CARDS-001: a deck naming a card that does not exist is refused",
+		ghost["status"] == "rejected" and String(ghost.get("code", "")) == "V-38",
+		"%s %s" % [ghost.get("code", ""), ghost.get("message", "")],
+	)
+	_check(
+		"TC-CARDS-001: the refusal names the missing card",
+		String(ghost.get("message", "")).contains("ghost"),
+		String(ghost.get("message", "")),
+	)
+	var silver := loader.import_bytes(_cards_package("cards-silver", "bad-cost"), _context())
+	_check(
+		"TC-CARDS-001: a cost key the ledger never declared is refused",
+		silver["status"] == "rejected" and String(silver.get("code", "")) == "V-37",
+		"%s %s" % [silver.get("code", ""), silver.get("message", "")],
+	)
+	var bare := loader.import_bytes(_cards_package("cards-bare", "no-hand"), _context())
+	_check(
+		"TC-CARDS-001: claiming the capability without a hand is refused",
+		bare["status"] == "rejected" and String(bare.get("code", "")) == "V-36",
+		"%s %s" % [bare.get("code", ""), bare.get("message", "")],
+	)
 
 
 func _long_wav_bytes(seconds: float) -> PackedByteArray:

@@ -38,6 +38,7 @@ package carries; a capability is what the engine knows how to do with them.
 | `save@2` | three slots, previews, resume, durable write | `B4`, `B23` | `TC-SAVE-001`…`TC-SAVE-003` |
 | `offline@1` | installable web build, package and save survival without a network | `B6`, `B12` | `TC-OFF-001`…`TC-OFF-004` |
 | `format@2` | package format `2.0.0`: `kind`, `layer`, `requires` | `B15` | `TC-FMT-001` |
+| `cards.hand@1` | a hand, a deck, a draw and a discard, a resolution order | `B41` | `TC-CARDS-001` |
 
 A package needs none of these by name today: an empty `requires.capabilities`
 means "narration only", which is what every existing package declares. The list
@@ -47,7 +48,7 @@ exists so that the next genre can ask for something specific.
 
 | Capability | What it would provide | Batch | What would prove it |
 | --- | --- | --- | --- |
-| `cards.hand@1` | a hand, a deck, a draw and a discard, a resolution order | not scheduled | a card battle package plays a full hand with no engine change per card |
+
 | `map@1` | cities with coordinates, adjacency with travel days, a travel action | not scheduled | a package moves between two cities and arrives after the declared days |
 | `units@1` | officer and troop instances with stats, loyalty and assignment | not scheduled | a package assigns an officer to a city and reads their stats back |
 | `battle.turnbased@1` | a resolution of two stacks with per-unit strength and modifiers | not scheduled | two stacks fight to a declared outcome that a test can reproduce |
