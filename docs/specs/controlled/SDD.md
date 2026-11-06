@@ -558,6 +558,27 @@ Three things are fixed at install rather than at draw time:
 REQ-037 maps to `Hand.icon_of()`, `Session.hand_view()` and
 `Shell.card_rows()`.
 
+### 11.9 A long hand wraps
+
+A hand is a row of cards, not a column. The container asks the window how many
+cells of `CARD_COLUMN_MIN` fit and puts the rest on the next row, so a hand of
+eight wraps to three rows at 600 px and to one at 1200 px. The order the cards
+are dealt in never changes, and the action menu keeps its single column below
+the hand.
+
+Three things are fixed when the hand is laid out rather than when it is drawn:
+
+- The number of columns is measured from the width the window actually has
+  (`Shell.hand_columns()`), so a constant would show up as a hand that never
+  re-wraps.
+- A card that shares a row has its label cut at `HAND_LABEL_CHARS` with an
+  ellipsis; a hand that fits on one row keeps the whole label.
+- The scene band, the scene text and the actions keep the widths they had. Only
+  the hand stops being one card per line.
+
+REQ-038 maps to `Shell.hand_columns()`, `Shell.hand_row_count()` and
+`Shell._fill_hand_rows()`.
+
 ## 12. Requirement mapping
 
 | REQ | Design |
@@ -599,6 +620,7 @@ REQ-037 maps to `Hand.icon_of()`, `Session.hand_view()` and
 | `REQ-035` | §11.6 the labels a run is made of, `Session.localise()`, `V-22` |
 | `REQ-036` | §11.7 the hand, `app/core/hand.gd`, `V-36`–`V-38` |
 | `REQ-037` | §11.8 card faces, `app/core/hand.gd`, `V-39` |
+| `REQ-038` | §11.9 the wrapped hand, `Shell.hand_columns()`, no `V-` code |
 
 ## 13. Decisions and open questions
 
