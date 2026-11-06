@@ -286,7 +286,7 @@ func _case_proto_002() -> void:
 
 
 func _case_builtin_001() -> void:
-	_section("TC-BUILTIN-001 Sanguo plays three decision turns from the shipped package")
+	_section("TC-BUILTIN-001 Sanguo plays a twenty-four turn run over four resources")
 	var loader := PackageLoader.new()
 	var package := FileAccess.get_file_as_bytes(BUILTIN_PACKAGE)
 	if package.is_empty():
@@ -301,49 +301,107 @@ func _case_builtin_001() -> void:
 	_check("TC-BUILTIN-001: it installs with no warnings", result.get("warnings", []).is_empty(), str(result.get("warnings", [])))
 	if result["status"] != "installed":
 		return
-	var session := Session.create(loader.registry.entry("sanguo"), {"start_counter": 1})
+	var entry: Dictionary = loader.registry.entry("sanguo")
+	var session := Session.create(entry, {"start_counter": 1})
 	_check("TC-BUILTIN-001: a Sanguo session starts", session != null)
 	if session == null:
 		return
 	var view := session.start()
-	_check("TC-BUILTIN-001: the entry scene shows text", String(view["text"]) != "")
-	_check("TC-BUILTIN-001: the entry scene offers a next step", view["choices"].size() >= 1)
-	var chosen: Array = []
-	var turn := 0
-	while turn < 3:
-		var offered: Array = view["choices"]
-		if offered.is_empty():
-			break
-		chosen.append(String(offered[0]["label"]))
-		view = session.choose(0)
-		turn += 1
-	_check("TC-BUILTIN-001: all three turns are playable", chosen.size() == 3, str(chosen))
-	_check("TC-BUILTIN-001: the end node is reached", view["finished"] == true)
-	_check("TC-BUILTIN-001: the end node shows its text", String(view["text"]) != "")
-	_check("TC-BUILTIN-001: the power supply mechanic ran", view["state"].has("standing"), str(view["state"]))
-	# Step 4 of the case: save the end scene to slot 1, then resume from the stored
-	# bytes. B3 deferred this step to B4, B4 shipped the store and asserted only the
-	# generic save cases, so the step is closed here — the exit line asks for the
-	# resumed session to start at the saved end node, not just for a slot to accept
-	# a write.
+	_check("TC-BUILTIN-001: the opening scene shows text", String(view["text"]) != "")
+	for key in ["grain", "troops", "coin", "standing"]:
+		_check(
+			"TC-BUILTIN-001: the run keeps %s" % key,
+			(view["state"] as Dictionary).has(key),
+			str((view["state"] as Dictionary).keys()),
+		)
+	_check(
+		"TC-BUILTIN-001: the run is budgeted at twenty-four turns",
+		int((session.phase as Dictionary).get("turns", 0)) == 24,
+		str(session.phase),
+	)
+	_check(
+		"TC-BUILTIN-001: the scene counts down from the budget",
+		int((view.get("situation", {}) as Dictionary).get("turnsLeft", -1)) == 24,
+		str(view.get("situation", {})),
+	)
+	_check("TC-BUILTIN-001: the first turn carries the first rank", String(view["rank"]) == "校尉", String(view["rank"]))
+	for pair in [[6, "都尉"], [11, "偏将军"], [16, "将军"], [21, "大将军"], [24, "大将军"]]:
+		_check(
+			"TC-BUILTIN-001: turn %d is ranked %s" % [int(pair[0]), String(pair[1])],
+			Phases.rank(session.phase, int(pair[0])) == String(pair[1]),
+			Phases.rank(session.phase, int(pair[0])),
+		)
+	_check(
+		"TC-BUILTIN-001: the run can be lost three ways",
+		(session.phase.get("fail", []) as Array).size() == 3,
+		str((session.phase.get("fail", []) as Array).size()),
+	)
+	_check(
+		"TC-BUILTIN-001: the menu offers the story's actions",
+		(view["actions"] as Array).size() == 5,
+		str((view["actions"] as Array).size()),
+	)
+	var grain_before := float((session.state as Dictionary).get("grain", 0.0))
+	session.act("farm")
+	_check(
+		"TC-BUILTIN-001: farming feeds the army",
+		float((session.state as Dictionary).get("grain", 0.0)) > grain_before,
+		"%f then %f" % [grain_before, float((session.state as Dictionary).get("grain", 0.0))],
+	)
+	_check("TC-BUILTIN-001: taking an action spends a turn", session.turn == 2, str(session.turn))
+	var relation_before := Relations.value(session.factions, "cao", "shao")
+	session.act("envoys")
+	session.act("envoys")
+	_check(
+		"TC-BUILTIN-001: sending envoys raises the standing",
+		float((session.state as Dictionary).get("standing", 0.0)) >= 3.0,
+		str((session.state as Dictionary).get("standing", 0.0)),
+	)
+	_check(
+		"TC-BUILTIN-001: a rule moves Cao against Shao",
+		Relations.value(session.factions, "cao", "shao") < relation_before,
+		"%f then %f" % [relation_before, Relations.value(session.factions, "cao", "shao")],
+	)
 	MemoryBackend.reset()
-	var entry: Dictionary = loader.registry.entry("sanguo")
 	var store := SaveStore.new()
-	var saved_node := session.current
 	var written := store.write(entry, 1, session.snapshot(), "三国")
-	_check("TC-BUILTIN-001: the end scene saves to slot 1", bool(written.get("ok", false)), str(written))
+	_check("TC-BUILTIN-001: a run in progress saves to slot 1", bool(written.get("ok", false)), str(written))
 	var read_back := store.read(entry, 1)
 	var resumed: Session = null
 	if bool(read_back.get("ok", false)):
 		resumed = store.resume(entry, read_back["payload"])
 	_check(
-		"TC-BUILTIN-001: the resumed session starts at the saved end node",
-		resumed != null and resumed.current == saved_node,
-		"resumed %s, saved %s" % [resumed.current if resumed != null else "-", saved_node],
+		"TC-BUILTIN-001: the resumed run keeps the turn",
+		resumed != null and resumed.turn == session.turn,
+		"resumed %s, saved %d" % [resumed.turn if resumed != null else "-", session.turn],
 	)
 	_check(
-		"TC-BUILTIN-001: the resumed session is still at the end",
-		resumed != null and resumed.finished and resumed.current == session.current,
+		"TC-BUILTIN-001: the resumed run keeps the resources",
+		resumed != null and is_equal_approx(float((resumed.state as Dictionary).get("grain", -1.0)), float((session.state as Dictionary).get("grain", 0.0))),
+		str(resumed.state if resumed != null else {}),
+	)
+	_check(
+		"TC-BUILTIN-001: the resumed run keeps the relation",
+		resumed != null and is_equal_approx(Relations.value(resumed.factions, "cao", "shao"), Relations.value(session.factions, "cao", "shao")),
+		"resumed %f" % [Relations.value(resumed.factions, "cao", "shao") if resumed != null else -999.0],
+	)
+	var lost := Session.create(entry, {"start_counter": 2})
+	lost.start()
+	var guard := 0
+	while not lost.finished and guard < 30:
+		lost.act("recruit")
+		guard += 1
+	_check("TC-BUILTIN-001: running out of grain ends the run", lost.finished, str(guard))
+	_check(
+		"TC-BUILTIN-001: the end names the loss",
+		String(lost.fail_reason).contains("粮"),
+		String(lost.fail_reason),
+	)
+	var english := Session.create(entry, {"start_counter": 1, "locale": "en"}).start()
+	_check(
+		"TC-BUILTIN-001: the English run reads English",
+		String(english["text"]).begins_with("In the"),
+		String(english["text"]).left(48),
 	)
 
 
@@ -867,22 +925,25 @@ func _case_ux_001() -> void:
 	var view := shell.start_plugin("sanguo")
 	_check("TC-UX-001: picking a pack starts a session", shell.screen_name() == "session")
 	_check("TC-UX-001: the first scene shows its text", String(view.get("text", "")) != "")
-	_check("TC-UX-001: the first scene offers a next step", view.get("choices", []).size() >= 1)
-	var first_node := String(view.get("node", ""))
-	view = shell.choose(0)
-	_check("TC-UX-001: a choice advances the scene", String(view.get("node", "")) != first_node)
-	# The readout follows the mechanic's state, so it is asserted after the first
-	# choice has moved power, not on the entry scene where nothing has happened yet.
-	_check("TC-UX-001: the mechanic readout is visible", shell.visible_text().contains("power"), shell.visible_text())
+	_check(
+		"TC-UX-001: the first scene offers a next step",
+		(view.get("choices", []) as Array).size() >= 1 or (view.get("actions", []) as Array).size() >= 1,
+	)
+	var first_turn := int(shell.session.turn)
+	shell.act("farm")
+	_check("TC-UX-001: taking a step advances the scene", int(shell.session.turn) == first_turn + 1, str(shell.session.turn))
+	# The readout follows the ledger, so it is asserted after the first action has
+	# moved a number, not on the entry scene where nothing has happened yet.
+	_check("TC-UX-001: the mechanic readout is visible", shell.visible_text().contains("grain"), shell.visible_text())
 	shell.save_to(1)
 	_check("TC-UX-001: saving reports the slot", shell.visible_text().contains("Saved to slot 1"), shell.visible_text())
-	var saved_node := String(shell.current_view().get("node", ""))
-	shell.choose(0)
+	var saved_turn := int(shell.session.turn)
+	shell.act("farm")
 	shell.load_from(1)
 	_check(
-		"TC-UX-001: loading the slot restores the saved node",
-		String(shell.current_view().get("node", "")) == saved_node,
-		"%s vs %s" % [String(shell.current_view().get("node", "")), saved_node],
+		"TC-UX-001: loading the slot restores the saved turn",
+		int(shell.session.turn) == saved_turn,
+		"%d vs %d" % [int(shell.session.turn), saved_turn],
 	)
 	_check("TC-UX-001: the restored scene is a session screen", shell.screen_name() == "session")
 	# The landing screen is a way in, not a menu: one line says what this is and
@@ -914,9 +975,9 @@ func _case_ux_001() -> void:
 	)
 	var resumed := shell.resume_slot("sanguo", 1)
 	_check(
-		"TC-UX-001: continue resumes at the saved scene",
-		String(resumed.get("node", "")) == saved_node,
-		"%s vs %s" % [String(resumed.get("node", "")), saved_node],
+		"TC-UX-001: continue resumes at the saved turn",
+		int(resumed.get("turn", -1)) == saved_turn,
+		"%d vs %d" % [int(resumed.get("turn", -1)), saved_turn],
 	)
 	_check("TC-UX-001: continue lands on a session screen", shell.screen_name() == "session")
 
@@ -2221,12 +2282,12 @@ func _case_scene() -> void:
 	)
 
 	var plain := _shell()
-	plain.start_plugin("sanguo")
+	plain.start_plugin("xiuxian")
 	var plain_labels := _button_labels(plain)
 	var turn_prefix := Locale.text("ui.turn_rank").get_slice("%d", 0)
 	_check(
 		"TC-SCENE-001: a package without actions looks exactly as before",
-		plain_labels.size() == 5 and not plain._status.text.contains(turn_prefix),
+		not plain._status.text.contains(turn_prefix) and not plain_labels.has("屯田"),
 		"%s %s" % [str(plain_labels), plain._status.text]
 	)
 

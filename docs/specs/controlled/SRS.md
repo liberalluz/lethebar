@@ -50,6 +50,7 @@ second.
 | `REQ-031` | A first visit says what it is downloading and whether the browser kept it. | The landing screen names the payload size once per profile and asks the player to keep the tab open; a cache write that fails is reported with its reason instead of being silent; a reload in the same profile does not repeat the sentence. |
 | `REQ-032` | A rule can move a relation, and a save keeps the result. | A rule names a pair the package declared and an `add` or `value` change; the session is the only writer of the faction map; the moved value survives a save and a resume; a rule that names an undeclared entity or a non-numeric change is refused at install with `V-31`. |
 | `REQ-033` | The scene states how the run stands. | The view carries the turns left, the entity the others lean toward, the entity they push against, and the resource closest to its declared floor; each section appears only when its source is declared; the scene draws one line from the catalog. |
+| `REQ-034` | The built-in Sanguo story is a full run, not a sketch. | It is budgeted at twenty-four turns over four resources, shows five ranks as the turn number passes them, can be lost three declared ways, offers a menu of five actions, and lets a rule move a relation; all of it is package data, and installing it changes nothing under `app/core`. |
 
 
 ## 3. Out of scope for v0.0.0
