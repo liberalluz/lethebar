@@ -9,22 +9,21 @@ English · [简体中文](README.zh-CN.md)
 
 ## Status
 
-**v0.1.0 is out and playable in a browser.**
+**v0.1.1 is out and playable in a browser.**
 
-- Eight content bricks are now the pack format: a ledger of numbers with bounds and
-  labels, rules that settle after an action, an action menu, a phase machine with ranks
-  and failure conditions, dice checks, item pools, directed relations, and a clock
-- A scene draws one button per action, keeps an unavailable one visible with its reason,
-  and shows the turn and the rank; an action can wait on a relation or on an item already
-  drawn, and can draw from a pool as part of itself
-- Three built-in stories ship with it: `sanguo` (`turn_based@1`), `xiuxian` (`linear@1`),
-  and `jianghu`, which is written only as data — a whole new kind of story on the same engine
-- Packs declare format `2.0.0`; a pack still on `1.0.0` installs with one warning until
-  `v0.2.0`, and the installer refuses a malformed or unmet requirement before it is played
-- A save waits for the storage layer to say it is durable, so the slot screen says
-  "Saving…" and only then "Saved"; a reload at that moment finds the run
-- The interface speaks English and Chinese, packs can carry their own text tables, and a
-  pack can declare pictures and sound that the scene draws and plays
+- Packs now name the engine capabilities they need (`text@1`, `render.2d@1`, …); a pack
+  that asks for something this build does not provide is refused at install, and the
+  refusal names the capability instead of failing somewhere inside the story
+- A package is held to a published install-time envelope before its manifest is read:
+  8 MB archive, 500 entries, 4 MB per entry, 32 MB unpacked, a path charset, 4096 px
+  pictures and 60 seconds of audio; every refusal names the value it measured
+- The first visit says how large the download is (about 42 MB) and asks for the tab to
+  stay open, once per browser; a cache write the browser refused is reported in the
+  interface with the browser's own reason
+- The pull request body of every batch carries a machine translation next to it, and a
+  stale or missing translation fails the gate
+- Eight content bricks remain the pack format from `v0.1.0`; three built-in stories ship,
+  one of them written only as data
 - Verified on desktop Chrome and on iOS Safari, online and with the network off
 - Known gaps: only PNG, JPEG and WAV; one picture band and one portrait column; CJK
   extension B still draws as boxes; relations cannot be changed by a rule yet
