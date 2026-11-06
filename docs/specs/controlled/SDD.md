@@ -186,6 +186,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-29` | every entry path is relative, lowercase and inside the charset whitelist | reject |
 | `V-30` | a declared picture is at most 4096 px on an edge and a declared sound is at most 2 MB and 60 seconds | reject |
 | `V-31` | a rule's relation change names entities the package declared and carries an `add` or `value` number | reject |
+| `V-33` | a package named in the assembly is not installed |
 | `V-36` | a package that names `cards.hand@1` ships a `data/cards.json` with a `hand` and a `deck` | reject |
 | `V-37` | every card's `cost` and `effects` name resources the ledger declares | reject |
 | `V-38` | every card id in the deck is declared in the package's `cards` table | reject |
@@ -639,6 +640,19 @@ assertions can say so. The three piles travel with the save, so a resume keeps
 the order it carries instead of shuffling again; a resumed run is the run that
 was saved, not a new deal.
 
+### 11.12 A run made of several packages
+
+A session may be opened from an ordered list of installed packages. The first
+supplies the nodes, the phase machine and the entry node; the rest may only
+add resources, actions, cards and pools. `PackageLoader.assemble()` resolves
+the list and refuses a name nothing installed provides, so a half-opened run
+never reaches the screen (`V-33`).
+
+Joining is not merging yet: a key two packages both declare keeps the earlier
+package's value and leaves one `W-05` naming the key. Override, append and
+disable arrive with the `layer` field (`ADR-0013`). The list travels in the
+save, so a resumed run rebuilds the same set.
+
 ## 12. Requirement mapping
 
 | REQ | Design |
@@ -683,7 +697,7 @@ was saved, not a new deal.
 | `REQ-038` | §11.9 the wrapped hand, `Shell.hand_columns()`, no `V-` code |
 | `REQ-039` | §11.10 the seeded reshuffle, `Session._shuffle_cards()`, no `V-` code |
 | `REQ-040` | §11.11 the world a package declares, `ManifestSchema.collection_of()`, `V-32`, `W-04`, `Shell.worlds()` |
-| `REQ-040` | §11.11 the world a package declares, `ManifestSchema.collection_of()`, `V-32`, `W-04`, `Shell.worlds()` |
+| `REQ-041` | §11.12 the assembly, `PackageLoader.assemble()`, `Session._merge_package()`, `V-33` |
 
 ## 13. Decisions and open questions
 

@@ -87,6 +87,9 @@ func write(entry: Dictionary, slot: int, snapshot: Dictionary, preview: String =
 		"pools": snapshot.get("pools", {}).duplicate(true),
 		"drawn": snapshot.get("drawn", []).duplicate(true),
 		"factions": snapshot.get("factions", {}).duplicate(true),
+		# A run of several packages writes the list it was opened from, so the
+		# slot says what it needs rather than the screen guessing (REQ-041).
+		"assembly": snapshot.get("assembly", []).duplicate(),
 		# The three piles of a hand travel with the run (REQ-036). A package
 		# without a hand writes three empty lists, which restores to what the
 		# package deals anyway.
@@ -160,6 +163,7 @@ func read(entry: Dictionary, slot: int) -> Dictionary:
 			"pools": payload.get("pools", {}),
 			"drawn": payload.get("drawn", []),
 			"factions": payload.get("factions", {}),
+			"assembly": payload.get("assembly", []),
 			"hand": payload.get("hand", []),
 			"deck": payload.get("deck", []),
 			"discard": payload.get("discard", []),

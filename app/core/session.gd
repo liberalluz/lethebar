@@ -46,6 +46,7 @@ var hand_spec: Dictionary
 var hand: Array
 var deck: Array
 var discard: Array
+var assembly: Array
 
 
 static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
@@ -116,6 +117,15 @@ static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
 		session.deck = []
 		session.discard = []
 	session.i18n = data.get("i18n", {}) if data.get("i18n", null) is Dictionary else {}
+	# A run can be opened from more than one package (REQ-041). The base entry
+	# supplies the nodes, the phases and the entry; the others may only add
+	# resources, actions, cards and pools. What two packages both declare is not
+	# resolved here: the earlier one keeps it and says so, because override and
+	# disable belong to the next batch (ADR-0013).
+	session.assembly = [session.plugin_id]
+	for extra in options.get("assembly", []):
+		if extra is Dictionary and not (extra as Dictionary).is_empty():
+			session._merge_package(extra)
 	session.locale = String(options.get("locale", ""))
 	var counter := int(options.get("start_counter", DEFAULT_START_COUNTER))
 	session.rng = ((session.plugin_id.hash() ^ (counter * 2654435761)) & 0x7FFFFFFF) | 1
@@ -544,6 +554,89 @@ func choices_of(node: Dictionary) -> Array:
 	return out
 
 
+func _merge_package(extra: Dictionary) -> void:
+	## Joins one more package into the run. Only additive bricks are merged: the
+	## nodes and the phase machine stay the base package's, because a story with
+	## two entry points is not a story (ADR-0013).
+	assembly.append(String(extra.get("id", "")))
+	var data: Dictionary = extra.get("data", {}) if extra.get("data", null) is Dictionary else {}
+	_merge_resources(data.get("ledger", {}))
+	_merge_actions(data.get("actions", []))
+	_merge_pools(data.get("pools", []))
+	_merge_cards(data.get("hand", {}))
+
+
+func _merge_resources(ledger: Variant) -> void:
+	if not (ledger is Dictionary):
+		return
+	for resource in (ledger as Dictionary).get("resources", []):
+		if not (resource is Dictionary) or not resource.has("id"):
+			continue
+		var key := String(resource["id"])
+		if ledger_defs.has(key):
+			reject("W-05", "resource %s is declared twice; the earlier package keeps it" % key)
+			continue
+		var single := Ledger.definitions({"resources": [resource]})
+		for name in single:
+			ledger_defs[name] = single[name]
+			state[name] = float(single[name].get("init", 0.0))
+
+
+func _merge_actions(incoming: Variant) -> void:
+	if not (incoming is Array):
+		return
+	var known: Array = []
+	for action in actions:
+		known.append(String(action.get("id", "")))
+	for action in incoming:
+		if not (action is Dictionary):
+			continue
+		var key := String(action.get("id", ""))
+		if known.has(key):
+			reject("W-05", "action %s is declared twice; the earlier package keeps it" % key)
+			continue
+		known.append(key)
+		actions.append(action)
+
+
+func _merge_pools(incoming: Variant) -> void:
+	if not (incoming is Array):
+		return
+	var known: Array = []
+	for pool in pools:
+		known.append(String(pool.get("id", "")))
+	for pool in incoming:
+		if not (pool is Dictionary):
+			continue
+		var key := String(pool.get("id", ""))
+		if known.has(key):
+			reject("W-05", "pool %s is declared twice; the earlier package keeps it" % key)
+			continue
+		known.append(key)
+		pools.append(pool)
+		pools_left[key] = Pools.remaining([pool]).get(key, [])
+
+
+func _merge_cards(incoming: Variant) -> void:
+	if not (incoming is Dictionary) or not Hand.declared(hand_spec):
+		return
+	for rank in ["size", "draw_per_turn", "reshuffle"]:
+		if hand_spec.has(rank):
+			continue
+		hand_spec[rank] = (incoming as Dictionary).get(rank, hand_spec.get(rank))
+	var cards: Dictionary = hand_spec.get("cards", {})
+	for card_id in (incoming as Dictionary).get("cards", {}):
+		if cards.has(card_id):
+			reject("W-05", "card %s is declared twice; the earlier package keeps it" % String(card_id))
+			continue
+		cards[card_id] = incoming["cards"][card_id]
+	hand_spec["cards"] = cards
+	var extra_deck: Array = (incoming as Dictionary).get("deck", [])
+	for card_id in extra_deck:
+		if not deck.has(card_id):
+			deck.append(card_id)
+
+
 func reject(code: String, message: String) -> void:
 	warnings.append({"code": code, "message": message})
 
@@ -682,6 +775,11 @@ func snapshot() -> Dictionary:
 		out["hand"] = hand.duplicate()
 		out["deck"] = deck.duplicate()
 		out["discard"] = discard.duplicate()
+	if assembly.size() > 1:
+		# A run made of several packages has to come back as the same set, or a
+		# resumed save would quietly lose the addition it was playing with
+		# (REQ-041).
+		out["assembly"] = assembly.duplicate()
 	return out
 
 

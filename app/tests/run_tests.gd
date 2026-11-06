@@ -77,6 +77,7 @@ func _initialize() -> void:
 	_case_hand_layout()
 	_case_shuffle()
 	_case_collection()
+	_case_assembly()
 	_case_limits()
 	_case_boot()
 	_case_assets()
@@ -3313,6 +3314,115 @@ func _case_capabilities() -> void:
 			broken.append(capability)
 	_check("TC-CAP-001: every known capability parses", broken.is_empty(), str(broken))
 	_check("TC-CAP-001: the table covers the bricks", known_ids.size() >= 17, str(known_ids.size()))
+
+
+func _assembly_package(name: String, variant: String = "") -> PackedByteArray:
+	## Two files make one story: the base brings the ledger, the node and one
+	## action; an addition brings its own resource and its own action. The
+	## duplicate variant declares a key the base already has, so the placeholder
+	## warning can be seen (merge semantics arrive in the next batch).
+	var resources := [{"id": "grain", "init": 10, "min": 0, "max": 20}]
+	var actions := [{"id": "farm", "label": "Farm", "effects": [{"grain": {"add": 2}}], "per_turn": 2}]
+	if variant == "addon":
+		resources = [{"id": "troops", "init": 3, "min": 0, "max": 9}]
+		actions = [{"id": "drill", "label": "Drill", "effects": [{"troops": {"add": 1}}], "per_turn": 2}]
+	if variant == "duplicate":
+		resources = [{"id": "grain", "init": 1, "min": 0, "max": 99}]
+		actions = []
+	var files := {
+		"data/state.json": JSON.stringify({"resources": resources}).to_utf8_buffer(),
+		"data/actions.json": JSON.stringify({"actions": actions}).to_utf8_buffer(),
+	}
+	return _package(
+		name,
+		{"id": name, "entry": "camp", "capabilities": ["ledger@1"], "mechanics": ["ledger"]},
+		[],
+		[],
+		{"nodes": [{"id": "camp", "text": "A camp.", "choices": []}]},
+		{},
+		files,
+	)
+
+
+func _case_assembly() -> void:
+	# A story and the addition that changes it are two files, and a player who
+	# installs both expects one run, not two. The session therefore has to be
+	# opened from an ordered list and show one merged view (ADR-0013). This batch
+	# stops at joining: a key two packages both declare is not resolved yet, it
+	# keeps the earlier value and says so, because override and disable are the
+	# next batch.
+	_section("TC-ASSEMBLY-001 a run can be opened from more than one package")
+	var loader := PackageLoader.new()
+	var base: Dictionary = loader.import_bytes(_assembly_package("asm-base"), _context())
+	var addon: Dictionary = loader.import_bytes(_assembly_package("asm-addon", "addon"), _context())
+	_check(
+		"TC-ASSEMBLY-001: both files of the assembly install",
+		base["status"] == "installed" and addon["status"] == "installed",
+		"%s / %s" % [base.get("code", ""), addon.get("code", "")],
+	)
+	var joined: Dictionary = loader.assemble(["asm-base", "asm-addon"])
+	_check(
+		"TC-ASSEMBLY-001: an assembly resolves to its packages in order",
+		joined.get("ok", false) and (joined["entries"] as Array).size() == 2,
+		str(joined.get("code", "")),
+	)
+	var entries: Array = joined.get("entries", [])
+	if entries.size() != 2:
+		return
+	var session := Session.create(entries[0], {"assembly": entries.slice(1)})
+	_check("TC-ASSEMBLY-001: a session opens from the assembly", session != null, "no session")
+	if session == null:
+		return
+	session.start()
+	var state: Dictionary = session.view()["state"]
+	_check(
+		"TC-ASSEMBLY-001: the readout shows the resources of both packages",
+		state.has("grain") and state.has("troops"),
+		str(state.keys()),
+	)
+	var ids: Array = []
+	for item in session.menu():
+		ids.append(String(item.get("id", "")))
+	_check(
+		"TC-ASSEMBLY-001: the menu carries the actions of both packages, in order",
+		ids == ["farm", "drill"],
+		str(ids),
+	)
+	_check(
+		"TC-ASSEMBLY-001: the assembly is recorded in the save",
+		session.snapshot().get("assembly", []) == ["asm-base", "asm-addon"],
+		str(session.snapshot().get("assembly", [])),
+	)
+	MemoryBackend.reset()
+	var store := SaveStore.new()
+	store.write(entries[0], 1, session.snapshot(), "Assembly")
+	var back: Dictionary = store.read(entries[0], 1)
+	var resumed := store.resume(entries[0], back["payload"], {"assembly": entries.slice(1)})
+	_check(
+		"TC-ASSEMBLY-001: a resumed run rebuilds the same packages",
+		resumed != null and resumed.view()["state"].has("troops"),
+		"read %s %s; resumed %s; keys %s" % [back.get("code", ""), back.get("message", ""), str(resumed != null), str((resumed.view()["state"] as Dictionary).keys()) if resumed != null else "none"],
+	)
+
+	var missing: Dictionary = loader.assemble(["asm-base", "asm-ghost"])
+	_check(
+		"TC-ASSEMBLY-001: a package the assembly names but nothing installed is refused",
+		not missing.get("ok", true) and String(missing.get("code", "")) == "V-33" and String(missing.get("message", "")).contains("asm-ghost"),
+		"%s %s" % [missing.get("code", ""), missing.get("message", "")],
+	)
+	loader.import_bytes(_assembly_package("asm-dupe", "duplicate"), _context())
+	var duped: Dictionary = loader.assemble(["asm-base", "asm-dupe"])
+	var dupe_entries: Array = duped.get("entries", [])
+	if dupe_entries.size() == 2:
+		var dupe_session := Session.create(dupe_entries[0], {"assembly": dupe_entries.slice(1)})
+		var codes: Array = []
+		for warning in dupe_session.view()["warnings"]:
+			codes.append(String(warning.get("code", "")))
+		_check(
+			"TC-ASSEMBLY-001: a key two packages both declare keeps the first and leaves one W-05",
+			codes.count("W-05") == 1 and float(dupe_session.view()["state"]["grain"]) == 10.0,
+			str(codes),
+		)
 
 
 func _cards_package(name: String, variant: String = "") -> PackedByteArray:
