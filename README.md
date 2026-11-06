@@ -9,19 +9,22 @@ English · [简体中文](README.zh-CN.md)
 
 ## Status
 
-**v0.2.1 is out and playable in a browser.** A run resumed from a save slot now
-reads in the language of the interface, so `Continue` on an English screen no longer
-opens a Chinese scene. Everything `v0.2.0` added still stands: Sanguo is a run of
-twenty-four turns over four resources, rules move the three factions against each
-other, and an English run reads English through its menu, ranks, resource words and
-failure reasons.
+**v0.3.0 is out and playable in a browser.** A hand of cards is a first-class thing
+now: a package declares a hand, a deck and the cards themselves, and the engine deals,
+plays, discards and reshuffles them from the run's seed. Duel ships as the fourth
+built-in story, with a face on every card. The shelf grew a level: a package names the
+world it belongs to, so the landing screen offers worlds first and packs second, and a
+single world still skips the screen. A run can also be opened from more than one
+package at once, sharing one readout and one menu.
 
-Known limits, unchanged: pictures and sound are drawn into one band and one portrait
-column, and only from PNG, JPEG and WAV; a run's clock is counted in turns or nodes,
-never in wall time; the shipped font covers the BMP and CJK extension A, so extension
-B still draws as boxes.
+Known limits: pictures and sound are drawn into one band and one portrait column, and
+only from PNG, JPEG and WAV; a run's clock is counted in turns or nodes, never in wall
+time; the shipped font covers the BMP and CJK extension A, so extension B still draws
+as boxes; and an assembly merges resources, actions, pools and cards while still
+taking its scene from one package.
 
-Next: v0.3.0, a card battle as a second genre, with `app/core` untouched.
+Next: v0.4.0, layer-aware assembly — precedence, an acyclic layer chain and a conflict
+code that names both packages, with behaviour still living only in `app/core`.
 
 
 This repository is public now because the plugin spec should be seen and challenged early.

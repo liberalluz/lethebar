@@ -1,5 +1,52 @@
 # Changelog
 
+## v0.3.0 - 2026-11-06
+
+### Added
+- `ADR-0012` gives a package an optional `collection` (`{id, names}`) and fixes the shelf as a world page above the pack list, skipped when only one world exists.
+- `ADR-0013` gives a session an assembly: an ordered package list, three merge semantics, an acyclic layer chain, `V-33`–`V-35` for conflicts, and the assembly recorded in the save.
+- `ADR-0014` records the four phases a mechanism mod passes through, from a field in its own package to a listed marketplace variant, and the hard line that a mod only changes what is declared.
+- `cards.hand@1` — a package declares a hand, a small deck and its cards, and the engine deals, plays, discards and draws them.
+- `app/core/hand.gd` — reads the declaration (`hand.size`, `hand.draw_per_turn`, `hand.reshuffle`, the `cards` table, the opening `deck`), deals the opening hand and refills it.
+- `Session.play_card()` — spends the cost, applies the effects through the same clamping the rules use, discards the card, draws a replacement and advances the turn by one.
+- `V-36`, `V-37`, `V-38` — a claimed `cards.hand@1` without a deck file, a card naming a resource the ledger never declares, and a deck naming a card the package never declares are refused at install with a message that names the missing thing.
+- A fourth built-in story, `duel`, written only as data: a hand of four cards drawn from a deck of eight, two plain actions, ten turns with three ranks and one failure. It plays with no change under `app/core` or `app/render`, which is what the card capability was for.
+- `TC-BUILTIN-004` in the test plan and the test design, in both languages: the opening hand, a played card, the refusal, the rank, the ending and a save that keeps the three piles.
+- `infra/checks/check_commit_body.py --ref <commit>` judges a single commit. The range mode cannot see a squash merge: the commit lands on the default branch and no branch is ahead of it.
+- `docs/specs/git-conventions.md` §2 states both rules: plain text wrapped at 72 columns, and the check that runs against `main` after a merge.
+- A card may name a picture its package declares; the hand draws it beside the label at `CARD_ICON_SIZE` (REQ-037).
+- `V-39`: a card naming an icon that no texture asset declares is refused at install, and the message names the missing path.
+- `Shell.card_rows()` reports what the last scene drew for the hand, so the headless smoke test can assert on a picture without reading pixels.
+- Six faces on the shipped `duel` cards, 64x64 PNG, one per card.
+- A hand is laid out in rows of as many cards as the window fits, so a long hand wraps instead of pushing the card faces and the menu below the fold.
+- The number of cards per row is measured from the window width (`Shell.hand_columns()`), so a resized window re-wraps the same hand.
+- A card that shares a row has its label cut at `HAND_LABEL_CHARS` with an ellipsis; a hand that fits on one row keeps the whole label.
+- `TC-HAND-001` covers the wrap: eight cards take more than one row at 600 px, every card is laid out once, a wider window needs fewer rows, and a short hand keeps its whole label.
+- A reshuffle can ask the session for an order: `Hand.draw_into()` takes an optional callable and keeps play order when no callable is given, so the function stays a pure function of what it is handed.
+- The session passes `_shuffle_cards()`, a Fisher-Yates pass over the run's own seeded generator, so one seed deals one order and another seed does not.
+- A package may declare `collection: {id, names}`, the world it belongs to, and the landing screen offers worlds before packs (PR 85).
+- A world title comes from the package that declares it and follows the interface locale; a world two packs word differently keeps one title, taken from the pack whose id sorts first.
+- `PackageLoader.assemble()` resolves an ordered list of installed packages into the entries a session is built from, and refuses a name nothing installed provides with `V-33`.
+- `Session` accepts `options.assembly`: the first package supplies the nodes, the phase machine and the entry, the rest may only add resources, actions, cards and pools.
+- `TC-ASSEMBLY-001` opens one run from two packages and covers the merged view, the merged menu, the missing package and the duplicate key.
+
+### Changed
+- `ADR-0010` is cut by world, not by genre: a theme repository holds packs, a genre repository holds material (example, template, acceptance list), and neither holds code. The card battle now moves into `lethebar-game-sanguo`, not into a repository of its own.
+- `ADR-0011` records `collection` and `layer`, resolves a composition before install rather than one file, and reviews by `kind`.
+- The scene draws the hand above the action menu, keeps a card it cannot pay for on screen with the reason and disables it, and the reason names the resource that is short (`S-08`).
+- `snapshot()` carries `hand`, `deck` and `discard` only when the package declares a hand, and a resume puts all three back before the scene is drawn.
+- `infra/tool/merge/pr_merge.py` now flattens the body it writes: inline code and bold lose their markers and every paragraph is filled at 72 columns, so a rendered pull-request body no longer becomes a commit message full of backticks and one 880-character line.
+- `--verify-only` applies the same rules, so the top commit of `origin/main` can be judged after a merge, which is the only moment a squashed message can first be read.
+- The `card` asset slot is skipped by the scene band instead of being reported as an unknown slot.
+- A package that allows a reshuffle now gets a shuffled deck instead of the discard pile in the order the cards were played. No package format field changed, and no package needs to be rebuilt.
+- `start_game()` opens the world screen only when more than one world holds packs, so a repository with a single theme keeps its click count.
+- A key that two packages both declare keeps the earlier package's value and leaves one `W-05` naming the key, instead of silently overwriting.
+- A save records the assembly when a run was opened from more than one package, so a resumed run rebuilds the same set; a single-package save keeps its old shape.
+
+### Fixed
+- The five decision records that had lived only in a conversation now exist in the repository, so the model can be read instead of remembered.
+- A pack that names a world with a malformed id or no titles is refused at install with `V-32` instead of showing up in a world nobody can name.
+
 ## v0.2.1 - 2026-11-06
 
 ### Changed
