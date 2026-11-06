@@ -78,6 +78,7 @@ func _initialize() -> void:
 	_case_shuffle()
 	_case_collection()
 	_case_assembly()
+	_case_layers()
 	_case_limits()
 	_case_boot()
 	_case_assets()
@@ -3423,6 +3424,124 @@ func _case_assembly() -> void:
 			codes.count("W-05") == 1 and float(dupe_session.view()["state"]["grain"]) == 10.0,
 			str(codes),
 		)
+
+
+func _layer_package(name: String, ignore: String = "") -> PackedByteArray:
+	## A layer names the package it sits on, not the other way round, so the only
+	## thing that makes it a layer is the target the assembly carries (REQ-042).
+	## It replaces one resource definition, adds one action and removes one.
+	var ledger := {
+		"resources": [{"id": "grain", "init": 10.0, "min": 0.0, "max": 99.0, "label": "粮"}],
+	}
+	var actions := {
+		"actions": [{"id": "drill", "label": "Drill", "per_turn": 1, "effects": [{"grain": {"add": 1}}]}],
+	}
+	var disable := {"actions": ["farm"]}
+	return _package(
+		name,
+		{"id": name, "capabilities": ["ledger@1"], "mechanics": ["ledger"]},
+		[],
+		[],
+		{},
+		{},
+		{
+			"data/state.json": JSON.stringify(ledger, "\t").to_utf8_buffer(),
+			"data/actions.json": JSON.stringify(actions, "\t").to_utf8_buffer(),
+			"data/disable.json": JSON.stringify(disable, "\t").to_utf8_buffer(),
+		},
+	)
+
+
+func _base_package(name: String) -> PackedByteArray:
+	var ledger := {
+		"resources": [{"id": "grain", "init": 10.0, "min": 0.0, "max": 20.0, "label": "粮"}],
+	}
+	var actions := {
+		"actions": [{"id": "farm", "label": "Farm", "per_turn": 1, "effects": [{"grain": {"add": 5}}]}],
+	}
+	return _package(
+		name,
+		{"id": name, "capabilities": ["ledger@1"], "mechanics": ["ledger"]},
+		[],
+		[],
+		{},
+		{},
+		{
+			"data/state.json": JSON.stringify(ledger, "\t").to_utf8_buffer(),
+			"data/actions.json": JSON.stringify(actions, "\t").to_utf8_buffer(),
+		},
+	)
+
+
+func _case_layers() -> void:
+	## TC-WIRE-002: a layer package changes the package it names. The three
+	## semantics are the whole contract: override a definition, append new
+	## entries, disable names. Everything else — a layer on a package that is not
+	## in the assembly, a layer on itself, two layers pointing at each other — is
+	## refused before a run opens.
+	var loader := PackageLoader.new()
+	var context := {"engine_version": "4.7.2", "work_dir": FIXTURE_DIR}
+	var base: Dictionary = loader.import_bytes(_base_package("lay-base"), context)
+	var layer: Dictionary = loader.import_bytes(_layer_package("lay-mod"), context)
+	_check("TC-WIRE-002: a base and its layer install", base["status"] == "installed" and layer["status"] == "installed", "%s %s" % [base.get("code", ""), layer.get("code", "")])
+
+	var resolved: Dictionary = loader.assemble([{"id": "lay-base"}, {"id": "lay-mod", "target": "lay-base"}])
+	var entries: Array = resolved.get("entries", [])
+	_check(
+		"TC-WIRE-002: an assembly entry may name the package it sits on",
+		resolved.get("ok", false) and entries.size() == 2 and String((entries[1] as Dictionary).get("target", "")) == "lay-base",
+		"%s %s" % [resolved.get("code", ""), resolved.get("message", "")],
+	)
+	if not resolved.get("ok", false):
+		return
+	var layered := Session.create(entries[0], {"assembly": entries.slice(1)})
+	var lay_state: Dictionary = layered.view()["state"]
+	_check("TC-WIRE-002: a layer overrides a definition it declares", float(lay_state.get("grain", 0.0)) == 10.0 and float(layered.ledger_defs["grain"]["max"]) == 99.0, "%s %s" % [str(lay_state), str(layered.ledger_defs)])
+	var lay_ids: Array = []
+	for action in layered.actions:
+		lay_ids.append(String(action.get("id", "")))
+	_check("TC-WIRE-002: a layer appends an action and disables one", lay_ids == ["drill"], str(lay_ids))
+	_check("TC-WIRE-002: the assembly records the layer in order", (layered.snapshot().get("assembly", []) as Array) == ["lay-base", "lay-mod"], str(layered.snapshot().get("assembly", [])))
+
+	var alone := Session.create(entries[0], {})
+	var alone_ids: Array = []
+	for action in alone.actions:
+		alone_ids.append(String(action.get("id", "")))
+	_check(
+		"TC-WIRE-002: without the layer the base is untouched",
+		alone_ids == ["farm"] and float(alone.ledger_defs["grain"]["max"]) == 20.0,
+		"%s %s" % [str(alone_ids), str(alone.ledger_defs)],
+	)
+
+	var stranger: Dictionary = loader.assemble([{"id": "lay-base"}, {"id": "lay-mod", "target": "nobody"}])
+	_check(
+		"TC-WIRE-002: a layer on a package the assembly does not name is refused",
+		not stranger.get("ok", true) and String(stranger.get("code", "")) == "V-34" and String(stranger.get("message", "")).contains("nobody"),
+		"%s %s" % [stranger.get("code", ""), stranger.get("message", "")],
+	)
+	var itself: Dictionary = loader.assemble([{"id": "lay-mod", "target": "lay-mod"}])
+	_check(
+		"TC-WIRE-002: a layer on itself is refused",
+		not itself.get("ok", true) and String(itself.get("code", "")) == "V-34",
+		"%s %s" % [itself.get("code", ""), itself.get("message", "")],
+	)
+	var ring: Dictionary = loader.import_bytes(_layer_package("lay-ring"), context)
+	_check("TC-WIRE-002: a second layer installs", ring["status"] == "installed", str(ring.get("code", "")))
+	var cycling: Dictionary = loader.assemble([
+		{"id": "lay-mod", "target": "lay-ring"},
+		{"id": "lay-ring", "target": "lay-mod"},
+	])
+	_check(
+		"TC-WIRE-002: two layers pointing at each other are refused",
+		not cycling.get("ok", true) and String(cycling.get("code", "")) == "V-34" and String(cycling.get("message", "")).contains("returns to"),
+		"%s %s" % [cycling.get("code", ""), cycling.get("message", "")],
+	)
+	var twice: Dictionary = loader.assemble(["lay-base", "lay-base"])
+	_check(
+		"TC-WIRE-002: a package named twice is refused",
+		not twice.get("ok", true) and String(twice.get("code", "")) == "V-34",
+		"%s %s" % [twice.get("code", ""), twice.get("message", "")],
+	)
 
 
 func _cards_package(name: String, variant: String = "") -> PackedByteArray:

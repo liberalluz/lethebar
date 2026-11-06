@@ -78,9 +78,9 @@ static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
 			session.nodes[String(node["id"])] = node
 	if data.get("mechanics", null) is Dictionary:
 		session.mechanics = data["mechanics"]
-	session.rules = data.get("rules", []) if data.get("rules", null) is Array else []
-	session.actions = data.get("actions", []) if data.get("actions", null) is Array else []
-	session.checks = data.get("checks", []) if data.get("checks", null) is Array else []
+	session.rules = (data.get("rules", []) as Array).duplicate(true) if data.get("rules", null) is Array else []
+	session.actions = (data.get("actions", []) as Array).duplicate(true) if data.get("actions", null) is Array else []
+	session.checks = (data.get("checks", []) as Array).duplicate(true) if data.get("checks", null) is Array else []
 	# An absent phases file must stay absent: `Phases.defines({})` fills in the
 	# defaults, and `Phases.declares()` then reads every package as having a phase
 	# machine. Keeping `{}` here is what lets a node without choices end a run
@@ -90,7 +90,7 @@ static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
 		session.phase = Phases.defines(raw_phases)
 	else:
 		session.phase = {}
-	session.pools = data.get("pools", []) if data.get("pools", null) is Array else []
+	session.pools = (data.get("pools", []) as Array).duplicate(true) if data.get("pools", null) is Array else []
 	session.pools_left = Pools.remaining(session.pools)
 	session.pools_shuffled = {}
 	session.drawn = []
@@ -125,7 +125,10 @@ static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
 	session.assembly = [session.plugin_id]
 	for extra in options.get("assembly", []):
 		if extra is Dictionary and not (extra as Dictionary).is_empty():
-			session._merge_package(extra)
+			if String((extra as Dictionary).get("target", "")) != "":
+				session._apply_layer(extra)
+			else:
+				session._merge_package(extra)
 	session.locale = String(options.get("locale", ""))
 	var counter := int(options.get("start_counter", DEFAULT_START_COUNTER))
 	session.rng = ((session.plugin_id.hash() ^ (counter * 2654435761)) & 0x7FFFFFFF) | 1
@@ -564,6 +567,64 @@ func _merge_package(extra: Dictionary) -> void:
 	_merge_actions(data.get("actions", []))
 	_merge_pools(data.get("pools", []))
 	_merge_cards(data.get("hand", {}))
+
+
+func _apply_layer(extra: Dictionary) -> void:
+	## A layer changes the package it names instead of adding a story (REQ-042).
+	## The three semantics are the record's, not code's convenience: a declared
+	## resource is replaced wholesale, new entries join the lists they belong to,
+	## and the names in `data/disable.json` leave them. A fourth semantic is a new
+	## decision, so there is none here (ADR-0013).
+	assembly.append(String(extra.get("id", "")))
+	var data: Dictionary = extra.get("data", {}) if extra.get("data", null) is Dictionary else {}
+	_override_resources(data.get("ledger", {}))
+	_merge_actions(data.get("actions", []))
+	_merge_pools(data.get("pools", []))
+	_merge_cards(data.get("hand", {}))
+	_disable(data.get("disable", {}))
+
+
+func _override_resources(ledger: Variant) -> void:
+	if not (ledger is Dictionary):
+		return
+	for resource in (ledger as Dictionary).get("resources", []):
+		if not (resource is Dictionary) or not resource.has("id"):
+			continue
+		var key := String(resource["id"])
+		if not ledger_defs.has(key):
+			continue
+		var single := Ledger.definitions({"resources": [resource]})
+		for name in single:
+			ledger_defs[name] = single[name]
+			var low := float(single[name].get("min", 0.0))
+			var high := float(single[name].get("max", 0.0))
+			state[name] = clampf(float(state.get(name, float(single[name].get("init", 0.0)))), low, high)
+
+
+func _disable(disable: Variant) -> void:
+	if not (disable is Dictionary):
+		return
+	for raw in (disable as Dictionary).get("actions", []):
+		var action_id := String(raw)
+		for index in range(actions.size() - 1, -1, -1):
+			if String((actions[index] as Dictionary).get("id", "")) == action_id:
+				actions.remove_at(index)
+	for raw in (disable as Dictionary).get("pools", []):
+		var pool_id := String(raw)
+		for index in range(pools.size() - 1, -1, -1):
+			if String((pools[index] as Dictionary).get("id", "")) == pool_id:
+				pools.remove_at(index)
+		pools_left.erase(pool_id)
+	for raw in (disable as Dictionary).get("cards", []):
+		var card_id := String(raw)
+		for pile in [hand, deck, discard]:
+			for index in range((pile as Array).size() - 1, -1, -1):
+				if String((pile as Array)[index]) == card_id:
+					(pile as Array).remove_at(index)
+	for raw in (disable as Dictionary).get("resources", []):
+		var key := String(raw)
+		ledger_defs.erase(key)
+		state.erase(key)
 
 
 func _merge_resources(ledger: Variant) -> void:

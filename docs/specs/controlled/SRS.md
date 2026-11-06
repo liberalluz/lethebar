@@ -58,6 +58,7 @@ second.
 | `REQ-039` | A deck is shuffled from the run's seed: one seed deals one order, another seed does not, and a save keeps the order it carries. | P1 |
 | `REQ-040` | A package may name the world it belongs to: the landing screen offers worlds first and packs second, one world skips that screen, and two packs that word the same world differently still share it. | P1 |
 | `REQ-041` | A run can be opened from more than one package at once. The base package supplies the nodes, the phases and the entry; the others may add resources, actions, cards and pools, and the view shows one merged run. A package the assembly names but nothing installed provides is refused before the run starts, naming it (`V-33`). |
+| `REQ-042` | A layer package changes the package it names, through override, append and disable. | P1 |
 
 
 ## 3. Out of scope for v0.0.0

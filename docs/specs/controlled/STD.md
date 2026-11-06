@@ -749,3 +749,20 @@ Exit: the view carries `grain` and `troops`; the menu lists `farm` then `drill`;
 the snapshot records both ids; the resumed run still carries `troops`; the
 missing package is refused with `V-33` naming it; the duplicate leaves exactly
 one `W-05` and keeps the first value.
+
+
+## TC-WIRE-002 — a layer changes the package it names
+
+- Covers: `REQ-042`
+- Fixtures: `lay-base` (grain 10 within 0..20, action `farm`), `lay-mod` (grain
+  bounds 0..99, action `drill`, `data/disable.json` removing `farm`), `lay-ring`.
+- Steps:
+  1. Install the base and the layer.
+  2. Assemble `[{id: lay-base}, {id: lay-mod, target: lay-base}]` and open a run.
+  3. Read the resource bounds, the action ids and the assembly record.
+  4. Open the base alone and compare.
+  5. Assemble a layer on a package that is not there, a layer on itself, two
+     layers pointing at each other, and the base twice.
+- Exit: the layered run carries the 0..99 bound, the menu holds only `drill`,
+  and the assembly records `lay-base` then `lay-mod`; the base alone still holds
+  `farm` and the 0..20 bound; each of the four bad assemblies returns `V-34`.
