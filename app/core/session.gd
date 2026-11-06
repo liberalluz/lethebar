@@ -199,9 +199,10 @@ func _clamped(values: Dictionary) -> Dictionary:
 func _state_labels() -> Dictionary:
 	var out: Dictionary = {}
 	for id in ledger_defs:
-		var text := Ledger.label_for(ledger_defs, String(id), float(state.get(id, 0.0)))
+		var value := float(state.get(id, 0.0))
+		var text := Ledger.label_for(ledger_defs, String(id), value)
 		if text != "":
-			out[id] = text
+			out[id] = localise("resource.%s.%d" % [String(id), int(value)], text)
 	return out
 
 
@@ -279,11 +280,22 @@ func _after_turn() -> void:
 	if Phases.declares(phase):
 		var failed := Phases.failure(phase, state)
 		if not failed.is_empty():
-			fail_reason = String(failed.get("reason", ""))
+			fail_reason = localise("failure.%d" % _failure_index(failed), String(failed.get("reason", "")))
 			finished = true
 			return
 		if turn > int(phase.get("turns", Phases.DEFAULT_TURNS)):
 			finished = true
+
+
+func _failure_index(entry: Dictionary) -> int:
+	## The position of the failure that ended the run, which is the key its
+	## translation is filed under: the story does not invent stable ids for them.
+	var index := 0
+	for item in phase.get("fail", []):
+		if item is Dictionary and item == entry:
+			return index
+		index += 1
+	return 0
 
 
 func draw(pool_id: String) -> Dictionary:
@@ -333,17 +345,43 @@ func faction_map() -> Array:
 	return out
 
 
+func localise(key: String, fallback: String) -> String:
+	## A label the package wrote, in the locale this session plays in. The table's
+	## `strings` section is keyed by the thing being named (`action.farm`,
+	## `rank.6`, `resource.standing.2`, `failure.0`); a key it leaves out falls
+	## back to the package's own text, never to an empty label (REQ-035).
+	var table := locale_text()
+	if table.is_empty():
+		return fallback
+	var strings: Variant = table.get("strings", null)
+	if not (strings is Dictionary):
+		return fallback
+	var translated := String(strings.get(key, ""))
+	return translated if translated != "" else fallback
+
+
 func rank() -> String:
-	return Phases.rank(phase, turn)
+	return localise("rank.%d" % _rank_at(), Phases.rank(phase, turn))
+
+
+func _rank_at() -> int:
+	## The `at` of the rank the run has reached, which is the key its translation
+	## is filed under; before the first rank there is no key to look up.
+	var at := 0
+	for entry in phase.get("ranks", []):
+		if entry is Dictionary and turn >= int(entry.get("at", 0)):
+			at = int(entry.get("at", 0))
+	return at
 
 
 func menu() -> Array:
 	var out: Array = []
 	for action in actions:
 		var availability := Menu.availability(action, self)
+		var action_id := String(action.get("id", ""))
 		out.append({
-			"id": String(action.get("id", "")),
-			"label": String(action.get("label", action.get("id", ""))),
+			"id": action_id,
+			"label": localise("action.%s" % action_id, String(action.get("label", action_id))),
 			"enabled": availability["enabled"],
 			"reason": String(availability["reason"]),
 		})

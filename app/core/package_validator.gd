@@ -462,14 +462,46 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 				true,
 			))
 			continue
-		var gap := locale_gaps(locale, package_nodes, tables.get(locale, null))
+		var gap := locale_gaps(locale, package_nodes, tables.get(locale, null), _label_keys(context))
 		if gap != "":
 			issues.append(_issue("V-22", "locales", gap, true))
 
 	return issues
 
 
-static func locale_gaps(locale: String, nodes: Array, table: Variant) -> String:
+static func _label_keys(context: Dictionary) -> Array:
+	## The labels a run is made of, in the order the player meets them: each
+	## action, each rank, each labelled value of a resource, each reported failure.
+	## A locale table that describes the scene and forgets the menu is the same
+	## half-translation V-22 already refuses (REQ-035).
+	var keys: Array = []
+	for entry in context.get("actions", []):
+		if entry is Dictionary:
+			keys.append("action.%s" % String(entry.get("id", "")))
+	var phases: Variant = context.get("phases", {})
+	if phases is Dictionary:
+		for entry in phases.get("ranks", []):
+			if entry is Dictionary:
+				keys.append("rank.%d" % int(entry.get("at", 0)))
+		var index := 0
+		for entry in phases.get("fail", []):
+			if entry is Dictionary:
+				keys.append("failure.%d" % index)
+			index += 1
+	var ledger: Variant = context.get("ledger", {})
+	if ledger is Dictionary:
+		for id in ledger:
+			var entry: Variant = ledger[id]
+			if not entry is Dictionary:
+				continue
+			var labels: Variant = entry.get("labels", null)
+			if labels is Dictionary:
+				for value in labels:
+					keys.append("resource.%s.%s" % [String(id), String(value)])
+	return keys
+
+
+static func locale_gaps(locale: String, nodes: Array, table: Variant, extra_keys: Array = []) -> String:
 	## Returns the first place a declared locale falls short, or "" when every
 	## node and every choice it offers has a label in that language.
 	if not table is Dictionary:
@@ -495,6 +527,15 @@ static func locale_gaps(locale: String, nodes: Array, table: Variant) -> String:
 		for label in labels:
 			if not label is String or String(label).strip_edges() == "":
 				return "data/i18n/%s.json has an empty label in node %s" % [locale, node_id]
+	var strings: Variant = table.get("strings", null)
+	if extra_keys.is_empty():
+		return ""
+	if not strings is Dictionary:
+		return "data/i18n/%s.json has no strings section for %s" % [locale, String(extra_keys[0])]
+	for key in extra_keys:
+		var translated := String(strings.get(String(key), ""))
+		if translated.strip_edges() == "":
+			return "data/i18n/%s.json has no string for %s" % [locale, String(key)]
 	return ""
 
 

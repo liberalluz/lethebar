@@ -472,6 +472,28 @@ The scene prints the reading as one more segment of the readout line, through
 `ui.turns_left`, `ui.leaning`, `ui.friction` and `ui.tight`, so the line follows
 the interface language like the rest of the screen.
 
+### 11.6 The labels a run is made of follow the locale
+
+A run is not made of one sentence: it is a menu of actions, a rank, the words a
+resource reads as, and the reason a run ended. The translation table used to
+describe those things not at all, so an English run read an English scene and
+then met Chinese buttons.
+
+The table gains an optional `strings` section keyed by the thing being named:
+`action.<id>`, `rank.<turn>`, `resource.<id>.<value>` for a label picked from a
+declared list, and `failure.<index>` for the position in the phase machine's
+declared failures. `Session.localise()` looks a key up when it builds the view,
+so the shell keeps receiving plain strings and the render layer did not change.
+A key the table leaves out falls back to the package's own text: a Chinese label
+in an English run is a defect the gap check reports, while an empty button is a
+broken run.
+
+`V-22` measures the same keys it now can describe. A package that ships a table
+for a locale must translate every action, rank, labelled value and failure it
+declares, because a table that covers the scene and forgets the menu is the same
+half-translation the check already refused.
+
+
 ## 12. Requirement mapping
 
 | REQ | Design |
@@ -510,6 +532,7 @@ the interface language like the rest of the screen.
 | `REQ-032` | §4.2 `V-31`, `app/core/mechanics.gd` relation changes, `app/core/session.gd` writer and payload field |
 | `REQ-033` | §11.5 situation reading, `app/core/session.gd` `situation()`, `app/render/shell.gd` readout |
 | `REQ-034` | §10.1 the Sanguo run, `content/builtin/sanguo/**` data only |
+| `REQ-035` | §11.6 the labels a run is made of, `Session.localise()`, `V-22` |
 
 ## 13. Decisions and open questions
 

@@ -56,6 +56,7 @@ func _initialize() -> void:
 	_case_locale()
 	_case_i18n()
 	_case_i18n_shipped()
+	_case_i18n_labels()
 	_case_format()
 	_case_ledger()
 	_case_turn()
@@ -1682,6 +1683,122 @@ func _case_ledger() -> void:
 
 
 
+func _labels_package(name: String, strings: Dictionary) -> PackedByteArray:
+	## A run whose labels are all package text: a rank ladder, a labelled
+	## resource, an action and a way to lose. The English table describes the same
+	## things the package declares, which is what V-22 measures.
+	var nodes := {"nodes": [{"id": "n1", "text": "开场。", "choices": []}]}
+	var actions := {
+		"actions": [
+			{"id": "farm", "label": "屯田", "costs": {}, "effects": [{"grain": {"add": 5}}]},
+			{"id": "burn", "label": "烧粮", "costs": {}, "effects": [{"grain": {"value": 0}}]},
+		],
+	}
+	var files := {
+		"data/actions.json": JSON.stringify(actions).to_utf8_buffer(),
+		"data/state.json": JSON.stringify({
+			"resources": [
+				{"id": "grain", "init": 10, "min": 0, "max": 20},
+				{"id": "standing", "init": 2, "min": 0, "max": 2, "labels": {"0": "兵微将寡", "2": "名动诸侯"}},
+			],
+		}).to_utf8_buffer(),
+		"data/phases.json": JSON.stringify({
+			"turns": 6,
+			"ranks": [{"at": 1, "title": "校尉"}, {"at": 4, "title": "将军"}],
+			"fail": [{"when": {"key": "grain", "op": "lte", "value": 0}, "reason": "粮草断绝"}],
+		}).to_utf8_buffer(),
+		"data/i18n/en.json": JSON.stringify({"n1": {"text": "Opening.", "choices": []}, "strings": strings}).to_utf8_buffer(),
+	}
+	return _package(name, {"id": name, "defaultLocale": "zh-CN", "locales": ["en"]}, [], [], nodes, {}, files)
+
+
+func _case_i18n_labels() -> void:
+	## B36. A run is made of labels: what the menu offers, what your rank is, what
+	## a resource is called in words, and why the run ended. The table could only
+	## describe node text before this, so an English run read Chinese there.
+	_section("TC-I18N-002 the labels a run is made of follow the locale")
+	var strings := {
+		"action.farm": "Farm",
+		"action.burn": "Burn the stores",
+		"rank.1": "Captain",
+		"rank.4": "General",
+		"resource.standing.0": "Bare",
+		"resource.standing.2": "Well-off",
+		"failure.0": "The grain ran out.",
+	}
+	var loader := PackageLoader.new()
+	var result := loader.import_bytes(_labels_package("labels-run", strings), _context())
+	_check(
+		"TC-I18N-002: a package whose table covers its labels installs",
+		result["status"] == "installed",
+		"%s %s" % [String(result.get("code", "-")), String(result.get("message", ""))],
+	)
+	if result["status"] != "installed":
+		return
+	var entry: Dictionary = loader.registry.entry("labels-run")
+
+	var english := Session.create(entry, {"locale": "en"}).start()
+	var english_view: Dictionary = english
+	var english_actions: Array = english_view.get("actions", [])
+	_check(
+		"TC-I18N-002: the menu reads in the locale it plays in",
+		english_actions.size() == 2 and String(english_actions[0].get("label", "")) == "Farm",
+		str(english_actions),
+	)
+	_check(
+		"TC-I18N-002: the rank reads in the locale it plays in",
+		String(english_view.get("rank", "")) == "Captain",
+		String(english_view.get("rank", "")),
+	)
+	_check(
+		"TC-I18N-002: a labelled resource reads in the locale it plays in",
+		String(english_view.get("labels", {}).get("standing", "")) == "Well-off",
+		str(english_view.get("labels", {})),
+	)
+
+	var chinese := Session.create(entry, {"locale": "zh-CN"}).start()
+	var chinese_actions: Array = chinese.get("actions", [])
+	_check(
+		"TC-I18N-002: a locale with no table keeps the package text",
+		chinese_actions.size() == 2 and String(chinese_actions[0].get("label", "")) == "屯田",
+		str(chinese_actions),
+	)
+
+	var losing := Session.create(entry, {"locale": "en"})
+	losing.start()
+	losing.act("burn")
+	_check(
+		"TC-I18N-002: the reason a run ended reads in the locale it plays in",
+		String(losing.view().get("failReason", "")) == "The grain ran out.",
+		String(losing.view().get("failReason", "")),
+	)
+
+	# A key the table leaves out is a gap V-22 refuses, so the fallback can only be
+	# reached by a table that never passed the checker; the session still must not
+	# blank a label.
+	var partial: Dictionary = entry.duplicate(true)
+	partial["data"]["i18n"]["en"]["strings"].erase("action.farm")
+	var fallback := Session.create(partial, {"locale": "en"})
+	fallback.start()
+	var fallback_actions: Array = fallback.view().get("actions", [])
+	_check(
+		"TC-I18N-002: a key the table leaves out falls back to the package text",
+		fallback_actions.size() == 2 and String(fallback_actions[0].get("label", "")) == "屯田",
+		str(fallback_actions),
+	)
+
+	var gap_strings := strings.duplicate(true)
+	gap_strings.erase("action.burn")
+	var refused := PackageLoader.new().import_bytes(_labels_package("labels-gap", gap_strings), _context())
+	_check(
+		"TC-I18N-002: a table that describes the scene but not the menu is refused",
+		refused["status"] != "installed"
+			and String(refused.get("code", "")) == "V-22"
+			and String(refused.get("message", "")).contains("action.burn"),
+		"%s %s" % [String(refused.get("code", "-")), String(refused.get("message", ""))],
+	)
+
+
 func _case_save_flush() -> void:
 	_section("TC-SAVE-003 a save is durable before the scene moves on")
 	MemoryBackend.reset()
@@ -2480,19 +2597,19 @@ func _case_builtin_003() -> void:
 	# The waiting action carries its reason inside the label, so match its prefix.
 	var waiting := false
 	for label in labels:
-		if String(label).begins_with("拔出那柄旧剑"):
+		if String(label).begins_with("Draw the old sword"):
 			waiting = true
 	_check(
 		"TC-BUILTIN-003: the scene draws one button per declared action",
-		labels.size() == 6 and labels.has("上后山搜寻") and waiting,
+		labels.size() == 6 and labels.has("Search the back hill") and waiting,
 		str(labels),
 	)
 	_check(
 		"TC-BUILTIN-003: the first turn shows the first rank the package declared",
-		shell._status.text.contains("初入江湖"),
+		shell._status.text.contains("new to the road"),
 		shell._status.text,
 	)
-	var wield_before := _button_pressed_text(shell, "拔出那柄旧剑")
+	var wield_before := _button_pressed_text(shell, "Draw the old sword")
 	_check(
 		"TC-BUILTIN-003: the action that waits on the item starts out unavailable",
 		wield_before != null and wield_before.disabled,
@@ -2504,7 +2621,7 @@ func _case_builtin_003() -> void:
 		shell._status.text.contains("old_sword"),
 		shell._status.text,
 	)
-	var wield_after := _button_pressed_text(shell, "拔出那柄旧剑")
+	var wield_after := _button_pressed_text(shell, "Draw the old sword")
 	_check(
 		"TC-BUILTIN-003: the drawn item unlocks the action that waits on it",
 		wield_after != null and not wield_after.disabled,
@@ -2517,7 +2634,7 @@ func _case_builtin_003() -> void:
 			break
 	_check(
 		"TC-BUILTIN-003: playing on ends the run with the failure reason the package declared",
-		bool(ended.get("finished", false)) and String(ended.get("failReason", "")) == "力竭而退",
+		bool(ended.get("finished", false)) and String(ended.get("failReason", "")) == "You are spent and turn back.",
 		"%s %s" % [str(ended.get("finished", false)), String(ended.get("failReason", ""))],
 	)
 	var english := Session.create(loader.registry.entry("jianghu"), {"start_counter": 1, "locale": "en"})
