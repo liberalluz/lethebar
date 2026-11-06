@@ -688,3 +688,27 @@ reads 2; `Charge` is refused with a message naming `edge` and the hand is unchan
   hold every card exactly once; no row asks for more than 600 px; the wider
   window needs fewer rows; the short hand stays on one row with its whole label;
   the last child of the options column is still a button.
+
+
+## TC-SHUFFLE-001 — a deck is shuffled from the run's seed
+
+- Covers: `REQ-039`
+- Preconditions: a package with `hand {size 2, draw_per_turn 1, reshuffle true}`,
+  six cards `c0`–`c5` in the deck, ten turns.
+- Steps:
+  1. Draw from a deck with no order given and confirm the hand takes the front
+     card, in play order.
+  2. Draw again with an order that reverses the discard pile and confirm the hand
+     takes the last card played.
+  3. Play twenty turns and confirm every card appears exactly once across the
+     three piles.
+  4. Fill a hand from a six-card discard with the session's own order and confirm
+     the card drawn is not the front of the discard.
+  5. Play twenty turns twice from the same start counter and confirm both runs
+     end with the same deck and hand.
+  6. Play twenty turns from another start counter and confirm the deck or hand
+     differs from the first run.
+  7. Save the first run, resume it and confirm the deck order is the saved one.
+- Exit criteria: the deck is shuffled from the run's seed, so the same seed deals
+  the same order, another seed does not, and a resumed run keeps the order its
+  save carried.

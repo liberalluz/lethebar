@@ -55,6 +55,7 @@ second.
 | `REQ-036` | A package can deal a hand and hold a deck. | A package declares a hand, a small deck and the cards themselves; the scene shows the cards it can play and disables the ones it cannot pay for with the reason; playing a card spends what it costs, applies what it does, discards the card, draws a replacement and advances the turn by one; the hand, the deck and the discard pile survive a save and a resume; a deck that names a card the package never declares, a card that names a resource the ledger never declares, and a capability claimed without a deck file are refused at install with `V-38`, `V-37` and `V-36`. |
 | `REQ-037` | A card may name a picture its package declares; the hand draws it beside the label, and a card that names a picture nobody declared is refused at install. | P1 |
 | `REQ-038` | A hand wider than the window wraps into more rows, and every card and every menu button stays inside the window. | P1 |
+| `REQ-039` | A deck is shuffled from the run's seed: one seed deals one order, another seed does not, and a save keeps the order it carries. | P1 |
 
 
 ## 3. Out of scope for v0.0.0

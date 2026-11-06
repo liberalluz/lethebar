@@ -579,6 +579,20 @@ Three things are fixed when the hand is laid out rather than when it is drawn:
 REQ-038 maps to `Shell.hand_columns()`, `Shell.hand_row_count()` and
 `Shell._fill_hand_rows()`.
 
+### 11.10 A reshuffle uses the run's seed
+
+`Hand.draw_into()` stays a pure function: it takes the piles and, when the deck
+runs out and the package allows a reshuffle, it hands the discard pile back as
+the deck in the order of its caller. When no order is given it keeps play order,
+which is what a package without `reshuffle` never reaches.
+
+The session passes an order: `_shuffle_cards()`, a Fisher-Yates pass over the
+run's own generator (`_next_rng()`, seeded from the plugin id and the start
+counter). One seed therefore deals one order and another seed does not, and the
+assertions can say so. The three piles travel with the save, so a resume keeps
+the order it carries instead of shuffling again; a resumed run is the run that
+was saved, not a new deal.
+
 ## 12. Requirement mapping
 
 | REQ | Design |
@@ -621,6 +635,7 @@ REQ-038 maps to `Shell.hand_columns()`, `Shell.hand_row_count()` and
 | `REQ-036` | §11.7 the hand, `app/core/hand.gd`, `V-36`–`V-38` |
 | `REQ-037` | §11.8 card faces, `app/core/hand.gd`, `V-39` |
 | `REQ-038` | §11.9 the wrapped hand, `Shell.hand_columns()`, no `V-` code |
+| `REQ-039` | §11.10 the seeded reshuffle, `Session._shuffle_cards()`, no `V-` code |
 
 ## 13. Decisions and open questions
 

@@ -4,7 +4,7 @@ English · [简体中文](STP.zh-CN.md)
 
 ## Scope
 
-Covers the thirty-eight P1 requirements of `SRS.md` (v0.0.0) against the design in
+Covers the thirty-nine P1 requirements of `SRS.md` (v0.0.0) against the design in
 `SDD.md`. Does not cover the plugin market, the plugin editor, 3D, multiplayer,
 accounts, cloud saves, or the native iOS build; those are out of scope for
 v0.0.0 and have no tests here by design.
@@ -85,6 +85,7 @@ claims: if they fail, the architecture claim fails, not just a feature.
 | `TC-CARDS-001` | `REQ-036` | A package that declares a hand deals it, a card spends its cost and applies its effect as one turn, an unaffordable card is refused by name and stays in the hand, the three piles survive a save and a resume, and a deck naming an undeclared card, a card naming an undeclared resource and a claimed `cards.hand@1` without a deck file are refused at install with `V-38`, `V-37` and `V-36`. |
 | `TC-CARDS-002` | `REQ-037` | A card that names a texture its package declares shows that picture beside its label and reports it in the view, a card that names none is drawn without a picture, a declared texture whose bytes do not decode keeps the label and leaves one warning, and a card naming an icon no texture asset declares is refused at install with `V-39` naming the missing path. |
 | `TC-HAND-001` | `REQ-038` | A hand of eight wraps into rows inside the window, every card is laid out once, a wider window needs fewer rows, and a short hand keeps its whole label. |
+| `TC-SHUFFLE-001` | `REQ-039` | Without an order a reshuffle keeps play order, a caller's order is honoured, every card comes back once, a reshuffle is not play order, one seed deals the same order twice, another seed does not, and a resume keeps the saved order. |
 | `TC-I18N-001` | `REQ-020` | A package with an English table shows English text and English choice labels when the reader's language is English, keeps its own text in the undeclared language, and a package whose table drops a scene or a choice is refused by `V-22`. |
 | `TC-FMT-001` | `REQ-021` | A `2.0.0` bundle with no requirements installs; a package whose `kind`/`layer`/`requires` are malformed is refused with `V-23`; one whose requirement is missing or outside its range is refused with `V-24` naming the package and the installed version; a satisfiable requirement installs; a `1.0.0` package still installs and carries exactly one `W-01` warning. |
 | `TC-LEDGER-001` | `REQ-022` | A declared resource starts at its `init` value; an effect above `max` is clamped rather than refused; a rule that names a resource `state.json` never declares is refused with `V-14` naming it; a rule that reads a value the same choice changed sees the new value; a labelled resource shows its label while the number is unchanged; the values survive a save and a resume. |

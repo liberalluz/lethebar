@@ -75,6 +75,7 @@ func _initialize() -> void:
 	_case_cards()
 	_case_card_art()
 	_case_hand_layout()
+	_case_shuffle()
 	_case_limits()
 	_case_boot()
 	_case_assets()
@@ -2696,6 +2697,135 @@ func _case_hand_layout() -> void:
 
 
 
+func _shuffle_package(name: String) -> PackedByteArray:
+	## Six distinct cards, two in hand, one drawn a turn. Small enough that a run
+	## empties the deck quickly, large enough that "the refill happens to equal
+	## the play order" is not something a passing test can rely on.
+	var cards: Array = []
+	var deck: Array = []
+	for index in 6:
+		cards.append({
+			"id": "c%d" % index,
+			"label": "Card %d" % index,
+			"cost": {},
+			"effects": [],
+		})
+		deck.append("c%d" % index)
+	var files := {
+		"data/state.json": JSON.stringify({
+			"resources": [{"id": "grain", "init": 5, "min": 0, "max": 20}],
+		}).to_utf8_buffer(),
+		"data/phases.json": JSON.stringify({
+			"turns": 40,
+			"ranks": [{"at": 1, "title": "Captain"}],
+			"fail": [],
+		}).to_utf8_buffer(),
+		"data/cards.json": JSON.stringify({
+			"hand": {"size": 2, "draw_per_turn": 1, "reshuffle": true},
+			"cards": cards,
+			"deck": deck,
+		}).to_utf8_buffer(),
+	}
+	return _package(
+		name,
+		{"id": name, "entry": "c1", "capabilities": ["cards.hand@1", "ledger@1", "phases@1"], "mechanics": ["cards", "ledger", "phases"]},
+		[],
+		[],
+		{"nodes": [{"id": "c1", "text": "A deck on the table.", "choices": []}]},
+		{},
+		files,
+	)
+
+
+func _play_turns(session: Session, count: int) -> void:
+	for index in count:
+		if session.hand.is_empty():
+			return
+		session.play_card(String(session.hand[0]))
+
+
+func _case_shuffle() -> void:
+	# The deck refilled in the order the cards were played, which let a player
+	# learn eight cards by heart and made `reshuffle: true` mean "cycle". The
+	# order now comes from the run's seeded generator, and the generator belongs
+	# to the session: the hand stays a pure function of what it is handed.
+	_section("TC-SHUFFLE-001 a deck is shuffled from the run's seed")
+	var piles := {"hand": [], "deck": [], "discard": ["a", "b", "c"]}
+	var plain: Dictionary = Hand.draw_into(piles, {"reshuffle": true}, 1)
+	_check(
+		"TC-SHUFFLE-001: a caller that gives no order still gets play order",
+		str(plain.get("hand", [])) == '["a"]',
+		str(plain.get("hand", [])),
+	)
+	var reversed: Dictionary = Hand.draw_into(piles, {"reshuffle": true}, 1, func(cards: Array) -> Array:
+		var out := cards.duplicate()
+		out.reverse()
+		return out
+	)
+	_check(
+		"TC-SHUFFLE-001: the order the caller passes is the order the deck takes",
+		str(reversed.get("hand", [])) == '["c"]',
+		str(reversed.get("hand", [])),
+	)
+
+	var shell := _shell()
+	shell.try_import(_shuffle_package("shuffle-run"))
+	if shell.session == null:
+		_check("TC-SHUFFLE-001: the shuffle fixture installs", false, str(shell.notice))
+		return
+	var session: Session = shell.session
+	_play_turns(session, 8)
+	var everywhere := {}
+	for card_id in session.hand + session.deck + session.discard:
+		everywhere[String(card_id)] = int(everywhere.get(String(card_id), 0)) + 1
+	_check("TC-SHUFFLE-001: the reshuffle keeps every card exactly once", everywhere.size() == 6, str(everywhere))
+	# A reshuffle must not hand the discard pile back in the order it was played.
+	var seeded := Session.create(shell.entry, {"start_counter": 7})
+	var refill := Hand.draw_into(
+		{"hand": [], "deck": [], "discard": ["c0", "c1", "c2", "c3", "c4", "c5"]},
+		{"reshuffle": true},
+		1,
+		Callable(seeded, "_shuffle_cards"),
+	)
+	_check(
+		"TC-SHUFFLE-001: the reshuffled deck is not the order the cards were played",
+		str(refill["hand"]) != '["c0"]',
+		str(refill["hand"]),
+	)
+
+	# The seed is the session's: one playthrough repeats, another does not.
+	var first := Session.create(shell.entry, {"start_counter": 7})
+	first.start()
+	_play_turns(first, 20)
+	var second := Session.create(shell.entry, {"start_counter": 7})
+	second.start()
+	_play_turns(second, 20)
+	var other := Session.create(shell.entry, {"start_counter": 8})
+	other.start()
+	_play_turns(other, 20)
+	_check(
+		"TC-SHUFFLE-001: the same seed deals the same order",
+		str(first.deck) == str(second.deck) and str(first.hand) == str(second.hand),
+		"%s vs %s" % [str(first.deck), str(second.deck)],
+	)
+	_check(
+		"TC-SHUFFLE-001: another seed deals another order",
+		str(first.deck) != str(other.deck) or str(first.hand) != str(other.hand),
+		"%s vs %s" % [str(first.deck), str(other.deck)],
+	)
+
+	# A save carries the order, so a resume must not shuffle again.
+	var saves := SaveStore.new(MemoryBackend.new())
+	saves.write(shell.entry, 1, first.snapshot(), "shuffled")
+	var loaded: Dictionary = saves.read(shell.entry, 1)
+	var resumed := saves.resume(shell.entry, loaded["payload"], {}) if bool(loaded.get("ok", false)) else null
+	_check(
+		"TC-SHUFFLE-001: the resume keeps the deck order the save carries",
+		resumed != null and str(resumed.deck) == str(first.deck),
+		"save %s, resume %s" % [str(first.deck), str(resumed.deck) if resumed != null else "none"],
+	)
+
+
 func _case_wire() -> void:
 	# Two bricks could only be reached from the assertions: a relation had a value
 	# nothing waited on, and a pool could only be drawn by calling the API. These
@@ -3784,4 +3914,6 @@ func _wav_bytes() -> PackedByteArray:
 	header.encode_u32(36, 0x61746164)  # data
 	header.encode_u32(40, data.size())
 	return header + data
+
+
 
