@@ -1,0 +1,17 @@
+{
+  "table": {
+    "text": "Two low tables stand on the drill ground. The man across from you lays his blade across his knees and says nothing. You move first.",
+    "choices": []
+  },
+  "strings": {
+    "action.taunt": "Call him out",
+    "action.steady": "Settle your breath",
+    "rank.1": "untried",
+    "rank.4": "a name worth watching",
+    "rank.7": "the talk of the ground",
+    "failure.0": "Your guard is broken and the duel stops.",
+    "resource.edge.0": "edge: plain",
+    "resource.edge.5": "edge: rising",
+    "resource.edge.9": "edge: overwhelming"
+  }
+}

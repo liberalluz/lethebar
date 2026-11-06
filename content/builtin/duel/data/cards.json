@@ -1,0 +1,16 @@
+{
+  "hand": {
+    "size": 4,
+    "draw_per_turn": 1,
+    "reshuffle": true
+  },
+  "cards": [
+    {"id": "heavy", "label": "力劈", "cost": {"guard": {"add": -4}}, "effects": [{"edge": {"add": 5}}]},
+    {"id": "strike", "label": "快斩", "cost": {"guard": {"add": -2}}, "effects": [{"edge": {"add": 3}}]},
+    {"id": "feint", "label": "虚招", "cost": {"guard": {"add": -1}}, "effects": [{"edge": {"add": 2}}]},
+    {"id": "breathe", "label": "调息", "cost": {}, "effects": [{"guard": {"add": 3}}]},
+    {"id": "charge", "label": "蓄势", "cost": {"edge": {"add": -9}}, "effects": [{"guard": {"add": 5}}]},
+    {"id": "parry", "label": "稳守", "cost": {}, "effects": [{"guard": {"add": 2}}]}
+  ],
+  "deck": ["heavy", "strike", "breathe", "feint", "charge", "parry", "heavy", "strike"]
+}

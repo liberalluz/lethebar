@@ -1,0 +1,6 @@
+{
+  "resources": [
+    {"id": "guard", "label": "守卫", "init": 12, "min": 0, "max": 15},
+    {"id": "edge", "label": "气势", "init": 0, "min": 0, "max": 9, "labels": {"0": "气势平平", "5": "气势渐盛", "9": "气势如虹"}}
+  ]
+}

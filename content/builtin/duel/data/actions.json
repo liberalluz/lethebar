@@ -1,0 +1,16 @@
+{
+  "actions": [
+    {
+      "id": "taunt",
+      "label": "喝阵",
+      "effects": [{"edge": {"add": 1}}],
+      "limit": {"per_turn": 1}
+    },
+    {
+      "id": "steady",
+      "label": "沉气",
+      "effects": [{"guard": {"add": 1}}],
+      "limit": {"per_turn": 1}
+    }
+  ]
+}

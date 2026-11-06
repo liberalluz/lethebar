@@ -23,6 +23,7 @@ until it was amended. Markdown is therefore refused here, with the reason in
 
 from __future__ import annotations
 
+import argparse
 import re
 import subprocess
 import sys
@@ -102,7 +103,61 @@ def _markdown(body: str, kind: str) -> bool:
     return bool(UNDERSCORE.search(prose))
 
 
-def main() -> int:
+def inspect(sha: str, body: str) -> list[str]:
+    """Every problem with one commit message, in the wording the gate uses."""
+    details: list[str] = []
+    subject = body.splitlines()[0] if body.splitlines() else ""
+    if not field(body, "Why"):
+        details.append(f"{sha[:8]} {subject}: missing 'Why:'")
+    batch = field(body, "Batch")
+    if not batch:
+        details.append(
+            f"{sha[:8]} {subject}: missing 'Batch:' (write 'Batch: none' when there is no card)"
+        )
+    elif not BATCH_VALUE.match(batch.split()[0]):
+        details.append(f"{sha[:8]} {subject}: 'Batch: {batch}' should be B<n>, B<n><letter>, or none")
+    for mark in ("backtick", "bold", "underscore-bold"):
+        if _markdown(body, mark):
+            details.append(
+                f"{sha[:8]} {subject}: the body carries {mark} markup; a commit message is plain text"
+            )
+    return details
+
+
+def check_one(ref: str) -> int:
+    """Judge one commit, whatever branch it sits on.
+
+    The range mode below can only see `origin/main..HEAD`, so a message that a
+    squash merge created is invisible to it: the commit lands on the default
+    branch and no branch is ahead of it. That is how `63862c7` carried ten
+    backticks and an 880-character line while every gate stayed green.
+    """
+    try:
+        sha = git("rev-parse", ref).strip()
+        body = git("show", "-s", "--format=%B", sha)
+    except RuntimeError as error:
+        print(f"[commit-body] cannot read {ref}: {error}")
+        return 1
+    problems = inspect(sha, body)
+    if problems:
+        for problem in problems:
+            print(f"[commit-body] {problem}")
+        print("[commit-body] see docs/specs/git-conventions.md §2")
+        return 1
+    print(f"[commit-body] {sha[:8]} carries Why: and Batch:")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Check the message of a commit.")
+    parser.add_argument(
+        "--ref",
+        help="judge this commit alone, for example origin/main after a squash merge",
+    )
+    args = parser.parse_args(argv)
+    if args.ref:
+        return check_one(args.ref)
+
     base = base_ref()
     if base is None:
         print("[commit-body] no main branch to compare against; nothing to check")
@@ -125,21 +180,7 @@ def main() -> int:
 
     problems: list[str] = []
     for sha, body in commits:
-        subject = body.splitlines()[0] if body.splitlines() else ""
-        if not field(body, "Why"):
-            problems.append(f"{sha[:8]} {subject}: missing 'Why:'")
-        batch = field(body, "Batch")
-        if not batch:
-            problems.append(f"{sha[:8]} {subject}: missing 'Batch:' (write 'Batch: none' when there is no card)")
-        elif not BATCH_VALUE.match(batch.split()[0]):
-            problems.append(
-                f"{sha[:8]} {subject}: 'Batch: {batch}' should be B<n>, B<n><letter>, or none"
-            )
-        for mark in ("backtick", "bold", "underscore-bold"):
-            if _markdown(body, mark):
-                problems.append(
-                    f"{sha[:8]} {subject}: the body carries {mark} markup; a commit message is plain text"
-                )
+        problems.extend(inspect(sha, body))
 
     if problems:
         for problem in problems:

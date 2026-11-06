@@ -1,0 +1,18 @@
+{
+  "id": "duel",
+  "version": "0.1.0",
+  "specVersion": "2.0.0",
+  "kind": "bundle",
+  "requires": [],
+  "engine": ">=4.7.0 <5.0.0",
+  "name": "校场决斗",
+  "defaultLocale": "zh-CN",
+  "locales": ["en"],
+  "names": {"zh-CN": "校场决斗", "en": "Duel at the drill ground"},
+  "protocol": "linear@1",
+  "capabilities": ["cards.hand@1", "ledger@1", "phases@1", "text@1"],
+  "mechanics": [],
+  "entry": "table",
+  "saveSchema": 1,
+  "assets": []
+}
