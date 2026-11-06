@@ -21,6 +21,7 @@ const CHECKS_PATH := "data/checks.json"
 const POOLS_PATH := "data/pools.json"
 const FACTIONS_PATH := "data/factions.json"
 const CARDS_PATH := "data/cards.json"
+const DISABLE_PATH := "data/disable.json"
 const DEFAULT_WORK_DIR := "user://pkg"
 
 var registry: InstallRegistry
@@ -126,6 +127,12 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 		var cards_variant: Variant = JSON.parse_string(reader.read_file(CARDS_PATH).get_string_from_utf8())
 		if cards_variant is Dictionary:
 			data["hand"] = cards_variant
+	# A layer removes entries by name instead of replacing the list that holds
+	# them (ADR-0013), so the names it wants gone travel in their own file.
+	if files.has(DISABLE_PATH):
+		var disable_variant: Variant = JSON.parse_string(reader.read_file(DISABLE_PATH).get_string_from_utf8())
+		if disable_variant is Dictionary:
+			data["disable"] = disable_variant
 	# Only the bytes a declared asset actually points at are read, and they stay
 	# undecoded: the render layer turns them into a texture or a stream when a
 	# scene asks for one (SDD §8.1 — read from memory, never from disk mid-run).
@@ -208,9 +215,23 @@ func assemble(ids: Array) -> Dictionary:
 	## Resolves the ordered package list a run is built from (ADR-0013). A name
 	## nothing installed is refused here rather than half-opened later, and the
 	## refusal names the package so an author can act on it (V-33).
-	var entries: Array = []
+	##
+	## An entry is either a package id or a record that also names `target`: a
+	## layer changes the package it sits on instead of adding another story
+	## (REQ-042). The chain is accepted only when every target is in the same
+	## assembly and the targets do not close on each other, because a cycle is a
+	## mistake to report rather than a loop to break (V-34).
+	var requests: Array = []
 	for raw in ids:
-		var plugin_id := String(raw)
+		if raw is Dictionary:
+			var record: Dictionary = raw
+			requests.append({"id": String(record.get("id", "")), "target": String(record.get("target", ""))})
+		else:
+			requests.append({"id": String(raw), "target": ""})
+	var entries: Array = []
+	var names: Array = []
+	for request in requests:
+		var plugin_id := String(request["id"])
 		if not registry.has(plugin_id):
 			return {
 				"ok": false,
@@ -218,9 +239,54 @@ func assemble(ids: Array) -> Dictionary:
 				"message": "the assembly names %s, which is not installed" % plugin_id,
 				"entries": [],
 			}
-		entries.append(registry.entry(plugin_id))
-	if entries.is_empty():
+		if names.has(plugin_id):
+			return {
+				"ok": false,
+				"code": "V-34",
+				"message": "the assembly names %s twice" % plugin_id,
+				"entries": [],
+			}
+		names.append(plugin_id)
+	if entries.is_empty() and names.is_empty():
 		return {"ok": false, "code": "V-33", "message": "the assembly names no package", "entries": []}
+	for request in requests:
+		var target := String(request["target"])
+		if target != "" and not names.has(target):
+			return {
+				"ok": false,
+				"code": "V-34",
+				"message": "the layer %s sits on %s, which this assembly does not name" % [String(request["id"]), target],
+				"entries": [],
+			}
+		if target != "" and target == String(request["id"]):
+			return {
+				"ok": false,
+				"code": "V-34",
+				"message": "the layer %s sits on itself" % String(request["id"]),
+				"entries": [],
+			}
+	var targets := {}
+	for request in requests:
+		if String(request["target"]) != "":
+			targets[String(request["id"])] = String(request["target"])
+	for request in requests:
+		var walk := String(request["id"])
+		var seen: Array = []
+		while targets.has(walk):
+			if seen.has(walk):
+				return {
+					"ok": false,
+					"code": "V-34",
+					"message": "the layer chain returns to %s" % walk,
+					"entries": [],
+				}
+			seen.append(walk)
+			walk = String(targets[walk])
+	for request in requests:
+		var entry: Dictionary = registry.entry(String(request["id"])).duplicate(true)
+		if String(request["target"]) != "":
+			entry["target"] = String(request["target"])
+		entries.append(entry)
 	return {"ok": true, "code": "", "message": "", "entries": entries}
 
 

@@ -187,6 +187,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-30` | a declared picture is at most 4096 px on an edge and a declared sound is at most 2 MB and 60 seconds | reject |
 | `V-31` | a rule's relation change names entities the package declared and carries an `add` or `value` number | reject |
 | `V-33` | a package named in the assembly is not installed |
+| `V-34` | A layer names a target the assembly does not contain, sits on itself, closes a chain, or a package is named twice. | fatal |
 | `V-36` | a package that names `cards.hand@1` ships a `data/cards.json` with a `hand` and a `deck` | reject |
 | `V-37` | every card's `cost` and `effects` name resources the ledger declares | reject |
 | `V-38` | every card id in the deck is declared in the package's `cards` table | reject |
@@ -653,6 +654,22 @@ package's value and leaves one `W-05` naming the key. Override, append and
 disable arrive with the `layer` field (`ADR-0013`). The list travels in the
 save, so a resumed run rebuilds the same set.
 
+## 11.13 A layer changes the package it names
+
+An assembly entry may carry a `target` beside its id (REQ-042). A package that
+does so is a layer: it does not add another story, it edits the one below it.
+Three semantics exist and no fourth: a resource definition the layer declares
+replaces the base definition wholesale (bounds included, the current value
+clamped into the new bounds); new actions, pools and cards are appended after
+the base entries; names listed in `data/disable.json` are removed from
+actions, pools, cards and the ledger.
+
+The target is resolved at assembly time, not in the manifest, because
+`manifest.layer` already means which of the six layers a package belongs to
+(ADR-0007). A layer whose target is not in the same assembly, a layer that
+sits on itself, a chain that returns to a package it already touched, and a
+package named twice are all refused with `V-34` before a run opens.
+
 ## 12. Requirement mapping
 
 | REQ | Design |
@@ -698,6 +715,7 @@ save, so a resumed run rebuilds the same set.
 | `REQ-039` | §11.10 the seeded reshuffle, `Session._shuffle_cards()`, no `V-` code |
 | `REQ-040` | §11.11 the world a package declares, `ManifestSchema.collection_of()`, `V-32`, `W-04`, `Shell.worlds()` |
 | `REQ-041` | §11.12 the assembly, `PackageLoader.assemble()`, `Session._merge_package()`, `V-33` |
+| `REQ-042` | §11.13 the layer, `PackageLoader.assemble()`, `Session._apply_layer()`, `V-34` |
 
 ## 13. Decisions and open questions
 

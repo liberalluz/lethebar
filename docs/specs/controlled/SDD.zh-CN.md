@@ -174,6 +174,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-30` | 声明的图片任一边不超过 4096 px，声音不超过 2 MB 且不超过 60 秒 | 拒绝 |
 | `V-31` | 规则里的关系变化点名包裹声明过的实体，并带 `add` 或 `value` 数字 | 拒绝 |
 | `V-33` | 装配里点名的包没有安装 |
+| `V-34` | 层的目标不在装配内、指向自身、链成环，或同一个包被命名两次。 | fatal |
 | `V-36` | 声明 `cards.hand@1` 的包裹带有 `hand` 与 `deck` 的 `data/cards.json` | 拒绝 |
 | `V-37` | 每张牌的 `cost` 与 `effects` 都点名账本声明过的资源 | 拒绝 |
 | `V-38` | 牌库里的每个牌 id 都在包裹的 `cards` 表里声明过 | 拒绝 |
@@ -542,6 +543,17 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 点名的 `W-05`。覆盖、追加与禁用随 `layer` 字段到来（`ADR-0013`）。这份列表
 随存档保存，所以恢复出来的是同一组包。
 
+## 11.13 层包改动的是它命名的那个包
+
+装配条目可以在 id 之外带一个 `target`（REQ-042）。带了就是层：它不再加一个故事，
+而是改它下面那个。语义只有三种，没有第四种：层声明的资源定义整体替换基座的定义
+（含上下限，当前值按新上下限夹一次）；新的动作、池子、牌追加在基座条目之后；
+`data/disable.json` 里列出的名字从动作、池子、牌与账本里移除。
+
+目标在装配时解析，不写进 manifest，因为 `manifest.layer` 已经表示这个包属于六层中的
+哪一层（ADR-0007）。目标不在同一装配里、层指向自身、链回到已经走过的包、同一个包
+出现两次，都在开局前以 `V-34` 拒绝。
+
 ## 12. 需求映射
 
 | REQ | 设计 |
@@ -585,6 +597,7 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 | `REQ-039` | §11.10 按种子洗牌，`Session._shuffle_cards()`，无 `V-` 码 |
 | `REQ-040` | §11.11 包裹声明的世界，`ManifestSchema.collection_of()`，`V-32`、`W-04`、`Shell.worlds()` |
 | `REQ-041` | §11.12 装配，`PackageLoader.assemble()`、`Session._merge_package()`、`V-33` |
+| `REQ-042` | §11.13 层包，`PackageLoader.assemble()`，`Session._apply_layer()`，`V-34` |
 | `REQ-040` | §11.11 包裹声明的世界，`ManifestSchema.collection_of()`，`V-32`、`W-04`、`Shell.worlds()` |
 | `REQ-034` | §10.1 三国的一局、`content/builtin/sanguo/**` 的数据 |
 | `REQ-031` | §11.4 首访提示、`infra/export_web.py` 的缓存探针 |
