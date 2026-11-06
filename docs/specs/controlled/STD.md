@@ -506,6 +506,21 @@ path, so the case survives fixture renames.
   backend is busy and says saved only after it agrees; the slot screen stays where
   it is; without a flush hook the write is finished at once.
 
+## TC-SAVE-004 — a resumed run reads in the locale of the interface
+
+- Covers: `REQ-028`.
+- Fixture: a run whose English table names the opening scene, two actions, two
+  ranks, a labelled resource and one way to lose, saved while the interface is
+  Chinese.
+- Steps:
+  1. Save the run and read the payload back.
+  2. Resume it with the interface set to English and read the view.
+  3. Resume the same payload with the interface set to Chinese.
+  4. Resume it again without passing a locale.
+- Exit: the English resume reads the translated scene text, menu labels, rank and
+  labelled resource; the Chinese resume reads the package's own text; the resume with
+  no locale falls back to the package text rather than failing.
+
 ### `TC-CAP-001` capabilities are checked at install
 
 - Covers: `REQ-029`.

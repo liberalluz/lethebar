@@ -224,7 +224,7 @@ func resume_slot(plugin_id: String, slot: int) -> Dictionary:
 	if not bool(result.get("ok", false)):
 		open_notice(String(result.get("code", "")), String(result.get("message", "")))
 		return current_view()
-	var restored := saves.resume(record, result["payload"])
+	var restored := saves.resume(record, result["payload"], {"locale": Locale.current()})
 	if restored == null:
 		open_notice(
 			SaveStore.CODE_NODE, "slot %d points at a scene this pack no longer has" % slot

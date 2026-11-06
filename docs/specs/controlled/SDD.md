@@ -335,6 +335,12 @@ second, and a frame budget would be a fraction of the window storage needs.
 Installing a package writes to the same store and passes through the same gate:
 `mark_writing()` exists so that a reload cannot outrun an install either.
 
+A resumed session takes the locale of the interface, not the package default. The
+save records a run, not a preference, so the locale does not travel inside the
+payload: `resume()` takes it as an option and the shell passes the language it is
+currently reading in. A payload that carries no such field still resumes, in the
+package's own text.
+
 ## 8. Asset strategy
 
 ### 8.1 Resolution
