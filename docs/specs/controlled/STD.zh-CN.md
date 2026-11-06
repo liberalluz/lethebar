@@ -489,3 +489,23 @@
   4. 让缓存状态带上 `QuotaExceededError` 读一次提示文本，再让错误为空读一次。
 - 出口：第一次读到的文本点名体量并要求保持标签页；缓存状态说明 worker 有没有收下
   载荷；重载之后什么也不说；失败文本替换首访那句话，并包含原因。
+
+## TC-CARDS-001 - 手牌被发出、打出并保留
+
+- Covers: `REQ-036`
+- 夹具：一份声明 `capabilities: ["cards.hand@1", "ledger@1", "phases@1"]` 的包裹，账本两个资源
+  （`grain`、`coin`），阶段机八回合一个段位，`data/cards.json` 里 `hand {size: 2, draw_per_turn: 1,
+  reshuffle: true}`、两张牌（`raid` 花三枚 coin 换四份 grain，`feast` 花两份 grain 换三枚 coin）
+  以及牌库 `["raid", "feast", "raid"]`。
+
+1. 安装并打开这个包裹。
+2. 读场景给出的手牌。
+3. 打出 `raid`。
+4. 试着打一张这一局付不起的牌。
+5. 存到存档位 1，重载并读档。
+6. 安装三个变体：点名不存在的牌、点名账本没声明的资源、声明 `cards.hand@1` 但文件里没有 `hand`。
+
+出口判据：开局手牌是 `["raid", "feast"]` 且视图带着它；打出 `raid` 后 coin 余 2、grain 变 14，
+牌进弃牌堆，补回一张，回合推进到 2；打不起的牌以 `S-08` 拒绝，消息里点名 `coin`，手牌不变；
+存档载荷带 `hand`、`deck` 与 `discard`，读档后三堆一致；三个坏包分别以 `V-38`、`V-37`、`V-36`
+拒绝安装。

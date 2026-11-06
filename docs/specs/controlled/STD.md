@@ -606,3 +606,26 @@ path, so the case survives fixture renames.
 - Exit: the first read names the size and asks for the tab to stay open; the cache
   state reports whether the worker stored the payload; the reload says nothing;
   the failure text replaces the first-visit sentence and contains the reason.
+
+## TC-CARDS-001 - a hand is dealt, played and kept
+
+- Covers: `REQ-036`
+- Fixture: a package that declares `capabilities: ["cards.hand@1", "ledger@1", "phases@1"]`,
+  a ledger of two resources (`grain`, `coin`), a phase machine of eight turns with one rank, and
+  a `data/cards.json` holding `hand {size: 2, draw_per_turn: 1, reshuffle: true}`, two cards
+  (`raid` costing three coin and giving four grain, `feast` costing two grain and giving three
+  coin) and the deck `["raid", "feast", "raid"]`.
+
+1. Install the package and open it.
+2. Read the hand the scene shows.
+3. Play `raid`.
+4. Try to play a card the run cannot afford.
+5. Save to slot 1, reload and resume.
+6. Install the variants that name a missing card, a resource the ledger never declares, and a
+   claimed `cards.hand@1` with no `hand` in the file.
+
+Exit criteria: the opening hand is `["raid", "feast"]` and the view carries it; playing `raid`
+leaves coin 2 and grain 14, moves the card to the discard pile, draws a replacement and advances
+the turn to 2; an unaffordable card is refused with `S-08`, the message names `coin`, and the hand
+is unchanged; the saved payload carries `hand`, `deck` and `discard`, and the resumed run holds the
+same three piles; the three bad packages are refused with `V-38`, `V-37` and `V-36`.

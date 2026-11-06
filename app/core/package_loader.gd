@@ -20,6 +20,7 @@ const PHASES_PATH := "data/phases.json"
 const CHECKS_PATH := "data/checks.json"
 const POOLS_PATH := "data/pools.json"
 const FACTIONS_PATH := "data/factions.json"
+const CARDS_PATH := "data/cards.json"
 const DEFAULT_WORK_DIR := "user://pkg"
 
 var registry: InstallRegistry
@@ -67,7 +68,7 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 
 	var manifest: Dictionary = manifest_variant
 	var node_ids: Array = []
-	var data := {"nodes": [], "mechanics": {}, "assets": {}, "i18n": {}, "ledger": {}, "rules": [], "actions": [], "phases": {}, "checks": [], "pools": [], "factions": {}}
+	var data := {"nodes": [], "mechanics": {}, "assets": {}, "i18n": {}, "ledger": {}, "rules": [], "actions": [], "phases": {}, "checks": [], "pools": [], "factions": {}, "hand": {}}
 
 	if files.has(NODES_PATH):
 		var nodes_variant: Variant = JSON.parse_string(reader.read_file(NODES_PATH).get_string_from_utf8())
@@ -118,6 +119,13 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 		var factions_variant: Variant = JSON.parse_string(reader.read_file(FACTIONS_PATH).get_string_from_utf8())
 		if factions_variant is Dictionary:
 			data["factions"] = factions_variant
+	# A hand is a deck, a set of cards and the size of the hand (REQ-036). It is
+	# kept whole so the session can deal from it; the validator resolves every
+	# card id and every cost key before a run may start.
+	if files.has(CARDS_PATH):
+		var cards_variant: Variant = JSON.parse_string(reader.read_file(CARDS_PATH).get_string_from_utf8())
+		if cards_variant is Dictionary:
+			data["hand"] = cards_variant
 	# Only the bytes a declared asset actually points at are read, and they stay
 	# undecoded: the render layer turns them into a texture or a stream when a
 	# scene asks for one (SDD §8.1 — read from memory, never from disk mid-run).
@@ -170,6 +178,7 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 	check_context["checks"] = data["checks"]
 	check_context["pools"] = data["pools"]
 	check_context["factions"] = data["factions"]
+	check_context["hand"] = data["hand"]
 	check_context["installed"] = registry.versions()
 	if not check_context.has("protocols"):
 		check_context["protocols"] = ProtocolRegistry.known_ids()

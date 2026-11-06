@@ -87,6 +87,12 @@ func write(entry: Dictionary, slot: int, snapshot: Dictionary, preview: String =
 		"pools": snapshot.get("pools", {}).duplicate(true),
 		"drawn": snapshot.get("drawn", []).duplicate(true),
 		"factions": snapshot.get("factions", {}).duplicate(true),
+		# The three piles of a hand travel with the run (REQ-036). A package
+		# without a hand writes three empty lists, which restores to what the
+		# package deals anyway.
+		"hand": snapshot.get("hand", []).duplicate(),
+		"deck": snapshot.get("deck", []).duplicate(),
+		"discard": snapshot.get("discard", []).duplicate(),
 		"preview": preview.left(PREVIEW_LIMIT),
 		"savedAt": Time.get_datetime_string_from_system(true),
 	}
@@ -154,6 +160,9 @@ func read(entry: Dictionary, slot: int) -> Dictionary:
 			"pools": payload.get("pools", {}),
 			"drawn": payload.get("drawn", []),
 			"factions": payload.get("factions", {}),
+			"hand": payload.get("hand", []),
+			"deck": payload.get("deck", []),
+			"discard": payload.get("discard", []),
 			"preview": String(payload.get("preview", "")),
 			"savedAt": String(payload.get("savedAt", "")),
 		},
@@ -202,6 +211,11 @@ func resume(entry: Dictionary, payload: Dictionary, options: Dictionary = {}) ->
 	session.drawn = payload.get("drawn", []) if payload.get("drawn", null) is Array else []
 	session.restore_pools(payload.get("pools", {}))
 	session.restore_factions(payload.get("factions", {}))
+	session.restore_cards({
+		"hand": payload.get("hand", []),
+		"deck": payload.get("deck", []),
+		"discard": payload.get("discard", []),
+	})
 	return session
 
 

@@ -42,6 +42,7 @@ const KNOWN_CAPABILITIES := [
 	"draws@1",
 	"clock@1",
 	"actions@1",
+	"cards.hand@1",
 	"assets@1",
 	"locale@1",
 	"save@2",
@@ -277,6 +278,53 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 					issues.append(_issue(
 						"V-26", "actions.json",
 						"action %s draws from %s, which data/pools.json never declares" % [String(action.get("id", "")), pool_id],
+						true,
+					))
+
+	# V-36, V-37, V-38 — a hand, its cards and the deck that names them
+	# (REQ-036). A deck is a list of ids and a cost is a set of ledger keys, so
+	# both are resolved at install: a typo found when the card is drawn would
+	# look like a card that does nothing.
+	var hand_raw: Variant = context.get("hand", {})
+	var hand_spec: Dictionary = Hand.defines(hand_raw) if hand_raw is Dictionary else {}
+	var claims_hand := false
+	if manifest.get("capabilities", null) is Array:
+		claims_hand = (manifest["capabilities"] as Array).has(Hand.CAPABILITY)
+	var has_hand_params := hand_raw is Dictionary and (hand_raw as Dictionary).get("hand", null) is Dictionary
+	if claims_hand and (not has_hand_params or not Hand.declared(hand_spec)):
+		issues.append(_issue(
+			"V-36", "cards.json",
+			"claims %s but data/cards.json declares no hand and no deck" % Hand.CAPABILITY,
+			true,
+		))
+	elif Hand.declared(hand_spec):
+		var cards: Dictionary = hand_spec.get("cards", {})
+		var listed_deck: Array = hand_spec.get("deck", [])
+		for card_id in listed_deck:
+			if not cards.has(card_id):
+				issues.append(_issue(
+					"V-38", "cards.json",
+					"deck names card %s, which the package never declares" % card_id,
+					true,
+				))
+		for card_id in cards:
+			var entry: Dictionary = cards[card_id]
+			var touches: Array = []
+			var costs: Variant = entry.get("cost", {})
+			if costs is Dictionary:
+				touches.append(costs)
+			var effects: Variant = entry.get("effects", [])
+			if effects is Array:
+				for effect in effects:
+					if effect is Dictionary:
+						touches.append(effect)
+			for block in touches:
+				for key in block:
+					if declared_resources.is_empty() or declared_resources.has(String(key)):
+						continue
+					issues.append(_issue(
+						"V-37", "cards.json",
+						"card %s names resource %s, which data/state.json never declares" % [card_id, String(key)],
 						true,
 					))
 

@@ -42,6 +42,10 @@ var tick: int
 var clock_per: String
 var used: Dictionary
 var fail_reason: String
+var hand_spec: Dictionary
+var hand: Array
+var deck: Array
+var discard: Array
 
 
 static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
@@ -99,6 +103,18 @@ static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
 	session.tick = 0
 	session.used = {}
 	session.fail_reason = ""
+	# Dealt once from the declared order, so a save draws the same cards (REQ-036).
+	var hand_raw: Variant = data.get("hand", {})
+	session.hand_spec = Hand.defines(hand_raw) if hand_raw is Dictionary else {}
+	if Hand.declared(session.hand_spec):
+		var dealt := Hand.deals(session.hand_spec)
+		session.hand = dealt["hand"]
+		session.deck = dealt["deck"]
+		session.discard = dealt["discard"]
+	else:
+		session.hand = []
+		session.deck = []
+		session.discard = []
 	session.i18n = data.get("i18n", {}) if data.get("i18n", null) is Dictionary else {}
 	session.locale = String(options.get("locale", ""))
 	var counter := int(options.get("start_counter", DEFAULT_START_COUNTER))
@@ -261,6 +277,107 @@ func act(action_id: String) -> Dictionary:
 	if state == before:
 		pass
 	return view()
+
+
+func play_card(card_id: String) -> Dictionary:
+	## Playing a card is one turn (REQ-036). The cost is paid and the effects are
+	## applied to the same copy, so a card that cannot be paid for changes
+	## nothing — the same rule a menu action follows.
+	if finished:
+		return view()
+	var card := Hand.card(hand_spec, card_id)
+	if card.is_empty() or not (hand as Array).has(card_id):
+		reject("S-09", "no card named %s in the hand" % card_id)
+		return view()
+	var costs: Variant = card.get("cost", {})
+	if not costs is Dictionary:
+		costs = {}
+	var before := state.duplicate(true)
+	var scratch := state.duplicate(true)
+	var paid := Mechanics.apply_effects([costs], scratch)
+	_absorb(paid["warnings"])
+	scratch = paid["state"]
+	for key in costs:
+		var name := String(key)
+		if not ledger_defs.has(name):
+			continue
+		var floor: float = ledger_defs[name]["min"]
+		if float(scratch.get(name, floor)) < floor:
+			reject("S-08", "not enough %s to play %s" % [localise("resource.%s.%d" % [name, int(float(before.get(name, 0.0)))], name), card_id])
+			return view()
+	var taken := Hand.take({"hand": hand, "deck": deck, "discard": discard}, card_id)
+	if taken.is_empty():
+		reject("S-09", "no card named %s in the hand" % card_id)
+		return view()
+	var effects: Variant = card.get("effects", [])
+	if effects is Array:
+		var done := Mechanics.apply_effects(effects, scratch)
+		_absorb(done["warnings"])
+		scratch = done["state"]
+	state = _clamped(scratch)
+	hand = taken["hand"]
+	deck = taken["deck"]
+	discard = taken["discard"]
+	_step_rng()
+	turn += 1
+	if clock_per != "node":
+		tick += 1
+	if clock_per != "":
+		apply_rules()
+	_after_turn()
+	if not finished:
+		_refill_hand()
+	return view()
+
+
+func _refill_hand() -> void:
+	## One turn takes one card out, so one comes back in; an empty deck deals nothing.
+	var filled := Hand.draw_into({"hand": hand, "deck": deck, "discard": discard}, hand_spec, int(hand_spec.get("draw", 0)))
+	hand = filled["hand"]
+	deck = filled["deck"]
+	discard = filled["discard"]
+
+
+func hand_view() -> Array:
+	## The cards the scene offers, shaped like the menu: enabled with a reason.
+	var out: Array = []
+	for card_id in hand:
+		var id := String(card_id)
+		var card := Hand.card(hand_spec, id)
+		var enabled := true
+		var reason := ""
+		var costs: Variant = card.get("cost", {})
+		if costs is Dictionary:
+			for key in costs:
+				var name := String(key)
+				if not ledger_defs.has(name):
+					continue
+				var change: Variant = costs[key]
+				var delta := 0.0
+				if change is Dictionary:
+					delta = float(change.get("add", 0.0))
+				var floor: float = ledger_defs[name]["min"]
+				if float(state.get(name, 0.0)) + delta < floor:
+					enabled = false
+					reason = String(name)
+		out.append({
+			"id": id,
+			"label": Hand.label_of(hand_spec, id),
+			"enabled": enabled,
+			"reason": reason,
+		})
+	return out
+
+
+func restore_cards(saved: Variant) -> void:
+	## The piles travel with the save; an older payload keeps the dealt hand.
+	if not (saved is Dictionary):
+		return
+	var piles: Dictionary = saved
+	if piles.get("hand", null) is Array and piles.get("deck", null) is Array:
+		hand = (piles["hand"] as Array).duplicate()
+		deck = (piles["deck"] as Array).duplicate()
+		discard = (piles.get("discard", []) as Array).duplicate()
 
 
 func resolve(check_id: String) -> Dictionary:
@@ -430,6 +547,10 @@ func view() -> Dictionary:
 		# What has been drawn is part of what the player knows, so the scene can
 		# say it and an action can wait on it (REQ-027).
 		out["drawn"] = drawn_ids()
+	if not (hand as Array).is_empty():
+		# A hand is how a card package offers its options; a package without one
+		# never grows the key, so a menu-only package looks exactly as before.
+		out["hand"] = hand_view()
 	if Relations.declares(factions):
 		out["factions"] = faction_map()
 		out["thresholds"] = (factions.get("thresholds", {}) as Dictionary).duplicate(true)
@@ -512,7 +633,7 @@ func _tightest() -> String:
 func snapshot() -> Dictionary:
 	## Serialisable payload for a save slot (SDD §7.2). No timestamp: the save
 	## layer stamps `savedAt`, which keeps gameplay output reproducible.
-	return {
+	var out := {
 		"schema": save_schema,
 		"plugin": plugin_id,
 		"version": plugin_version,
@@ -529,6 +650,13 @@ func snapshot() -> Dictionary:
 		"drawn": drawn.duplicate(true),
 		"factions": factions.duplicate(true),
 	}
+	if Hand.declared(hand_spec):
+		# Only a package that dealt a hand carries the piles, so a story that
+		# never asked for one keeps the payload it always had (TC-DET-001).
+		out["hand"] = hand.duplicate()
+		out["deck"] = deck.duplicate()
+		out["discard"] = discard.duplicate()
+	return out
 
 
 func restore_factions(saved: Variant) -> void:
