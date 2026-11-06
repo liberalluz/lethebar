@@ -148,6 +148,34 @@ func apply_rules() -> void:
 	var result := Mechanics.apply(rules, state, {ManifestSchema.TICK_KEY: float(tick)})
 	state = _clamped(result["state"])
 	_absorb(result["warnings"])
+	_apply_relations(result.get("relations", []))
+
+
+func _apply_relations(changes: Array) -> void:
+	## A rule names a pair and a change; the session owns the map, so it is the
+	## only writer (REQ-032). An undeclared pair cannot reach here: V-31 refuses
+	## it at install time.
+	var entities: Dictionary = factions.get("entities", {})
+	for change in changes:
+		if not (change is Dictionary):
+			continue
+		var from_id := String(change.get("from", ""))
+		var to_id := String(change.get("to", ""))
+		if not entities.has(from_id):
+			continue
+		var entity: Dictionary = entities[from_id]
+		var relations: Variant = entity.get("relations", null)
+		if not (relations is Dictionary):
+			relations = {}
+			entity["relations"] = relations
+		var current := 0.0
+		var raw: Variant = relations.get(to_id, 0.0)
+		if raw is int or raw is float:
+			current = float(raw)
+		if change.has("add"):
+			relations[to_id] = current + float(change["add"])
+		elif change.has("value"):
+			relations[to_id] = float(change["value"])
 
 
 func apply_effects(effects: Array) -> void:
@@ -393,7 +421,19 @@ func snapshot() -> Dictionary:
 		"used": used.duplicate(true),
 		"pools": _pool_snapshot(),
 		"drawn": drawn.duplicate(true),
+		"factions": factions.duplicate(true),
 	}
+
+
+func restore_factions(saved: Variant) -> void:
+	## The faction map is part of the run once a rule can move it (REQ-032). A
+	## payload without one keeps the map the package declared.
+	if not (saved is Dictionary):
+		return
+	var parsed: Dictionary = saved
+	if not (parsed.get("entities", null) is Dictionary):
+		return
+	factions = parsed.duplicate(true)
 
 
 func declares(mechanic_id: String) -> bool:

@@ -31,6 +31,7 @@ static func apply_effects(effects: Array, state: Dictionary) -> Dictionary:
 static func _run(ops: Array, state: Dictionary, scope: Dictionary = {}) -> Dictionary:
 	var out := state.duplicate(true)
 	var warnings: Array = []
+	var relations: Array = []
 	for item in ops:
 		var rule: Dictionary = item if item is Dictionary else {}
 		if not rule.has("set"):
@@ -39,7 +40,31 @@ static func _run(ops: Array, state: Dictionary, scope: Dictionary = {}) -> Dicti
 		if rule.has("when") and not _matches(rule["when"], out, warnings, scope):
 			continue
 		_apply_set(rule["set"], out, warnings)
-	return {"state": out, "warnings": warnings}
+		for change in _relation_changes(rule):
+			relations.append(change)
+	return {"state": out, "warnings": warnings, "relations": relations}
+
+
+static func _relation_changes(rule: Dictionary) -> Array:
+	## A rule may move the way one entity feels about another. The engine never
+	## applies the move itself: it hands the changes back so the session, which
+	## owns the faction map, stays the only writer (REQ-032).
+	var raw: Variant = rule.get("relations", null)
+	if not (raw is Array):
+		return []
+	var out: Array = []
+	for entry in raw:
+		if not (entry is Dictionary):
+			continue
+		var from_id := String(entry.get("from", ""))
+		var to_id := String(entry.get("to", ""))
+		if from_id == "" or to_id == "":
+			continue
+		if entry.has("add"):
+			out.append({"from": from_id, "to": to_id, "add": _number(entry["add"])})
+		elif entry.has("value"):
+			out.append({"from": from_id, "to": to_id, "value": _number(entry["value"])})
+	return out
 
 
 static func _matches(when: Variant, state: Dictionary, warnings: Array, scope: Dictionary = {}) -> bool:

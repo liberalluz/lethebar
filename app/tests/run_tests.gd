@@ -64,6 +64,7 @@ func _initialize() -> void:
 	_case_clock()
 	_case_scene()
 	_case_wire()
+	_case_writable_relations()
 	_case_save_flush()
 	_case_capabilities()
 	_case_limits()
@@ -453,7 +454,7 @@ func _case_det_001() -> void:
 	)
 	var keys: Array = JSON.parse_string(first).keys()
 	keys.sort()
-	var expected := ["drawn", "finished", "node", "plugin", "pools", "protocol", "rng", "schema", "state", "tick", "turn", "used", "version", "visited"]
+	var expected := ["drawn", "factions", "finished", "node", "plugin", "pools", "protocol", "rng", "schema", "state", "tick", "turn", "used", "version", "visited"]
 	_check("TC-DET-001: the payload keeps its declared shape", str(keys) == str(expected), str(keys))
 
 
@@ -2545,6 +2546,149 @@ func _long_wav_bytes(seconds: float) -> PackedByteArray:
 	silence.resize(int(8000.0 * seconds))
 	bytes.append_array(silence)
 	return bytes
+
+
+func _case_writable_relations() -> void:
+	# A relation could be read but never moved: rules wrote resources only, so a
+	# story could not earn an alliance it did not declare up front. These
+	# assertions are the contract for making the write path part of play.
+	_section("TC-REL-002 a rule can move a relation, and a save keeps it")
+	MemoryBackend.reset()
+	var nodes := {"nodes": [{"id": "r1", "text": "The envoys wait.", "choices": []}]}
+	var ledger := {
+		"resources": [
+			{"id": "grain", "init": 10, "min": 0, "max": 100},
+			{"id": "pop", "init": 0, "min": 0, "max": 100},
+		],
+	}
+	var factions := {
+		"thresholds": {"ally": 60, "hostile": -60},
+		"entities": [
+			{"id": "wei", "label": "Wei", "relations": {"shu": 70}},
+			{"id": "shu", "label": "Shu", "relations": {"wei": -40}},
+		],
+	}
+	var rules := {
+		"rules": [
+			{
+				"when": {"key": "grain", "op": "gte", "value": 5},
+				"set": {"grain": {"add": -1}, "pop": {"add": 1}},
+				"relations": [{"from": "wei", "to": "shu", "add": -20}],
+			},
+		],
+	}
+	var phases := {"turns": 10, "ranks": [], "fail": []}
+	var files := {
+		"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+		"data/factions.json": JSON.stringify(factions).to_utf8_buffer(),
+		"data/rules.json": JSON.stringify(rules).to_utf8_buffer(),
+		"data/phases.json": JSON.stringify(phases).to_utf8_buffer(),
+	}
+	var loader := PackageLoader.new()
+	var entry: Dictionary = loader.import_bytes(
+		_package("relation-run", {"id": "relation-run", "entry": "r1"}, [], [], nodes, {}, files),
+		_context(),
+	)["entry"]
+	var session := Session.create(entry)
+	_check(
+		"TC-REL-002: the component keeps the state it declared until a rule runs",
+		session.relation_state("wei", "shu") == "ally",
+		"%s %.1f" % [session.relation_state("wei", "shu"), session.relation("wei", "shu")],
+	)
+	session.start()
+	_check(
+		"TC-REL-002: a rule moves the relation it names",
+		session.relation("wei", "shu") == 50.0,
+		"%.1f" % session.relation("wei", "shu"),
+	)
+	_check(
+		"TC-REL-002: the moved relation leaves the state it was in",
+		session.relation_state("wei", "shu") == "",
+		session.relation_state("wei", "shu"),
+	)
+	_check(
+		"TC-REL-002: the opposite direction is untouched",
+		session.relation("shu", "wei") == -40.0,
+		"%.1f" % session.relation("shu", "wei"),
+	)
+
+	var store := SaveStore.new()
+	store.write(entry, 1, session.snapshot())
+	var read := store.read(entry, 1)
+	var resumed := store.resume(entry, read["payload"])
+	_check(
+		"TC-REL-002: the moved relation survives a save and a resume",
+		resumed != null and resumed.relation("wei", "shu") == 50.0,
+		"null" if resumed == null else "%.1f" % resumed.relation("wei", "shu"),
+	)
+
+	var quiet: Dictionary = loader.import_bytes(
+		_package(
+			"relation-quiet",
+			{"id": "relation-quiet", "entry": "r1"},
+			[],
+			[],
+			nodes,
+			{},
+			{
+				"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+				"data/factions.json": JSON.stringify(factions).to_utf8_buffer(),
+				"data/phases.json": JSON.stringify(phases).to_utf8_buffer(),
+			},
+		),
+		_context(),
+	)["entry"]
+	var quiet_session := Session.create(quiet)
+	quiet_session.start()
+	_check(
+		"TC-REL-002: a package that writes no relation behaves as before",
+		quiet_session.relation_state("wei", "shu") == "ally",
+		quiet_session.relation_state("wei", "shu"),
+	)
+
+	# V-31: the write has to name entities the package declared, and it has to be
+	# a number. Both are refused before the session ever runs.
+	var bad_target := files.duplicate(true)
+	bad_target["data/rules.json"] = JSON.stringify({
+		"rules": [{"set": {"pop": {"add": 1}}, "relations": [{"from": "wei", "to": "nobody", "add": 5}]}],
+	}).to_utf8_buffer()
+	var refused: Dictionary = loader.import_bytes(
+		_package("relation-bad-target", {"id": "relation-bad-target", "entry": "r1"}, [], [], nodes, {}, bad_target),
+		_context(),
+	)
+	_check(
+		"TC-REL-002: a write naming an undeclared entity is refused at install",
+		refused["status"] == "rejected" and String(refused.get("code", "")) == "V-31",
+		"%s / %s" % [refused.get("code", ""), refused.get("message", "")],
+	)
+
+	var bad_source := files.duplicate(true)
+	bad_source["data/rules.json"] = JSON.stringify({
+		"rules": [{"set": {"pop": {"add": 1}}, "relations": [{"from": "nobody", "to": "shu", "add": 5}]}],
+	}).to_utf8_buffer()
+	var refused_source: Dictionary = loader.import_bytes(
+		_package("relation-bad-source", {"id": "relation-bad-source", "entry": "r1"}, [], [], nodes, {}, bad_source),
+		_context(),
+	)
+	_check(
+		"TC-REL-002: a write that starts from an undeclared entity is refused too",
+		refused_source["status"] == "rejected" and String(refused_source.get("code", "")) == "V-31",
+		"%s / %s" % [refused_source.get("code", ""), refused_source.get("message", "")],
+	)
+
+	var bad_change := files.duplicate(true)
+	bad_change["data/rules.json"] = JSON.stringify({
+		"rules": [{"set": {"pop": {"add": 1}}, "relations": [{"from": "wei", "to": "shu", "add": "lots"}]}],
+	}).to_utf8_buffer()
+	var refused_change: Dictionary = loader.import_bytes(
+		_package("relation-bad-change", {"id": "relation-bad-change", "entry": "r1"}, [], [], nodes, {}, bad_change),
+		_context(),
+	)
+	_check(
+		"TC-REL-002: a write whose change is not a number is refused at install",
+		refused_change["status"] == "rejected" and String(refused_change.get("code", "")) == "V-31",
+		"%s / %s" % [refused_change.get("code", ""), refused_change.get("message", "")],
+	)
 
 
 func _case_limits() -> void:

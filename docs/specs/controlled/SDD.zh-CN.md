@@ -172,6 +172,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-28` | 压缩包本身、条目数、每个条目解压后的字节与解压总量都在上限内；由加载器在读取清单之前判定 | 拒绝 |
 | `V-29` | 每个条目路径都是相对路径、全小写且落在字符集白名单内 | 拒绝 |
 | `V-30` | 声明的图片任一边不超过 4096 px，声音不超过 2 MB 且不超过 60 秒 | 拒绝 |
+| `V-31` | 规则里的关系变化点名包裹声明过的实体，并带 `add` 或 `value` 数字 | 拒绝 |
 
 每次拒绝都给出代码与出错字段；拒绝不会扰动已安装插件及其存档。
 
@@ -423,6 +424,7 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 | `REQ-028` | §7.4 存储、§7.5 落盘（`SaveStore` 的落盘请求与探针）、`app/core/save_store.gd` |
 | `REQ-029` | §4.2 校验（`V-27`、`W-03`）、`docs/specs/capabilities.md`、`PackageValidator.KNOWN_CAPABILITIES` |
 | `REQ-030` | §4.2 校验（`V-28`–`V-30`）、`app/core/package_limits.gd`、加载器的信封检查 |
+| `REQ-032` | §4.2 `V-31`、`app/core/mechanics.gd` 的关系变化、`app/core/session.gd` 的唯一写入点与载荷字段 |
 | `REQ-031` | §11.4 首访提示、`infra/export_web.py` 的缓存探针 |
 
 ## 13. 决策与待定
