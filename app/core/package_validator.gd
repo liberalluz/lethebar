@@ -91,6 +91,42 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 			true,
 		))
 
+	# V-32 / W-04 — the world a package belongs to is well formed, and two packs
+	# that describe the same world agree on how it is written (ADR-0012).
+	var collection := ManifestSchema.collection_of(manifest)
+	if not collection.is_empty():
+		var world_id := String(collection.get("id", ""))
+		var names: Variant = collection.get("names", {})
+		if not ManifestSchema.is_collection_id(world_id):
+			issues.append(_issue("V-32", "collection", "id must match [a-z0-9-]+", true))
+		elif not (names is Dictionary) or (names as Dictionary).is_empty():
+			issues.append(_issue("V-32", "collection", "names must map a locale to a title", true))
+		else:
+			var broken := false
+			for locale in (names as Dictionary):
+				var title: Variant = (names as Dictionary)[locale]
+				if not (title is String) or (title as String).strip_edges() == "":
+					broken = true
+					break
+			if broken:
+				issues.append(_issue("V-32", "collection", "names must map a locale to a title", true))
+			else:
+				# A world already installed under another spelling is one world; the
+				# title comes from the pack whose id sorts first, so it is stable.
+				var seen: Dictionary = context.get("collections", {})
+				for other_id in seen:
+					var other: Variant = seen[other_id]
+					if not (other is Dictionary) or String((other as Dictionary).get("id", "")) != world_id:
+						continue
+					var other_names: Variant = (other as Dictionary).get("names", {})
+					if JSON.stringify(other_names) != JSON.stringify(names):
+						issues.append(_issue(
+							"W-04", "collection",
+							"the world %s is already described by %s; the engine keeps that title" % [world_id, other_id],
+							false,
+						))
+					break
+
 	# V-04 — authored against a spec version the engine still understands.
 	if not ManifestSchema.version_in_range(manifest["specVersion"], SPEC_MIN, SPEC_MAX):
 		issues.append(_issue(

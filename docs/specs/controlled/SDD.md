@@ -581,6 +581,52 @@ REQ-038 maps to `Shell.hand_columns()`, `Shell.hand_row_count()` and
 
 ### 11.10 A reshuffle uses the run's seed
 
+### 11.11 The world a package belongs to
+
+A repository is cut by world (ADR-0010), so a world holds several packs. A
+package says so in an optional `collection: {id, names}` block: `id` is the
+world's slug and `names` maps a locale to the title a player reads.
+
+`manifest_schema.gd` reads the block (`collection_of`) and checks the id's
+alphabet (`is_collection_id`, the same one package ids use).
+`package_validator.gd` refuses a malformed block with `V-32` — an id that is not
+a slug, `names` that is not a locale-to-title map, or a title that is empty — and
+warns with `W-04` when an installed pack describes the same world differently;
+the engine keeps one world and takes its title from the pack whose id sorts
+first, so the answer does not depend on install order.
+
+`app/render/shell.gd` groups the installed packs into worlds (`worlds()`), and
+`start_game()` opens the world screen only when more than one world exists, so a
+repository with a single theme keeps the click count it has today. A pack that
+declares no world belongs to the fallback world, whose title comes from the
+interface (`ui.world_other`). The pack list honours the chosen world, and
+`lethebarState.worlds` publishes ids and titles so a browser driver can click a
+world by the name a player reads.
+
+
+### 11.11 The world a package belongs to
+
+A repository is cut by world (ADR-0010), so a world holds several packs. A
+package says so in an optional `collection: {id, names}` block: `id` is the
+world's slug and `names` maps a locale to the title a player reads.
+
+`manifest_schema.gd` reads the block (`collection_of`) and checks the id's
+alphabet (`is_collection_id`, the same one package ids use).
+`package_validator.gd` refuses a malformed block with `V-32` — an id that is not
+a slug, `names` that is not a locale-to-title map, or a title that is empty — and
+warns with `W-04` when an installed pack describes the same world differently;
+the engine keeps one world and takes its title from the pack whose id sorts
+first, so the answer does not depend on install order.
+
+`app/render/shell.gd` groups the installed packs into worlds (`worlds()`), and
+`start_game()` opens the world screen only when more than one world exists, so a
+repository with a single theme keeps the click count it has today. A pack that
+declares no world belongs to the fallback world, whose title comes from the
+interface (`ui.world_other`). The pack list honours the chosen world, and
+`lethebarState.worlds` publishes ids and titles so a browser driver can click a
+world by the name a player reads.
+
+
 `Hand.draw_into()` stays a pure function: it takes the piles and, when the deck
 runs out and the package allows a reshuffle, it hands the discard pile back as
 the deck in the order of its caller. When no order is given it keeps play order,
@@ -636,6 +682,8 @@ was saved, not a new deal.
 | `REQ-037` | §11.8 card faces, `app/core/hand.gd`, `V-39` |
 | `REQ-038` | §11.9 the wrapped hand, `Shell.hand_columns()`, no `V-` code |
 | `REQ-039` | §11.10 the seeded reshuffle, `Session._shuffle_cards()`, no `V-` code |
+| `REQ-040` | §11.11 the world a package declares, `ManifestSchema.collection_of()`, `V-32`, `W-04`, `Shell.worlds()` |
+| `REQ-040` | §11.11 the world a package declares, `ManifestSchema.collection_of()`, `V-32`, `W-04`, `Shell.worlds()` |
 
 ## 13. Decisions and open questions
 

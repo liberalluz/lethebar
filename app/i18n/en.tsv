@@ -42,3 +42,6 @@ ui.turns_left	turns left: %d
 ui.leaning	leaning: %s
 ui.friction	friction: %s
 ui.tight	tightest: %s
+ui.choose_world	Choose a world
+ui.worlds_hint	Each world holds its own stories.
+ui.world_other	Other stories

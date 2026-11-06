@@ -32,6 +32,9 @@ const SCREEN_SESSION := "session"
 const SCREEN_SAVES := "saves"
 const SCREEN_LOADS := "loads"
 const SCREEN_NOTICE := "notice"
+const SCREEN_WORLDS := "worlds"
+## The world a package declares none of; its title comes from the interface.
+const WORLD_OTHER := ""
 
 ## The window title carries the screen name. On the web build Godot maps it to
 ## `document.title`, which is the only piece of the interface a browser driver
@@ -47,6 +50,8 @@ var saves := SaveStore.new(FileBackend.new())
 var packages := PackageStore.new(FileBackend.new())
 
 var screen := SCREEN_LANDING
+## Empty means the list shows every pack; otherwise only one world's.
+var _world_filter := ""
 var session: Session = null
 var entry: Dictionary = {}
 var notice := {"code": "", "message": ""}
@@ -136,7 +141,8 @@ func show_landing() -> String:
 	_sub.text = "%s · v%s" % [Locale.text("app.tagline"), version_string()]
 	_clear_options()
 	_status.text = ""
-	_options.add_child(_button(Locale.text("ui.new_game"), open_plugins))
+	_world_filter = ""
+	_options.add_child(_button(Locale.text("ui.new_game"), start_game))
 	if not _saves_index().is_empty():
 		_options.add_child(_button(Locale.text("ui.continue"), show_loads))
 	if builtin_ids.is_empty():
@@ -259,11 +265,16 @@ func resume_slot(plugin_id: String, slot: int) -> Dictionary:
 
 func open_plugins() -> String:
 	screen = SCREEN_PLUGINS
-	_heading.text = Locale.text("ui.all_packs")
+	if _world_filter == "":
+		_heading.text = Locale.text("ui.all_packs")
+	else:
+		_heading.text = world_title(_world_filter)
 	_sub.text = Locale.text("ui.packs_hint")
 	_status.text = "" if not builtin_ids.is_empty() else Locale.text("ui.no_pack_installed")
 	_clear_options()
 	for plugin_id in builtin_ids:
+		if _world_filter != "" and world_of(plugin_id) != _world_filter:
+			continue
 		_options.add_child(_button(_pack_title(plugin_id), start_plugin.bind(plugin_id)))
 	_options.add_child(_button(Locale.text("ui.install"), request_install))
 	_options.add_child(_button(Locale.text("ui.back"), show_landing))
@@ -698,6 +709,8 @@ func _announce() -> void:
 			"locale": Locale.current(),
 			"packs": builtin_ids.duplicate(),
 			"stories": _story_list(),
+			"worlds": _world_list(),
+			"world": _world_filter,
 			"saves": _saves_index(),
 			"slots": slot_previews(),
 			"pictures": _picture_slots.duplicate(),
@@ -939,6 +952,88 @@ func _builtin_packages() -> Array:
 	return found
 
 
+func start_game() -> String:
+	## A repository is cut by world (ADR-0010), so several worlds need one screen
+	## between the landing page and the packs; a single world keeps the click
+	## count a one-theme repository has today (ADR-0012).
+	if worlds().size() > 1:
+		return show_worlds()
+	return open_plugins()
+
+
+func show_worlds() -> String:
+	screen = SCREEN_WORLDS
+	_heading.text = Locale.text("ui.choose_world")
+	_sub.text = Locale.text("ui.worlds_hint")
+	_status.text = ""
+	_world_filter = ""
+	_clear_options()
+	for row in worlds():
+		_options.add_child(_button(String(row["title"]), open_world.bind(String(row["id"]))))
+	_options.add_child(_button(Locale.text("ui.install"), request_install))
+	_options.add_child(_button(Locale.text("ui.back"), show_landing))
+	_announce()
+	return screen
+
+
+func open_world(world_id: String) -> String:
+	## The pack list is the same screen either way; only the filter differs, so
+	## a pack is never reachable through one route and missing from the other.
+	_world_filter = world_id
+	return open_plugins()
+
+
+func world_of(plugin_id: String) -> String:
+	var manifest: Dictionary = loader.registry.entry(plugin_id).get("manifest", {})
+	return String(ManifestSchema.collection_of(manifest).get("id", ""))
+
+
+func worlds() -> Array:
+	## Sorted by world id: the order on screen, and in `lethebarState`, is the
+	## same on every visit, which is what makes a driver's click repeatable.
+	var buckets: Dictionary = {}
+	for plugin_id in builtin_ids:
+		var world_id := world_of(plugin_id)
+		if not buckets.has(world_id):
+			buckets[world_id] = []
+		(buckets[world_id] as Array).append(plugin_id)
+	var ids := buckets.keys()
+	ids.sort()
+	var out: Array = []
+	for world_id in ids:
+		out.append({"id": String(world_id), "title": world_title(String(world_id)), "packs": buckets[world_id]})
+	return out
+
+
+func world_title(world_id: String) -> String:
+	## The world's name is the package's, like the pack's own title: the engine
+	## never invents one. Packs that describe the same world may word it
+	## differently (W-04); the lowest id decides, so the answer is stable.
+	if world_id == WORLD_OTHER:
+		return Locale.text("ui.world_other")
+	var candidates: Array = []
+	for plugin_id in builtin_ids:
+		if world_of(plugin_id) == world_id:
+			candidates.append(plugin_id)
+	candidates.sort()
+	for plugin_id in candidates:
+		var manifest: Dictionary = loader.registry.entry(plugin_id).get("manifest", {})
+		var names: Variant = ManifestSchema.collection_of(manifest).get("names", {})
+		if names is Dictionary:
+			var localized := String((names as Dictionary).get(Locale.current(), ""))
+			if not localized.is_empty():
+				return localized
+	for plugin_id in candidates:
+		var manifest: Dictionary = loader.registry.entry(plugin_id).get("manifest", {})
+		var default_locale := String(manifest.get("defaultLocale", ""))
+		var names: Variant = ManifestSchema.collection_of(manifest).get("names", {})
+		if names is Dictionary:
+			var written := String((names as Dictionary).get(default_locale, ""))
+			if not written.is_empty():
+				return written
+	return world_id
+
+
 func _pack_title(plugin_id: String) -> String:
 	## The player sees the pack's own name, never the protocol it happens to
 	## speak: `sanguo — turn_based@1, 0.1.0` looked like a turn-based strategy
@@ -954,6 +1049,14 @@ func _pack_title(plugin_id: String) -> String:
 			return localized
 	var title := String(manifest.get("name", ""))
 	return title if not title.is_empty() else plugin_id
+
+
+func _world_list() -> Array:
+	## Ids and titles only: the driver clicks a world by the name a player reads.
+	var rows: Array = []
+	for row in worlds():
+		rows.append({"id": String(row["id"]), "title": String(row["title"])})
+	return rows
 
 
 func _story_list() -> Array:

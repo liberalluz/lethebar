@@ -484,6 +484,44 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 
 ### 11.10 洗牌用的是这一局的种子
 
+### 11.11 包裹属于哪个世界
+
+仓库按世界切分（ADR-0010），所以一个世界放得下好几个包。包裹用可选的
+`collection: {id, names}` 说明这件事：`id` 是世界的机器名，`names` 把语言映射到
+玩家读到的标题。
+
+`manifest_schema.gd` 读这个块（`collection_of`）并检查 id 的字母表
+（`is_collection_id`，与包裹 id 同一套）。`package_validator.gd` 用 `V-32` 拒绝
+结构不对的块——id 不是 slug、`names` 不是语言到标题的映射、或者标题为空——并在
+已装的包用另一种写法描述同一个世界时给出 `W-04`；引擎只留一个世界，标题取 id
+排序最前的那个包，于是答案与安装顺序无关。
+
+`app/render/shell.gd` 把已装的包分组到世界（`worlds()`），`start_game()` 只在世界
+多于一个时打开世界页，所以只有一个题材的仓库仍然保持今天的点击次数。没有声明
+世界的包归入兜底世界，它的标题来自界面（`ui.world_other`）。故事列表遵守选中的
+世界，`lethebarState.worlds` 公布 id 与标题，浏览器驱动就能按玩家读到的名字点一个
+世界。
+
+
+### 11.11 包裹属于哪个世界
+
+仓库按世界切分（ADR-0010），所以一个世界放得下好几个包。包裹用可选的
+`collection: {id, names}` 说明这件事：`id` 是世界的机器名，`names` 把语言映射到
+玩家读到的标题。
+
+`manifest_schema.gd` 读这个块（`collection_of`）并检查 id 的字母表
+（`is_collection_id`，与包裹 id 同一套）。`package_validator.gd` 用 `V-32` 拒绝
+结构不对的块——id 不是 slug、`names` 不是语言到标题的映射、或者标题为空——并在
+已装的包用另一种写法描述同一个世界时给出 `W-04`；引擎只留一个世界，标题取 id
+排序最前的那个包，于是答案与安装顺序无关。
+
+`app/render/shell.gd` 把已装的包分组到世界（`worlds()`），`start_game()` 只在世界
+多于一个时打开世界页，所以只有一个题材的仓库仍然保持今天的点击次数。没有声明
+世界的包归入兜底世界，它的标题来自界面（`ui.world_other`）。故事列表遵守选中的
+世界，`lethebarState.worlds` 公布 id 与标题，浏览器驱动就能按玩家读到的名字点一个
+世界。
+
+
 `Hand.draw_into()` 仍是纯函数：拿到三堆，当牌库抽空且包裹允许重洗时，把弃牌堆
 按调用方给的顺序放回牌库。没给顺序时按出牌顺序，这是没有 `reshuffle` 的包裹
 永远走不到的分支。
@@ -534,6 +572,8 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 | `REQ-037` | §11.8 牌面，`app/core/hand.gd`，`V-39` |
 | `REQ-038` | §11.9 换行的手牌，`Shell.hand_columns()`，无 `V-` 码 |
 | `REQ-039` | §11.10 按种子洗牌，`Session._shuffle_cards()`，无 `V-` 码 |
+| `REQ-040` | §11.11 包裹声明的世界，`ManifestSchema.collection_of()`，`V-32`、`W-04`、`Shell.worlds()` |
+| `REQ-040` | §11.11 包裹声明的世界，`ManifestSchema.collection_of()`，`V-32`、`W-04`、`Shell.worlds()` |
 | `REQ-034` | §10.1 三国的一局、`content/builtin/sanguo/**` 的数据 |
 | `REQ-031` | §11.4 首访提示、`infra/export_web.py` 的缓存探针 |
 

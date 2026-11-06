@@ -261,7 +261,17 @@ async function openFirstPack() {
   const stories = ((await appState()) || {}).stories || [];
   if (stories.length === 0) return false;
   await clickLabel("New game");
-  if (!(await waitState((state) => state.screen === "plugins"))) return false;
+  // A repository cut by world opens the world screen first and skips it only
+  // when a single world holds every pack (ADR-0012), so the probe follows
+  // whichever screen came up instead of assuming the flat list.
+  const opened = await waitState((state) => state.screen === "worlds" || state.screen === "plugins");
+  if (!opened) return false;
+  const worlds = ((await appState()) || {}).worlds || [];
+  if (((await appState()) || {}).screen === "worlds") {
+    if (worlds.length === 0) return false;
+    await clickLabel(String(worlds[0].title));
+    if (!(await waitState((state) => state.screen === "plugins"))) return false;
+  }
   await clickLabel(String(stories[0].title));
   return Boolean(await waitState((state) => state.screen === "session"));
 }

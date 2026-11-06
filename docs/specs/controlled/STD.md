@@ -692,6 +692,25 @@ reads 2; `Charge` is refused with a message naming `edge` and the hand is unchan
 
 ## TC-SHUFFLE-001 — a deck is shuffled from the run's seed
 
+## TC-COLLECTION-001 — a package says which world it belongs to
+
+- Covers: `REQ-040`
+- Fixture: the shipped packs, whose manifests declare a `collection` for
+  `three-kingdoms` and `jianghu`; two packs built by the test that name the same
+  world differently; two packs whose `collection` is malformed (a non-slug id, an
+  empty `names`)
+- Steps:
+  1. Build a shell whose installed set is two worlds and press the landing
+     button: the world screen comes up and lists both worlds by title.
+  2. Read a world title with the interface in English, then in Chinese.
+  3. Build a shell with a single world, and one with no pack at all.
+  4. Import two packs that describe the same world with different titles.
+  5. Import a pack whose world id is not a slug, then one with no titles.
+- Exit: the world screen appears exactly when more than one world exists; a
+  title follows the interface locale; a shell with nothing installed offers no
+  world; the fallback world is titled by the interface; the second spelling
+  installs with one `W-04`; both malformed blocks are refused with `V-32`.
+
 - Covers: `REQ-039`
 - Preconditions: a package with `hand {size 2, draw_per_turn 1, reshuffle true}`,
   six cards `c0`–`c5` in the deck, ten turns.
