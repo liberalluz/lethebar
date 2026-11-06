@@ -254,25 +254,62 @@ async function waitState(predicate, limit = 60) {
   return null;
 }
 
-async function openFirstPack() {
-  // `New game` leads to the story list, and the story is clicked by the name a
-  // player reads — the probe takes it from `lethebarState.stories` rather than
-  // guessing at button order.
-  const stories = ((await appState()) || {}).stories || [];
-  if (stories.length === 0) return false;
-  await clickLabel("New game");
-  // A repository cut by world opens the world screen first and skips it only
-  // when a single world holds every pack (ADR-0012), so the probe follows
-  // whichever screen came up instead of assuming the flat list.
+// A repository cut by world opens the world screen first and skips it only when
+// a single world holds every pack (ADR-0012). Walking that path is its own step
+// because the story list is filtered by the world once one is chosen: reading
+// `stories` before the click reads the landing state, whose list is not the one
+// the next screen shows.
+async function enterPackList() {
+  // The landing screen lists every pack; a world screen then narrows the list to
+  // its own. Prefer the world that holds a pictured story, otherwise the first
+  // world wins and the picture assertion has nothing to look at.
+  const landingStories = ((await appState()) || {}).stories || [];
+  const pictured = landingStories.find((entry) => Number(entry.pictures || 0) > 0);
+  const started = await clickLabel("New game");
+  if (started === null) return false;
   const opened = await waitState((state) => state.screen === "worlds" || state.screen === "plugins");
   if (!opened) return false;
+  if (((await appState()) || {}).screen !== "worlds") return true;
   const worlds = ((await appState()) || {}).worlds || [];
-  if (((await appState()) || {}).screen === "worlds") {
-    if (worlds.length === 0) return false;
-    await clickLabel(String(worlds[0].title));
-    if (!(await waitState((state) => state.screen === "plugins"))) return false;
+  if (worlds.length === 0) return false;
+  const holding = pictured
+    ? worlds.find((world) => (world.packs || []).includes(pictured.id))
+    : null;
+  await clickLabel(String((holding || worlds[0]).title));
+  return Boolean(await waitState((state) => state.screen === "plugins"));
+}
+
+// A story can declare textures that never reach the scene band: a deck of cards
+// declares one picture per face, and a band is drawn only from a "scene" slot.
+// The probe therefore opens stories until one of them fills that slot, rather
+// than trusting a picture count to mean "the band will be visible".
+async function openStoryWithScene(limit = 4) {
+  if (!(await enterPackList())) return null;
+  const stories = ((await appState()) || {}).stories || [];
+  if (stories.length === 0) return null;
+  const ordered = stories
+    .slice()
+    .sort((a, b) => Number(b.pictures || 0) - Number(a.pictures || 0))
+    .slice(0, limit);
+  for (const story of ordered) {
+    if ((await clickLabel(String(story.title))) === null) continue;
+    if (!(await waitState((state) => state.screen === "session"))) continue;
+    const withScene = await waitState((state) => (state.pictures || []).includes("scene"), 10);
+    if (withScene) return story;
+    await clickLabel("Back to packs");
+    await waitState((state) => state.screen === "plugins");
   }
-  await clickLabel(String(stories[0].title));
+  return null;
+}
+
+// The offline phase opens the first story; it only needs a session, so the
+// picture count is a preference and not a requirement.
+async function openFirstPack() {
+  if (!(await enterPackList())) return false;
+  const stories = ((await appState()) || {}).stories || [];
+  if (stories.length === 0) return false;
+  const story = stories.find((entry) => Number(entry.pictures || 0) > 0) || stories[0];
+  await clickLabel(String(story.title));
   return Boolean(await waitState((state) => state.screen === "session"));
 }
 
@@ -359,24 +396,25 @@ if (landingScreen === "landing") {
     480
   );
   interaction.cacheControlled = Boolean(cacheReady);
-  const stories = ((await appState()) || {}).stories || [];
-  interaction.plugins = stories.length > 0;
-  // A story may declare no pictures at all, and then the band is empty on
-  // purpose. Open one that declares a picture when the assertion is about a
-  // picture reaching the screen.
-  const picturedStory = stories.find((story) => Number(story.pictures || 0) > 0) || stories[0];
+  // The shell installs the built-in packages during startup, so the first
+  // announce can carry an empty story list. Wait for the list itself instead of
+  // reading whatever the landing screen happened to say first.
+  const listed = await waitState((state) => ((state.stories || []) || []).length > 0, 240);
+  interaction.plugins = Boolean(listed);
+  // `New game` → world (when the repository is cut by world) → story list → the
+  // story itself: the same clicks a player takes, so the measured time is the
+  // path they actually walk.
   if (interaction.plugins) {
-    // `New game` → story list → the story itself: the same two clicks a player
-    // takes, so the measured time is the path they actually walk.
-    await clickLabel("New game");
-    const onPlugins = await waitState((state) => state.screen === "plugins");
-    interaction.session =
-    onPlugins && (await clickLabel(String((picturedStory || stories[0] || {}).title || ""))) !== null;
+    const story = await openStoryWithScene();
+    interaction.session = Boolean(story);
     if (interaction.session && (await waitState((state) => state.screen === "session"))) {
       clickToSceneMs = Math.round((await evaluate("performance.now()")) - clickStarted);
       // The desktop suite decodes a PNG in a headless renderer; the browser is a
       // separate decoder. Reporting the filled slots here is what makes "the
-      // picture really reached the screen" a check instead of a screenshot.
+      // picture really reached the screen" a check instead of a screenshot. The
+      // slots are filled on the announce that follows the scene, so wait for the
+      // list rather than reading the frame that entered the screen.
+      await waitState((state) => ((state.pictures || []) || []).length > 0, 240);
       interaction.pictures = await evaluate(
         "(window.lethebarState && window.lethebarState.pictures) || []"
       );
