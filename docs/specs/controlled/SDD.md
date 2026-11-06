@@ -185,6 +185,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-28` | the archive, its entry count, each entry's unpacked bytes and the unpacked total are inside the envelope; raised by the loader before the manifest is read | reject |
 | `V-29` | every entry path is relative, lowercase and inside the charset whitelist | reject |
 | `V-30` | a declared picture is at most 4096 px on an edge and a declared sound is at most 2 MB and 60 seconds | reject |
+| `V-31` | a rule's relation change names entities the package declared and carries an `add` or `value` number | reject |
 
 Every rejection names its code and the offending field; a rejection never
 disturbs already-installed plugins or their saves. `V-24` is checked at install
@@ -490,6 +491,7 @@ visible in the interface instead of only in a console nobody opens.
 | `REQ-029` | §4.2 validation (`V-27`, `W-03`), `docs/specs/capabilities.md`, `PackageValidator.KNOWN_CAPABILITIES` |
 | `REQ-030` | §4.2 validation (`V-28`–`V-30`), `app/core/package_limits.gd`, loader envelope pass |
 | `REQ-031` | §11.4 first-visit notice, `infra/export_web.py` cache probe |
+| `REQ-032` | §4.2 `V-31`, `app/core/mechanics.gd` relation changes, `app/core/session.gd` writer and payload field |
 
 ## 13. Decisions and open questions
 

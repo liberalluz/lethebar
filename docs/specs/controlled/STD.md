@@ -528,6 +528,20 @@ path, so the case survives fixture renames.
   `V-28`, `V-30` and `V-30`; the two path packages with `V-29`; every message
   gives the measured value or the limit; the ordinary package installs.
 
+## TC-REL-002 - a rule moves a relation, and the save keeps it
+
+- Covers: `REQ-032`.
+- Fixture: a package whose `data/factions.json` declares two entities and one
+  relation at 70, and whose `data/rules.json` adds -20 to that same pair.
+- Steps: create the session and read the relation before any rule runs; start
+  the run; read the relation and its state; run the rules once more; save the
+  session to slot 1 and resume it; import two packages whose rule names an
+  undeclared entity and a non-numeric change.
+- Exit: the relation is 70 before the rule, 50 after it, the state is no longer
+  `ally`, the opposite direction is untouched, the save keeps 50, the two
+  malformed packages are refused with `V-31`, and the run still reports the
+  same checks as before.
+
 ## TC-BOOT-001 — the first visit says what is coming
 
 - Covers: `REQ-031`.

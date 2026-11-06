@@ -362,6 +362,55 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 				true,
 			))
 
+	# V-31 — a rule that moves a relation has to name a pair the package declared
+	# and a change that is a number. A silent zero would read to the player as a
+	# real value, which is the same mistake V-14 refuses for resources.
+	var faction_map: Variant = context.get("factions", {})
+	var entities: Dictionary = {}
+	if faction_map is Dictionary:
+		var parsed := Relations.defines(faction_map)
+		entities = parsed.get("entities", {})
+	for rule in timing_rules:
+		if not (rule is Dictionary):
+			continue
+		var changes: Variant = rule.get("relations", null)
+		if changes == null:
+			continue
+		if not (changes is Array):
+			issues.append(_issue("V-31", "rules", "a rule's relations must be an array", true))
+			continue
+		for change in changes:
+			if not (change is Dictionary):
+				issues.append(_issue("V-31", "rules", "each relation change must be an object", true))
+				continue
+			var from_id := String(change.get("from", ""))
+			var to_id := String(change.get("to", ""))
+			if not entities.has(from_id):
+				issues.append(_issue(
+					"V-31", "rules",
+					"a relation change names %s, which data/factions.json never declares" % from_id,
+					true,
+				))
+			if not entities.has(to_id):
+				issues.append(_issue(
+					"V-31", "rules",
+					"a relation change points at %s, which data/factions.json never declares" % to_id,
+					true,
+				))
+			var amount: Variant = null
+			if change.has("add"):
+				amount = change["add"]
+			elif change.has("value"):
+				amount = change["value"]
+			else:
+				issues.append(_issue("V-31", "rules", "a relation change needs add or value", true))
+			if amount != null and not (amount is int or amount is float):
+				issues.append(_issue(
+					"V-31", "rules",
+					"a relation change is not a number: %s" % str(amount),
+					true,
+				))
+
 	# V-08 — asset inventory. Never fatal: the node degrades to a placeholder.
 	var package_files: Array = context.get("package_files", [])
 	for asset in manifest["assets"]:
