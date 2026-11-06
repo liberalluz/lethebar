@@ -1,7 +1,46 @@
 {
   "rules": [
-    {"when": {"key": "power", "op": "gte", "value": 1}, "set": {"standing": {"value": 1}}},
-    {"when": {"key": "power", "op": "gte", "value": 5}, "set": {"standing": {"value": 2}}},
-    {"when": {"key": "power", "op": "lte", "value": 0}, "set": {"standing": {"value": 0}}}
+    {
+      "when": {
+        "key": "tick",
+        "op": "gte",
+        "value": 12
+      },
+      "set": {
+        "grain": {
+          "add": 1
+        }
+      }
+    },
+    {
+      "when": {
+        "key": "standing",
+        "op": "gte",
+        "value": 2
+      },
+      "set": {},
+      "relations": [
+        {
+          "from": "cao",
+          "to": "shao",
+          "add": -5
+        }
+      ]
+    },
+    {
+      "when": {
+        "key": "standing",
+        "op": "gte",
+        "value": 3
+      },
+      "set": {},
+      "relations": [
+        {
+          "from": "liu",
+          "to": "cao",
+          "add": 5
+        }
+      ]
+    }
   ]
 }

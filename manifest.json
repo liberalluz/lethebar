@@ -7,12 +7,45 @@
   "engine": ">=4.7.0 <5.0.0",
   "name": "三国",
   "defaultLocale": "zh-CN",
-  "locales": ["en"],
-  "names": {"zh-CN": "三国", "en": "Three Kingdoms"},
+  "locales": [
+    "en"
+  ],
+  "names": {
+    "zh-CN": "三国",
+    "en": "Three Kingdoms"
+  },
   "protocol": "turn_based@1",
-  "capabilities": ["render.2d@1", "text@1"],
-  "mechanics": ["power"],
+  "capabilities": [
+    "render.2d@1",
+    "text@1",
+    "ledger@1",
+    "rules@1",
+    "phases@1",
+    "menu@1",
+    "relations@1"
+  ],
+  "mechanics": [
+    "power",
+    "ledger",
+    "phases",
+    "menu",
+    "relations"
+  ],
   "entry": "n1",
   "saveSchema": 1,
-  "assets": [{"type": "texture", "path": "assets/scene.png", "slot": "scene"}, {"type": "audio", "path": "assets/theme.wav", "slot": "audio"}]
+  "assets": [
+    {
+      "type": "texture",
+      "path": "assets/scene.png",
+      "slot": "scene"
+    },
+    {
+      "type": "audio",
+      "path": "assets/theme.wav",
+      "slot": "audio"
+    }
+  ],
+  "clock": {
+    "per": "turn"
+  }
 }
