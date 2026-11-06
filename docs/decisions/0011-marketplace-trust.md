@@ -1,5 +1,8 @@
 # ADR-0011 · The marketplace records, it does not host
 
+Amended: 2026-11-06 — the index grows `collection` and `layer`, preflight resolves
+a composition rather than one package, and review is layered by `kind`.
+
 ## Context
 
 Packages are installed from a `.zip` the player downloads. Today the only
@@ -33,6 +36,8 @@ describes the data, not the repository.
 | `specVersion`, `engine` | what formats and engines can run it |
 | `capabilities` | what the engine must provide (`ADR-0008`) |
 | `author`, `license`, `homepage`, `tags` | attribution and discovery |
+| `collection` | the world a package belongs to, so a shelf can group by it (`ADR-0012`) |
+| `layer` | for a mod, the package it changes; empty for everything else (`ADR-0014`) |
 | `publishedAt`, `status` | when it appeared; `published` or `withdrawn` |
 
 **A version is immutable.** Once published, a version's bytes and metadata do not
@@ -49,6 +54,26 @@ bandwidth bill and an abuse queue on day one.
 idea of a valid package: the same code that decides whether an install works is
 what a publisher runs before submitting (`package_check`), so "it passed review
 but will not install" cannot happen.
+
+**Preflight resolves a composition, not one file.** A world, a genre pack and a mod
+are chosen together, so the check has to answer three questions before the first
+download: every `requires` is satisfiable at the declared versions; every `layer`
+names a package that is present and in range; and no two chosen mods write the same
+field (`ADR-0013`). What can be proved statically is refused in the browser, not
+after a restart. The same resolution is recorded with the install, so a later
+withdrawal can name the compositions it affects.
+
+**Review is layered by `kind`, not only by trust tier.**
+
+| `kind` | Automatic lane | What a human still decides |
+| --- | --- | --- |
+| `bundle` (a playable pack) | envelope, manifest, licence, namespace, capabilities | content judgement |
+| `mod` | the same, plus its `layer` target and its declared field set | whether changing someone else's fields is acceptable |
+| genre material | not listed | nothing: templates are copied from a git repository, not installed |
+
+A genre repository's `example/` may be listed once it is a real playable package;
+its `template/` never is, because an empty shell installed from a shelf is a trap
+for the player, not a demonstration.
 
 **Review is layered.** A data-only package gets an automated lane: the envelope,
 the manifest, the licence field, the id namespace. A scripted package, if that
