@@ -527,3 +527,20 @@
 出口判据：开局手牌是 `["heavy", "strike", "breathe", "feint"]`；打出 `heavy` 后 guard 为 8、
 edge 为 5，牌进弃牌堆并补回一张，回合读到 2；「蓄势」被拒且消息点名 `edge`，手牌不变；段位读到
 `untried`，结局点名「阵脚已乱」；读档后的会话带着同样的三堆；此后 `git diff --stat -- app` 为空。
+
+## TC-CARDS-002 — 牌显示包裹声明的图片
+
+- 覆盖：REQ-037
+- 夹具：`art-run`，两张牌，`raid` 指名 `assets/card-raid.png`、`feast` 什么都没
+  指名；`art-broken`，声明了资源但字节不是图片；`art-bad`，牌指名了清单从未
+  声明过的 `assets/card-ghost.png`。
+- 步骤：
+  1. 装上 `art-run` 并打开它的场景。
+  2. 读手牌与场景造出的行。
+  3. 装上 `art-broken`，读警告。
+  4. 装上 `art-bad`。
+  5. 打开内置的 `duel`，数它声明的牌面。
+- 退出判据：视图对 `raid` 报 `assets/card-raid.png`，对 `feast` 没有 `icon`
+  键；场景造出两行，第一行有图、第二行没有；`art-broken` 保留两个标签并留下
+  一条含 `card icon` 的警告；`art-bad` 被 `V-39` 拒绝，消息点名
+  `card-ghost.png`；`duel` 里每张牌都带自己的脸。

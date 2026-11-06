@@ -73,6 +73,7 @@ func _initialize() -> void:
 	_case_save_locale()
 	_case_capabilities()
 	_case_cards()
+	_case_card_art()
 	_case_limits()
 	_case_boot()
 	_case_assets()
@@ -2485,6 +2486,108 @@ func _case_scene() -> void:
 		not plain._status.text.contains(turn_prefix) and not plain_labels.has("屯田"),
 		"%s %s" % [str(plain_labels), plain._status.text]
 	)
+
+
+func _art_package(name: String, variant: String = "") -> PackedByteArray:
+	## A hand where one card carries a picture and one does not. The variants
+	## build the two failures: a card naming a texture the manifest never
+	## declares, and a declared texture whose bytes are not a picture.
+	var cards := [
+		{"id": "raid", "label": "Raid the stores", "icon": "assets/card-raid.png", "cost": {"coin": {"add": -1}}},
+		{"id": "feast", "label": "Hold a feast", "cost": {"grain": {"add": -1}}},
+	]
+	if variant == "bad-icon":
+		cards[0]["icon"] = "assets/card-ghost.png"
+	var pictures := {"assets/card-raid.png": _png_bytes(8, 8)}
+	if variant == "broken-icon":
+		pictures = {"assets/card-raid.png": "this is not a picture".to_utf8_buffer()}
+	var assets := [{"type": "texture", "path": "assets/card-raid.png", "slot": "card"}]
+	var files := {
+		"data/state.json": JSON.stringify({
+			"resources": [
+				{"id": "grain", "init": 10, "min": 0, "max": 20},
+				{"id": "coin", "init": 5, "min": 0, "max": 10},
+			],
+		}).to_utf8_buffer(),
+		"data/phases.json": JSON.stringify({"turns": 8, "ranks": [{"at": 1, "title": "Captain"}], "fail": []}).to_utf8_buffer(),
+		"data/cards.json": JSON.stringify({"hand": {"size": 2, "draw_per_turn": 0}, "cards": cards, "deck": ["raid", "feast"]}).to_utf8_buffer(),
+	}
+	for picture_path in pictures:
+		files[picture_path] = pictures[picture_path]
+	return _package(
+		name,
+		{"id": name, "entry": "c1", "assets": assets, "capabilities": ["cards.hand@1", "ledger@1", "phases@1"], "mechanics": ["cards", "ledger", "phases"]},
+		[],
+		[],
+		{"nodes": [{"id": "c1", "text": "A table with two cards on it.", "choices": []}]},
+		{},
+		files,
+	)
+
+
+func _case_card_art() -> void:
+	# A card game where every card is a phrase is readable and forgettable. A
+	# card may name a picture the package declares; the hand draws it beside the
+	# label, and a card that names a picture nobody declared is refused at
+	# install rather than losing its face silently (REQ-037).
+	_section("TC-CARDS-002 a card shows the picture its package declares")
+	var shell := _shell()
+	shell.try_import(_art_package("art-run"))
+	_check("TC-CARDS-002: a package with a card picture installs", shell.session != null, str(shell.notice))
+	if shell.session == null:
+		return
+	var view: Dictionary = shell.session.view()
+	var cards: Array = view.get("hand", [])
+	_check(
+		"TC-CARDS-002: the view reports the icon a card declares",
+		cards.size() == 2 and String(cards[0].get("icon", "")) == "assets/card-raid.png",
+		JSON.stringify(cards),
+	)
+	_check(
+		"TC-CARDS-002: a card without an icon reports none",
+		cards.size() == 2 and not cards[1].has("icon"),
+		JSON.stringify(cards),
+	)
+	var rows: Array = shell.card_rows()
+	_check("TC-CARDS-002: the scene builds one row per card", rows.size() == 2, str(rows.size()))
+	if rows.size() == 2:
+		_check("TC-CARDS-002: the row with an icon holds a picture", bool(rows[0].get("has_icon", false)), str(rows[0]))
+		_check("TC-CARDS-002: the row without an icon holds none", not bool(rows[1].get("has_icon", false)), str(rows[1]))
+
+	var broken := _shell()
+	broken.try_import(_art_package("art-broken", "broken-icon"))
+	_check(
+		"TC-CARDS-002: a picture that does not decode keeps the label",
+		broken.session != null and not (broken.session.view().get("hand", []) as Array).is_empty(),
+		str(broken.notice),
+	)
+	if broken.session != null:
+		var said := ""
+		for warning in broken.session.warnings:
+			said += String(warning.get("message", ""))
+		_check("TC-CARDS-002: a broken picture leaves one warning", said.contains("card icon"), said)
+
+	var bad := _shell()
+	var refused: Dictionary = bad.try_import(_art_package("art-bad", "bad-icon"))
+	_check(
+		"TC-CARDS-002: a card naming an undeclared picture is refused at install",
+		String(refused.get("code", "")) == "V-39",
+		str(refused),
+	)
+	_check(
+		"TC-CARDS-002: the refusal names the missing picture",
+		String(refused.get("text", "")).contains("card-ghost.png"),
+		String(refused.get("text", "")),
+	)
+
+	var duel := _shell()
+	duel.start_plugin("duel")
+	if duel.session != null:
+		var icons := {}
+		for entry in duel.session.hand_spec.get("cards", {}).values():
+			if entry is Dictionary and entry.has("icon"):
+				icons[String(entry["icon"])] = true
+		_check("TC-CARDS-002: the shipped duel deck has one picture per card", icons.size() == 6, str(icons.keys()))
 
 
 func _case_wire() -> void:

@@ -189,6 +189,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-36` | a package that names `cards.hand@1` ships a `data/cards.json` with a `hand` and a `deck` | reject |
 | `V-37` | every card's `cost` and `effects` name resources the ledger declares | reject |
 | `V-38` | every card id in the deck is declared in the package's `cards` table | reject |
+| `V-39` | A card names an icon that no texture asset declares | fatal, `data/cards.json` |
 
 Every rejection names its code and the offending field; a rejection never
 disturbs already-installed plugins or their saves. `V-24` is checked at install
@@ -527,6 +528,36 @@ the ledger never declares (`V-37`) and a claimed `cards.hand@1` without a deck
 file (`V-36`) are refused at install, so the scene never deals from a broken
 deck.
 
+### 11.8 A card can show a face
+
+A card is a label with a cost, and a hand of labels is readable but hard to
+tell apart at a glance. A card may name a picture the package declares:
+
+```json
+{"id": "heavy", "label": "A heavy blow", "icon": "assets/card-heavy.png"}
+```
+
+```json
+{"type": "texture", "path": "assets/card-heavy.png", "slot": "card"}
+```
+
+The `card` slot is not drawn on the scene band: the scene band has one picture
+and one portrait, and a face belongs beside its label in the hand. The hand
+draws the picture to the left of the button, at `CARD_ICON_SIZE`, and keeps the
+label as the button text.
+
+Three things are fixed at install rather than at draw time:
+
+- A card that names an icon no texture asset declares is refused (`V-39`). A
+  card that silently loses its face is the same defect as a card that never had
+  one, only slower to notice.
+- A declared texture whose bytes do not decode keeps the label, leaves one
+  `R-01` warning that names the path, and the run goes on.
+- A card without an `icon` is drawn as before, with no picture and no warning.
+
+REQ-037 maps to `Hand.icon_of()`, `Session.hand_view()` and
+`Shell.card_rows()`.
+
 ## 12. Requirement mapping
 
 | REQ | Design |
@@ -567,6 +598,7 @@ deck.
 | `REQ-034` | §10.1 the Sanguo run, `content/builtin/sanguo/**` data only |
 | `REQ-035` | §11.6 the labels a run is made of, `Session.localise()`, `V-22` |
 | `REQ-036` | §11.7 the hand, `app/core/hand.gd`, `V-36`–`V-38` |
+| `REQ-037` | §11.8 card faces, `app/core/hand.gd`, `V-39` |
 
 ## 13. Decisions and open questions
 
