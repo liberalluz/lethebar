@@ -799,3 +799,20 @@ one `W-05` and keeps the first value.
 - Steps: install it; play the first card; save to slot 1; resume; and separately remove the four built-in archives and run the whole suite
 - Exit: the hand opens at its declared size, playing a card advances the turn, the save and resume keep the turn and the hand, the suite reports `OK — 394 checks, 12 skipped` with no story staged and `OK — 526 checks, 0 skipped` with them staged
 
+## `TC-INSTALL-001` a package from a link is checked before it installs
+
+- Covers: `REQ-047`
+- Preconditions: no story named `linked-pack` is installed; the build offers the
+  pack list with both entries.
+
+1. Open the pack list and read it.
+2. Install from a link with an address that returns nothing, and a valid digest.
+3. Install from a link with a good package and a digest of sixty-four zeros.
+4. Install from a link with the same package and its real digest.
+5. Install the same package again.
+6. Install from a link with the address and an empty digest.
+
+Exit criteria: step 1 shows a file entry and a link entry; step 2 is refused with
+`V-01` and the address; step 3 is refused with `V-43` naming both digests and
+leaves the installed set unchanged; step 4 installs, starts the pack and reports
+`installed`; step 5 reports `already`; step 6 is refused with `V-43`.

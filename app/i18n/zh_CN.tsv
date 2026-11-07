@@ -47,3 +47,7 @@ ui.worlds_hint	每个世界各有自己的故事。
 ui.world_other	其他故事
 ui.arc_stage	弧光：%s（自第 %d 回合）
 ui.cast_line	登场：%s
+ui.install_link	从链接安装…
+ui.link_ask	粘贴一个 .zip 包的地址。
+ui.link_digest	粘贴它的 sha256（64 个十六进制字符）。
+ui.link_refused	没有装任何东西。地址和摘要不足以接受这个文件。

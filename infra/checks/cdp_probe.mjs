@@ -264,6 +264,7 @@ async function enterPackList() {
   // its own. Prefer the world that holds a pictured story, otherwise the first
   // world wins and the picture assertion has nothing to look at.
   const landingStories = ((await appState()) || {}).stories || [];
+storyCount = landingStories.length;
   const pictured = landingStories.find((entry) => Number(entry.pictures || 0) > 0);
   const started = await clickLabel("New game");
   if (started === null) return false;
@@ -367,6 +368,7 @@ async function installPack(zipPath) {
 const landingScreen = await screenName();
 const clickStarted = Math.round(await evaluate("performance.now()"));
 let clickToSceneMs = null;
+let storyCount = 0;
 let interactionAsked = false;
 const requestsBeforeInteraction = requestsSeen;
 const interaction = {
@@ -735,6 +737,7 @@ console.log(
       interaction,
       language,
       clickToSceneMs,
+      stories: storyCount,
       interactionRequests,
       offline,
       directFile,

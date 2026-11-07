@@ -150,6 +150,7 @@ func show_landing() -> String:
 		# state rather than a dead end.
 		_status.text = Locale.text("ui.no_pack_yet")
 		_options.add_child(_button(Locale.text("ui.install"), request_install))
+	_options.add_child(_button(Locale.text("ui.install_link"), request_link_install))
 	# The interface is translated, so the player needs a way to say "not my
 	# language" without changing the browser.
 	_options.add_child(_button(_language_label(), toggle_language))
@@ -289,6 +290,7 @@ func open_plugins() -> String:
 			_options.add_child(note)
 		_options.add_child(row)
 	_options.add_child(_button(Locale.text("ui.install"), request_install))
+	_options.add_child(_button(Locale.text("ui.install_link"), request_link_install))
 	_options.add_child(_button(Locale.text("ui.back"), show_landing))
 	_announce()
 	return screen
@@ -554,13 +556,38 @@ func open_notice(code: String, message: String) -> String:
 func try_import(bytes: PackedByteArray) -> Dictionary:
 	## Shared by the import button and by tests: a rejected package reports its
 	## code on screen and leaves the installed packs untouched (V-01…V-09).
-	var result := loader.import_bytes(bytes, _context())
-	if String(result.get("status", "")) != "installed":
-		open_notice(String(result.get("code", "V-01")), String(result.get("message", "")))
+	return _after_install(loader.import_bytes(bytes, _context()))
+
+
+func install_from_url(url: String, expected_sha256: String, fetch: Callable) -> Dictionary:
+	## A package that arrives over the wire. `PackageLoader.import_url` hashes
+	## the bytes before anything is written, so a truncated download or a wrong
+	## digest stops here with V-01 or V-43 and this screen shows the refusal the
+	## same way it shows a malformed file.
+	if url.strip_edges().is_empty() or expected_sha256.strip_edges().is_empty():
+		open_notice("V-43", Locale.text("ui.link_refused"))
 		return current_view()
+	return _after_install(loader.import_url(url, expected_sha256, _context(), fetch))
+
+
+func _after_install(result: Dictionary) -> Dictionary:
+	## One epilogue for every way a package can arrive. A refusal is a screen,
+	## not an exception: the code and the message are what the player reads.
+	if String(result.get("status", "")) != "installed":
+		var code := String(result.get("code", "V-01"))
+		var message := String(result.get("message", ""))
+		open_notice(code, message)
+		# The view is what the screen shows; the code and the message are what a
+		# caller needs in order to say what happened without reading pixels.
+		var refused := current_view()
+		refused["code"] = code
+		refused["message"] = message
+		refused["install"] = "refused"
+		return refused
 	var record: Dictionary = result["entry"]
 	var plugin_id := String(record.get("id", ""))
-	if not builtin_ids.has(plugin_id):
+	var already := builtin_ids.has(plugin_id)
+	if not already:
 		builtin_ids.append(plugin_id)
 	packages.persist(record)
 	saves.mark_writing()
@@ -568,7 +595,9 @@ func try_import(bytes: PackedByteArray) -> Dictionary:
 	entry = record
 	session = Session.create(entry, {"start_counter": 1, "locale": Locale.current()})
 	session.start()
-	return enter_session()
+	var view := enter_session()
+	view["install"] = "already" if already else "installed"
+	return view
 
 
 # --- installing a pack ------------------------------------------------------
@@ -593,6 +622,27 @@ func request_install() -> void:
 	_picker.canceled.connect(_on_picker_closed)
 	add_child(_picker)
 	_picker.popup_centered_ratio(0.6)
+
+
+func request_link_install() -> void:
+	## A browser has no file system and no dialog of its own, so the address and
+	## the digest are asked for with two prompts. The digest is not optional:
+	## without it `import_url` would compare against nothing and the screen would
+	## claim a file it never checked.
+	if not OS.has_feature("web"):
+		open_notice("V-43", Locale.text("ui.link_refused"))
+		return
+	var url := String(JavaScriptBridge.eval(
+		"window.prompt(%s) || ''" % JSON.stringify(Locale.text("ui.link_ask")), true
+	)).strip_edges()
+	if url.is_empty():
+		return
+	var digest := String(JavaScriptBridge.eval(
+		"window.prompt(%s) || ''" % JSON.stringify(Locale.text("ui.link_digest")), true
+	)).strip_edges()
+	var fetch := func(address: String) -> PackedByteArray:
+		return await Downloader.fetch(self, address)
+	install_from_url(url, digest, fetch)
 
 
 func _on_picker_closed() -> void:
@@ -990,6 +1040,7 @@ func show_worlds() -> String:
 	for row in worlds():
 		_options.add_child(_button(String(row["title"]), open_world.bind(String(row["id"]))))
 	_options.add_child(_button(Locale.text("ui.install"), request_install))
+	_options.add_child(_button(Locale.text("ui.install_link"), request_link_install))
 	_options.add_child(_button(Locale.text("ui.back"), show_landing))
 	_announce()
 	return screen

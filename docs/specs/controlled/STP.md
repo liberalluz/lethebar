@@ -4,7 +4,7 @@ English · [简体中文](STP.zh-CN.md)
 
 ## Scope
 
-Covers the forty-six P1 requirements
+Covers the forty-seven P1 requirements
 `SDD.md`. Does not cover the plugin market, the plugin editor, 3D, multiplayer,
 accounts, cloud saves, or the native iOS build; those are out of scope for
 v0.0.0 and have no tests here by design.
@@ -89,6 +89,7 @@ claims: if they fail, the architecture claim fails, not just a feature.
 | `TC-CONTENT-001` | `REQ-044` | A package that declares nothing keeps the old view; the declared view, density, cast and stage reach the view; the sparse density hides the situation line and the dense one names the stage and its turn; the arc says nothing before its first stage and holds the last one; an unknown view or density is refused with `V-40`; a repeated cast id and a falling arc are refused with `V-41`; the declaration comes back with the resumed run. |
 | `TC-META-001` | `REQ-045` | A package that declares nothing keeps an empty meta and still installs; the declared pitch, audience, length and icon reach the list; the pitch follows the reader and falls back without going blank; the list shows the pitch and the length; an audience, a length, a pitch and an icon the engine cannot honour are refused with `V-42` naming the field; the three shipped stories declare a pitch in both languages and a length. |
 | `TC-PACK-001` | `REQ-046` | The digest of a package is lowercase hex sha256; a package whose hash matches installs and keeps its id; a hash mismatch is refused with `V-43` naming both digests; a fetch that returns nothing is refused with `V-01` naming the url; the release tool builds one directory into byte-identical zips and writes a descriptor that agrees with the file. |
+| `TC-INSTALL-001` | `REQ-047` | The pack list offers a file and a link; an empty download is refused with `V-01` naming the address; a wrong digest is refused with `V-43` naming both digests and leaves the installed set unchanged; a matching digest installs and starts the pack; a second install of the same id reports `already`; a link install without a digest is refused. |
 | `TC-CARDS-001` | `REQ-036` | A package that declares a hand deals it, a card spends its cost and applies its effect as one turn, an unaffordable card is refused by name and stays in the hand, the three piles survive a save and a resume, and a deck naming an undeclared card, a card naming an undeclared resource and a claimed `cards.hand@1` without a deck file are refused at install with `V-38`, `V-37` and `V-36`. |
 | `TC-CARDS-002` | `REQ-037` | A card that names a texture its package declares shows that picture beside its label and reports it in the view, a card that names none is drawn without a picture, a declared texture whose bytes do not decode keeps the label and leaves one warning, and a card naming an icon no texture asset declares is refused at install with `V-39` naming the missing path. |
 | `TC-HAND-001` | `REQ-038` | A hand of eight wraps into rows inside the window, every card is laid out once, a wider window needs fewer rows, and a short hand keeps its whole label. |

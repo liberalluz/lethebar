@@ -51,6 +51,7 @@ func _initialize() -> void:
 	_case_landing_without_saves()
 	_case_shell_refusal()
 	_case_import_control()
+	_case_install_url()
 	_case_font_coverage()
 	_case_slot_layout()
 	_case_version()
@@ -1130,6 +1131,78 @@ func _case_import_control() -> void:
 		"TC-PKG-001: an installed pack survives a refused file",
 		shell.builtin_ids.has("imported-pack") and shell.builtin_ids.has("sanguo"),
 		str(shell.builtin_ids),
+	)
+
+
+func _case_install_url() -> void:
+	if not _stories_staged(1):
+		_skip("TC-INSTALL-001", "no story is staged")
+		return
+	# A package that arrives over the wire. The bytes are handed in through a
+	# fake fetcher, which is exactly the contract `import_url` has: it never
+	# dials a URL, it hashes what it was given. Three outcomes are asserted
+	# because the screen has three, and the digest is what separates them.
+	_section("TC-INSTALL-001 a package from a link is checked before it installs")
+	var bytes := _package("link-fixture", {"id": "linked-pack", "name": "Linked Pack"})
+	var digest := PackageLoader.digest_of(bytes)
+	var shell := _shell()
+	shell.open_plugins()
+	_check(
+		"TC-INSTALL-001: the pack list offers a link install",
+		shell.visible_text().contains("Install from a link"),
+		shell.visible_text(),
+	)
+
+	var empty := shell.install_from_url(
+		"https://example.invalid/gone.zip",
+		digest,
+		func(_url: String) -> PackedByteArray: return PackedByteArray(),
+	)
+	_check(
+		"TC-INSTALL-001: an empty download is refused with V-01 and the address",
+		String(empty.get("code", "")) == "V-01" and String(empty.get("message", "")).contains("gone.zip"),
+		"%s / %s" % [String(empty.get("code", "")), String(empty.get("message", ""))],
+	)
+
+	var wrong := shell.install_from_url(
+		"https://example.invalid/pack.zip",
+		"0".repeat(64),
+		func(_url: String) -> PackedByteArray: return bytes,
+	)
+	_check(
+		"TC-INSTALL-001: a wrong digest is refused with both digests named",
+		String(wrong.get("code", "")) == "V-43"
+			and String(wrong.get("message", "")).contains(digest)
+			and String(wrong.get("message", "")).contains("0".repeat(8)),
+		String(wrong.get("message", "")),
+	)
+	_check(
+		"TC-INSTALL-001: a refused link install changes no installed pack",
+		not shell.builtin_ids.has("linked-pack"),
+		str(shell.builtin_ids),
+	)
+
+	shell.open_plugins()
+	var accepted := shell.install_from_url(
+		"https://example.invalid/pack.zip",
+		digest.to_upper(),
+		func(_url: String) -> PackedByteArray: return bytes,
+	)
+	_check("TC-INSTALL-001: a matching digest installs the pack", shell.builtin_ids.has("linked-pack"), str(shell.builtin_ids))
+	_check("TC-INSTALL-001: installing starts the pack", shell.screen_name() == "session")
+	_check("TC-INSTALL-001: the install reports itself as fresh", String(accepted.get("install", "")) == "installed", str(accepted.get("install")))
+	shell.open_plugins()
+	var again := shell.install_from_url(
+		"https://example.invalid/pack.zip",
+		digest,
+		func(_url: String) -> PackedByteArray: return bytes,
+	)
+	_check("TC-INSTALL-001: a second install of the same id says so", String(again.get("install", "")) == "already", str(again.get("install")))
+	var blank := shell.install_from_url("https://example.invalid/pack.zip", "", func(_url: String) -> PackedByteArray: return bytes)
+	_check(
+		"TC-INSTALL-001: a link install without a digest is refused",
+		String(blank.get("code", "")) == "V-43",
+		String(blank.get("code", "")),
 	)
 
 

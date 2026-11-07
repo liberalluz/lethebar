@@ -128,6 +128,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dir", type=Path, default=DEFAULT_DIR, help="exported build")
     parser.add_argument("--reloads", type=int, default=3, help="reloads timed for the median")
+    parser.add_argument(
+        "--min-packs",
+        type=int,
+        default=0,
+        help="fail when fewer stories are offered than this, counting the shipped ones",
+    )
     args = parser.parse_args()
 
     build = args.dir.resolve()
@@ -288,6 +294,11 @@ def main() -> int:
         report["ok"] = False
         report["offlineFailure"] = "the installed pack did not come back after the offline reload"
 
+    if report.get("ok") and (report.get("stories") or 0) < args.min_packs:
+        report["ok"] = False
+        report["storyFailure"] = (
+            f"the build offered {report.get('stories')} story(ies), expected at least {args.min_packs}"
+        )
     if report.get("ok") and not offline.get("landing"):
         report["ok"] = False
         report["offlineFailure"] = "the page did not come back from cache while offline"

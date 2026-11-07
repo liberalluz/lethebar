@@ -63,6 +63,7 @@ second.
 | `REQ-044` | A package declares how its story reads: the view, the density, the cast and the arc, and the scene follows it. |
 | `REQ-045` | A package says who it is for: a pitch, an audience, a length and an icon, and the pack list shows the pitch and the length. |
 | `REQ-046` | A package that arrives from a URL installs only when its bytes hash to the value the descriptor names, and the refusal names both digests. |
+| `REQ-047` | The install screen offers a link as well as a file, and a link install names its outcome: installed, already installed, or refused with the reason. |
 
 
 ## 3. Out of scope for v0.0.0
