@@ -202,6 +202,16 @@ static func format_issues(manifest: Dictionary) -> Array:
 				issues.append({"field": "layer", "message": "a layer package must name its layer: %s" % ", ".join(LAYERS)})
 			elif not LAYERS.has(layer):
 				issues.append({"field": "layer", "message": "expected one of: %s" % ", ".join(LAYERS)})
+			# The target sits beside `layer`, not inside it (REQ-043): `layer`
+			# already answers which of the six pieces this package is, and a key
+			# that means two things depending on its shape is a trap for authors.
+			var target: Variant = manifest.get("target", "")
+			if String(target) == "":
+				issues.append({"field": "target", "message": "a layer package must name the package it changes"})
+			elif not is_id(target):
+				issues.append({"field": "target", "message": "target must match %s" % ID_PATTERN})
+		elif manifest.has("target"):
+			issues.append({"field": "target", "message": "only a layer package may name a target"})
 
 	if manifest.has("requires"):
 		var requires: Variant = manifest["requires"]

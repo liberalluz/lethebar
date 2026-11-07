@@ -79,6 +79,7 @@ func _initialize() -> void:
 	_case_collection()
 	_case_assembly()
 	_case_layers()
+	_case_wire3()
 	_case_limits()
 	_case_boot()
 	_case_assets()
@@ -1516,7 +1517,7 @@ func _case_format() -> void:
 
 	var loader := PackageLoader.new()
 	loader.import_bytes(
-		_package("fmt-layer", {"id": "fmt-layer", "kind": "layer", "layer": "mod"}), _context()
+		_package("fmt-layer", {"id": "fmt-layer", "kind": "layer", "layer": "mod", "target": "fmt-base"}), _context()
 	)
 	var wrong_range := loader.import_bytes(
 		_package("fmt-range", {
@@ -3542,6 +3543,119 @@ func _case_layers() -> void:
 		not twice.get("ok", true) and String(twice.get("code", "")) == "V-34",
 		"%s %s" % [twice.get("code", ""), twice.get("message", "")],
 	)
+
+
+func _layer_with_target(name: String, target: String, ledger: bool = true, action: bool = true, action_id: String = "drill") -> PackedByteArray:
+	## A layer that names its own base (REQ-043). `target` empty means the package
+	## forgot to say, which is the case the assembly has to refuse.
+	var overrides := {"id": name, "kind": "layer", "layer": "mod", "capabilities": ["ledger@1"], "mechanics": ["ledger"]}
+	if target != "":
+		overrides["target"] = target
+	var files := {}
+	if ledger:
+		files["data/state.json"] = JSON.stringify({
+			"resources": [{"id": "grain", "init": 10.0, "min": 0.0, "max": 99.0, "label": "粮"}],
+		}, "\t").to_utf8_buffer()
+	if action:
+		files["data/actions.json"] = JSON.stringify({
+			"actions": [{"id": action_id, "label": "Drill", "per_turn": 1, "effects": [{"grain": {"add": 1}}]}],
+		}, "\t").to_utf8_buffer()
+	return _package(name, overrides, [], [], {}, {}, files)
+
+
+func _case_wire3() -> void:
+	## TC-WIRE-003: the target belongs to the package. A layer names its base in
+	## the manifest, the assembly may override it, a layer with no target anywhere
+	## is refused, and two layers writing the same field are refused with a code
+	## that names both.
+	var loader := PackageLoader.new()
+	var context := {"engine_version": "4.7.2", "work_dir": FIXTURE_DIR}
+	var base: Dictionary = loader.import_bytes(_base_package("w3-base"), context)
+	var other_base: Dictionary = loader.import_bytes(_base_package("w3-other"), context)
+	var layer: Dictionary = loader.import_bytes(_layer_with_target("w3-mod", "w3-base"), context)
+	var orphan: Dictionary = loader.import_bytes(_layer_with_target("w3-orphan", ""), context)
+	var twin: Dictionary = loader.import_bytes(_layer_with_target("w3-twin", "w3-base"), context)
+	var neighbour: Dictionary = loader.import_bytes(_layer_with_target("w3-neighbour", "w3-base", false, true, "scout"), context)
+	var bundle: Dictionary = loader.import_bytes(
+		_package("w3-bundle", {"id": "w3-bundle", "target": "w3-base"}, [], [], {}, {}, {}),
+		context,
+	)
+	_check(
+		"TC-WIRE-003: a base and a layer install, and a layer that forgot its target does not",
+		base["status"] == "installed" and layer["status"] == "installed"
+			and orphan["status"] == "rejected" and String(orphan.get("code", "")) == "V-23",
+		"%s %s %s" % [base.get("code", ""), layer.get("code", ""), orphan.get("code", "")],
+	)
+	_check(
+		"TC-WIRE-003: the manifest carries the target the package declared",
+		String((loader.registry.entry("w3-mod")["manifest"] as Dictionary).get("target", "")) == "w3-base",
+		str((loader.registry.entry("w3-mod")["manifest"] as Dictionary).get("target", "none")),
+	)
+
+	var declared: Dictionary = loader.assemble(["w3-base", "w3-mod"])
+	var declared_entries: Array = declared.get("entries", [])
+	var layered := Session.create(declared_entries[0], {"assembly": declared_entries.slice(1)}) if declared.get("ok", false) else null
+	_check(
+		"TC-WIRE-003: an assembly may name only the package and let the manifest decide",
+		declared.get("ok", false) and declared_entries.size() == 2
+			and String((declared_entries[1] as Dictionary).get("target", "")) == "w3-base"
+			and layered != null and float(layered.ledger_defs["grain"]["max"]) == 99.0,
+		"%s %s" % [declared.get("code", ""), declared.get("message", "")],
+	)
+
+	var stray: Dictionary = loader.assemble(["w3-base", "w3-orphan"])
+	_check(
+		"TC-WIRE-003: a layer that never installed cannot be named by an assembly",
+		not stray.get("ok", true) and String(stray.get("code", "")) == "V-33",
+		"%s %s" % [stray.get("code", ""), stray.get("message", "")],
+	)
+
+	_check(
+		"TC-WIRE-003: a bundle that declares a target is refused as a manifest problem",
+		bundle["status"] == "rejected" and String(bundle.get("code", "")) == "V-23",
+		"%s %s" % [bundle.get("status", ""), str(bundle.get("issues", bundle.get("code", "")))],
+	)
+
+	var override: Dictionary = loader.assemble(["w3-other", {"id": "w3-mod", "target": "w3-other"}])
+	var override_entries: Array = override.get("entries", [])
+	var rebuilt := Session.create(override_entries[0], {"assembly": override_entries.slice(1)}) if override.get("ok", false) else null
+	_check(
+		"TC-WIRE-003: an assembly target wins over the manifest target",
+		override.get("ok", false) and rebuilt != null and float(rebuilt.ledger_defs["grain"]["max"]) == 99.0,
+		"%s %s" % [override.get("code", ""), override.get("message", "")],
+	)
+
+	var clash: Dictionary = loader.assemble(["w3-base", "w3-mod", "w3-twin"])
+	var clash_message := String(clash.get("message", ""))
+	_check(
+		"TC-WIRE-003: two layers writing the same field are refused and both are named",
+		not clash.get("ok", true) and String(clash.get("code", "")) == "V-35" and clash_message.contains("w3-mod") and clash_message.contains("w3-twin"),
+		"%s %s" % [clash.get("code", ""), clash_message],
+	)
+
+	var apart: Dictionary = loader.assemble(["w3-base", "w3-mod", "w3-neighbour"])
+	_check(
+		"TC-WIRE-003: two layers writing different fields both apply",
+		apart.get("ok", false),
+		"%s %s" % [apart.get("code", ""), apart.get("message", "")],
+	)
+
+	if layered != null:
+		MemoryBackend.reset()
+		var store := SaveStore.new()
+		layered.start()
+		store.write(declared_entries[0], 1, layered.snapshot(), "Layered")
+		var back: Dictionary = store.read(declared_entries[0], 1)
+		var resumed := store.resume(declared_entries[0], back["payload"], {"assembly": declared_entries.slice(1)})
+		var ids: Array = []
+		if resumed != null:
+			for action in resumed.actions:
+				ids.append(String(action.get("id", "")))
+		_check(
+			"TC-WIRE-003: a saved layered run comes back with the same assembly",
+			resumed != null and (resumed.snapshot().get("assembly", []) as Array) == ["w3-base", "w3-mod"] and ids == ["farm", "drill"],
+			"%s %s" % [str(ids), str(resumed.snapshot().get("assembly", [])) if resumed != null else "none"],
+		)
 
 
 func _cards_package(name: String, variant: String = "") -> PackedByteArray:

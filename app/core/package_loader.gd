@@ -282,12 +282,59 @@ func assemble(ids: Array) -> Dictionary:
 				}
 			seen.append(walk)
 			walk = String(targets[walk])
+	var written := {}
 	for request in requests:
 		var entry: Dictionary = registry.entry(String(request["id"])).duplicate(true)
-		if String(request["target"]) != "":
-			entry["target"] = String(request["target"])
+		var manifest: Dictionary = entry.get("manifest", {}) if entry.get("manifest", null) is Dictionary else {}
+		var target := String(request["target"])
+		if target == "":
+			target = String(manifest.get("target", ""))
+		if target == "" and String(manifest.get("kind", "")) == "layer":
+			return {
+				"ok": false,
+				"code": "V-34",
+				"message": "the layer %s names no target, and the assembly names none for it" % String(request["id"]),
+				"entries": [],
+			}
+		if target != "":
+			entry["target"] = target
+			var clash := _layer_conflict(entry, written)
+			if clash != "":
+				return {"ok": false, "code": "V-35", "message": clash, "entries": []}
 		entries.append(entry)
 	return {"ok": true, "code": "", "message": "", "entries": entries}
+
+
+func _layer_conflict(entry: Dictionary, written: Dictionary) -> String:
+	## Two layers that write the same field are an authoring mistake, not an
+	## order to choose from: the later one would silently win. The refusal names
+	## the field and both packages so the author knows which pair to look at
+	## (REQ-043, V-35).
+	var layer_id := String(entry.get("id", ""))
+	var data: Dictionary = entry.get("data", {}) if entry.get("data", null) is Dictionary else {}
+	var fields: Array = []
+	var ledger: Variant = data.get("ledger", {})
+	if ledger is Dictionary:
+		for resource in (ledger as Dictionary).get("resources", []):
+			if resource is Dictionary and resource.has("id"):
+				fields.append(["resource", String(resource["id"])])
+	for action in data.get("actions", []):
+		if action is Dictionary and action.has("id"):
+			fields.append(["action", String(action["id"])])
+	for pool in data.get("pools", []):
+		if pool is Dictionary and pool.has("id"):
+			fields.append(["pool", String(pool["id"])])
+	var hand: Variant = data.get("hand", {})
+	if hand is Dictionary:
+		for card in (hand as Dictionary).get("cards", []):
+			if card is Dictionary and card.has("id"):
+				fields.append(["card", String(card["id"])])
+	for field in fields:
+		var key := "%s:%s" % [String(field[0]), String(field[1])]
+		if written.has(key):
+			return "the layers %s and %s both write %s %s" % [String(written[key]), layer_id, String(field[0]), String(field[1])]
+		written[key] = layer_id
+	return ""
 
 
 func _envelope_problem(bytes: PackedByteArray, files: Array, reader: ZIPReader) -> Dictionary:
