@@ -805,3 +805,10 @@ one `W-05` and keeps the first value.
 - Steps: install all six; read the plain and the declared block; ask the pitch for `en`, `zh-CN` and a language the package does not have; build the list row; import the four refused packages; read the meta of the three shipped stories
 - Exit: the plain entry has no meta, the declared one carries pitch/audience/length/icon, `zh-CN` and the unknown language both resolve without a blank row, the row names the pitch and the length, the four refusals carry `V-42` and name their field, and every shipped story has a pitch in both languages and a positive length
 
+## TC-PACK-001 — a pack arrives with a hash
+
+- Covers: `REQ-046`
+- Fixture: a package built for the case, and three fetchers: one returning its bytes, one returning nothing
+- Steps: hash the fixture bytes; install with the right digest; install with sixty-four zeros; install with a fetcher that returns nothing; build `content/builtin/jianghu` twice with `infra/tool/release/pack.py build` and compare the two archives
+- Exit: the digest is sixty-four lowercase hex characters, the matching install reports `installed` and keeps the id, the mismatch reports `V-43` with both digests in the message, the empty fetch reports `V-01` with the url, and the two builds are byte-identical with a descriptor whose sha256 equals the file's
+

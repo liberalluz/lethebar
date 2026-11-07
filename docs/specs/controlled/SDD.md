@@ -192,6 +192,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-40` | A `content` block names a view or a density the engine does not know. |
 | `V-41` | The cast repeats an id or carries an empty name, or the arc's turns do not ascend and stay unique. |
 | `V-42` | The `meta` block names an audience, a length, a pitch or an icon the engine cannot honour. |
+| `V-43` | The bytes of a downloaded package do not hash to the value the caller expects. |
 | `V-36` | a package that names `cards.hand@1` ships a `data/cards.json` with a `hand` and a `deck` | reject |
 | `V-37` | every card's `cost` and `effects` name resources the ledger declares | reject |
 | `V-38` | every card id in the deck is declared in the package's `cards` table | reject |
@@ -697,6 +698,12 @@ A package may carry a `content` block in its manifest: the view a story is told 
 
 A package may carry a `meta` block: a `pitch` in one or more languages, an `audience` from `kids`, `teens`, `adults`, a `minutes` length and an optional `icon` that must be a texture the manifest already declares. `MetaLayer` reads the block; the pack list renders the pitch in the reader's language, then the package default, then any language it has, together with the length. `V-42` refuses an audience the engine does not know, a length that is not positive, a pitch entry with no text and an icon no texture provides, naming the field in every message. The block is never read by a run, so declaring it cannot change a save.
 
+## 11.17 A pack travels as an artifact with a hash
+
+A pack leaves the repository as a zip and a descriptor. `infra/tool/release/pack.py` builds the zip with one timestamp for every entry and the entries in a sorted order, so two builds of one directory are byte-identical; it writes `<id>-<version>.json` holding the id, the version, the byte count, the sha256, the `specVersion` and the engine range, and it can upload both files to a release (dry by default).
+
+An engine installs such a pack through `PackageLoader.import_url(url, expected_sha256, context, fetch)`. The caller supplies the bytes, never a socket: `PackageLoader` sits under `res://core`, where no network path may be opened. The bytes are hashed first and compared in lowercase hex; a mismatch stops the install with `V-43`, naming the url and both digests, and an empty fetch is `V-01` naming the url. A match goes on to `import_bytes`, so every install-time rule (the envelope, the capability check, the story's own validation) applies to a downloaded pack exactly as it does to an imported one.
+
 ## 12. Requirement mapping
 
 | REQ | Design |
@@ -746,6 +753,7 @@ A package may carry a `meta` block: a `pitch` in one or more languages, an `audi
 | `REQ-043` | §11.14 the declared target, `ManifestSchema.format_issues()`, `PackageLoader._layer_conflict()`, `V-35` |
 | `REQ-044` | §11.15 the declared view, `ContentLayer`, `V-40`, `V-41` |
 | `REQ-045` | §11.16 the declared meta, `MetaLayer`, `V-42` |
+| `REQ-046` | §11.17 the artifact and the hash, `PackageLoader.import_url`, `V-43` |
 
 ## 13. Decisions and open questions
 

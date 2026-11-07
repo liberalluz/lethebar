@@ -214,6 +214,44 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 	}
 
 
+func import_url(url: String, expected_sha256: String, context: Dictionary, fetch: Callable) -> Dictionary:
+	## Installs a package that was downloaded rather than handed over (REQ-046).
+	##
+	## The hash is the only thing standing between a truncated download and a
+	## package that installs and then refuses to open, so the bytes are hashed
+	## before they reach `import_bytes` and a mismatch stops the install with
+	## V-43, naming the expected and the actual digest.
+	##
+	## The caller supplies the bytes, never a socket: this file lives under
+	## `res://core`, and TC-OFF-003 holds that no runtime source in `core` or
+	## `protocols` opens a network path. Whoever offers a download (an install
+	## screen, a store) passes the fetcher in.
+	if not fetch.is_valid():
+		return _rejected("V-01", "package", "no fetcher was given for %s" % url, [])
+	var fetched: Variant = fetch.call(url)
+	if not fetched is PackedByteArray or (fetched as PackedByteArray).is_empty():
+		return _rejected("V-01", "package", "could not download the package from %s" % url, [])
+	var bytes: PackedByteArray = fetched
+	var actual := digest_of(bytes)
+	var expected := expected_sha256.strip_edges().to_lower()
+	if actual != expected:
+		return _rejected(
+			"V-43", "package",
+			"the package from %s hashes to %s, not the expected %s" % [url, actual, expected],
+			[],
+		)
+	return import_bytes(bytes, context)
+
+
+static func digest_of(bytes: PackedByteArray) -> String:
+	## The sha256 of a package's bytes, lowercase hex, which is the form a
+	## descriptor prints and the form `import_url` compares (REQ-046).
+	var context := HashingContext.new()
+	context.start(HashingContext.HASH_SHA256)
+	context.update(bytes)
+	return context.finish().hex_encode().to_lower()
+
+
 func assemble(ids: Array) -> Dictionary:
 	## Resolves the ordered package list a run is built from (ADR-0013). A name
 	## nothing installed is refused here rather than half-opened later, and the

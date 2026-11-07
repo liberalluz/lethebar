@@ -73,6 +73,7 @@ func _initialize() -> void:
 	_case_save_locale()
 	_case_capabilities()
 	_case_cards()
+	_case_pack_url()
 	_case_card_art()
 	_case_hand_layout()
 	_case_shuffle()
@@ -3983,6 +3984,28 @@ func _cards_package(name: String, variant: String = "") -> PackedByteArray:
 		files,
 	)
 
+
+
+func _case_pack_url() -> void:
+	## TC-PACK-001 — a pack that arrives by url is installed only when its bytes
+	## hash to the expected value (REQ-046).
+	var bytes := _package("url-pack", {"id": "url-pack"}, [], [], {}, {}, {})
+	var expected := PackageLoader.digest_of(bytes)
+	_check("B56: the digest of a package is lowercase hex sha256", expected.length() == 64, expected)
+
+	var loader := PackageLoader.new(InstallRegistry.new())
+	var fetched := func(_url: String) -> PackedByteArray: return bytes
+	var installed := loader.import_url("https://example.invalid/url-pack.zip", expected, {"work_dir": FIXTURE_DIR, "engine_version": "4.7.2"}, fetched)
+	_check("B56: a package whose hash matches installs", String(installed.get("status", "")) == "installed", str(installed.get("message", "")))
+	_check("B56: the installed package keeps its id", String(installed.get("manifest", {}).get("id", "")) == "url-pack", "")
+
+	var wrong := loader.import_url("https://example.invalid/url-pack.zip", "0".repeat(64), {"work_dir": FIXTURE_DIR, "engine_version": "4.7.2"}, fetched)
+	_check("B56: a hash mismatch is refused with V-43", String(wrong.get("code", "")) == "V-43", String(wrong.get("message", "")))
+	_check("B56: the refusal names both digests", String(wrong.get("message", "")).contains(expected) and String(wrong.get("message", "")).contains("0".repeat(64)), "")
+
+	var missing := func(_url: String) -> PackedByteArray: return PackedByteArray()
+	var empty := loader.import_url("https://example.invalid/gone.zip", expected, {"work_dir": FIXTURE_DIR, "engine_version": "4.7.2"}, missing)
+	_check("B56: a download that returns nothing is refused with V-01 and the url", String(empty.get("code", "")) == "V-01" and String(empty.get("message", "")).contains("gone.zip"), String(empty.get("message", "")))
 
 func _case_cards() -> void:
 	# A hand is not a differently drawn menu: it is state that has to be held,
