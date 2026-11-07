@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Check that the author-repository gate template keeps its four steps in order.
+"""Check that the author-repository gate template keeps its three steps in order.
 
-The template is copied into repositories that have no gate of their own, so the
-only thing that can be wrong with it in this repository is its shape: the four
-steps must exist, they must be named the same as the engine's own checks, and
-they must appear in the order each one depends on.
+The template is copied into repositories that publish packs and nothing else, so
+the only thing that can be wrong with it here is its shape: the steps must be
+the three a pack can fail at, they must appear in the order each one depends on,
+and they must not mention a repository layout - a plugin repository is a
+project, and only its archive is checked.
 """
 
 from __future__ import annotations
@@ -13,31 +14,43 @@ import re
 import sys
 from pathlib import Path
 
-TEMPLATE = Path(__file__).resolve().parent.parent / "ci" / "author-gate.yml"
-ORDER = ["tree", "stage", "import", "test"]
+DEFAULT_TEMPLATE = Path(__file__).resolve().parent.parent / "ci" / "author-gate.yml"
+ORDER = ["build", "check_pack", "publish"]
+# Every one of these was in the template before B66 and was wrong for a
+# repository that has no engine tree of its own.
+FORBIDDEN = [
+    ("infra/stage_packs.py", "asks the world to supply an engine-side stager"),
+    ("--path app", "opens the engine's project directory"),
+    ("app/builtin", "reads the engine's built-in packages"),
+    ("--profile world", "checks the repository layout instead of the pack"),
+    ("check_tree.py", "checks the repository layout instead of the pack"),
+]
 
 
 def steps(text: str) -> list[str]:
     found = []
     for line in text.splitlines():
-        match = re.match(r"\s*- name: (\w+)\s*$", line)
+        match = re.match(r"\s*- name: ([\w-]+)\s*$", line)
         if match:
             found.append(match.group(1))
     return found
 
 
-def main() -> int:
-    if not TEMPLATE.is_file():
-        print(f"[author-gate] missing template: {TEMPLATE.name}")
+def main(argv: list[str]) -> int:
+    target = DEFAULT_TEMPLATE
+    if "--template" in argv:
+        target = Path(argv[argv.index("--template") + 1])
+    if not target.is_file():
+        print(f"[author-gate] missing template: {target.name}")
         return 1
-    text = TEMPLATE.read_text(encoding="utf-8")
+    text = target.read_text(encoding="utf-8")
     found = steps(text)
     problems = []
     for name in ORDER:
         if name not in found:
             problems.append(f"[author-gate] the template has no {name} step")
     positions = [found.index(name) for name in ORDER if name in found]
-    if positions != sorted(positions):
+    if positions and positions != sorted(positions):
         problems.append(
             f"[author-gate] steps are out of order: {' -> '.join(found)}"
         )
@@ -45,10 +58,11 @@ def main() -> int:
         problems.append(
             "[author-gate] the template does not say it is a template to copy"
         )
-    if "--profile world" not in text:
-        problems.append("[author-gate] the tree step does not check the world profile")
+    for needle, reason in FORBIDDEN:
+        if needle in text:
+            problems.append(f"[author-gate] the template {reason} ({needle})")
     if not problems:
-        print(f"[author-gate] {len(found)} step(s), tree -> stage -> import -> test")
+        print(f"[author-gate] {len(found)} step(s), build -> check_pack -> publish")
         return 0
     for problem in problems:
         print(problem)
@@ -56,4 +70,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

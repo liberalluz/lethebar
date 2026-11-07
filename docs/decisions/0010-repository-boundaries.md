@@ -4,6 +4,9 @@ Amended: 2026-11-06 — repositories are cut by world, not by genre; a genre
 repository holds material, never a runtime.
 
 Amended: 2026-11-07 — a package has three axes rather than one field; the
+Amended: 2026-11-07 — the line about executables moved from the repository to
+the pack: a repository's own tree is the author's business, while an archive
+carrying an executable entry is refused.
 marketplace holds an index and a review record and never the packages themselves;
 and no author repository may hold engine code, which is a narrower rule than "no
 code" and a wider one than "no files that the engine reads".
@@ -105,10 +108,13 @@ template; opening it earlier means maintaining a tutorial nobody reads.
      package that declares the `scripted` trust, and only under the conditions
      `ADR-0009` sets (signed, confirmed by the player, reviewed on its own lane) —
      the engine is not extended to run it, it is asked to run it;
-   - an **executable entry point at the repository root** — a build script that
-     boots the game, a launcher, a copy of the export presets — is a violation
-     even when it contains no `.gd` file, because it makes the repository look
-     runnable when only the engine is.
+   - **no executable inside a pack.** `.gd` outside a package that declares
+     `scripted`, `.exe`, `.sh`, `.dll`, a symbolic link, an absolute path or a
+     `..` entry is refused twice: when the archive is checked before publishing
+     (`infra/checks/check_pack.py`) and when the engine installs it (`V-01` and
+     its siblings). The repository's own tree is the author's business — a build
+     script at the root is fine — because a repository is a project; the pack is
+     the thing that travels, and the pack is what gets checked.
 2. **The capability comes first.** A genre repository can only teach what the
    engine already provides; a package that names a capability the engine lacks is
    refused at install (`V-27`).
