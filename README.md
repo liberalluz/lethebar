@@ -9,26 +9,25 @@ English · [简体中文](README.zh-CN.md)
 
 ## Status
 
-**v0.4.0 is out and playable in a browser.** A run can be assembled from more than
-one package, and a package can now be a layer: it names the package it edits in its own
-manifest, then overrides a declared resource, appends an action, or disables a name by
-listing it in `data/disable.json`. The chain is resolved base first, a target outside
-the assembly, a layer on itself and a chain that closes a loop are refused with `V-34`,
-and two layers writing the same field are refused with `V-35`, which names both. The
-assembly is recorded in the save, so a reloaded run comes back layered.
+**v0.5.0 is out and playable in a browser.** A package now says how its story reads:
+`content` declares the narrative view (first person, third person or ensemble), the
+information density, the cast that is named on screen, and an arc whose stages change
+the line under the text as the run advances. A package also says who it is for: `meta`
+carries a pitch in one or more languages, an audience, a length in minutes and an
+optional icon, and the pack list shows the pitch and the length before a reader picks a
+story. Both blocks are declared by the package, validated at install (`V-40`, `V-41`
+and `V-42` each name the field they refuse) and recorded in the save, so a reloaded run
+reads the way it read before.
 
 Known limits: pictures and sound are drawn into one band and one portrait column, and
 only from PNG, JPEG and WAV; a run's clock is counted in turns or nodes, never in wall
 time; the shipped font covers the BMP and CJK extension A, so extension B still draws
-as boxes; a layer merges resources, actions, pools and cards while the scene still
-comes from one package; and two layers changing different fields of the same entry are
-not treated as a conflict yet.
+as boxes; faction names and arc stages are package text and do not follow the reader
+yet; the audience is validated but nothing filters on it yet; and two layers changing
+different fields of the same entry are not treated as a conflict.
 
-Next: v0.5.0, the content layer and Meta — how a story reads and who it is for, both
-declared by the package instead of guessed from the code.
-
-
-This repository is public now because the plugin spec should be seen and challenged early.
+Next: v0.5.0 is the last feature release before the phone build — v0.6.0 adds an iOS
+build so a device installs the game once instead of fetching the payload again.
 
 ## What it does
 
