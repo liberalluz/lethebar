@@ -28,7 +28,7 @@ mean two ways to describe the same package at once.
 `requires`.**
 
 1. `kind` is `bundle` or `layer`.
-   - `bundle` is playable on its own. It is what `sanguo` and `xiuxian` are
+   - `bundle` is playable on its own. It is what `sanguo` and `cultivation` are
      today.
    - `layer` is a piece that only means something when a bundle requires it.
 2. `layer` is required when `kind` is `layer`, and names one of

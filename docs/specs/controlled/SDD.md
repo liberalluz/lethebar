@@ -404,7 +404,7 @@ Protocol `turn_based@1`. One run over twenty-four turns with four resources
 five actions; rules move the relations between three neighbours. Save/resume at
 any turn boundary (REQ-034).
 
-### 10.2 修仙 (`xiuxian`)
+### 10.2 修仙 (`cultivation`)
 
 Protocol `linear@1`. One segment: entry scene, a fixed sequence of choices with
 one mechanic (progress display). Delivered after 三国 and cut first if the date
