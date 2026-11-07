@@ -704,6 +704,12 @@ A pack leaves the repository as a zip and a descriptor. `infra/tool/release/pack
 
 An engine installs such a pack through `PackageLoader.import_url(url, expected_sha256, context, fetch)`. The caller supplies the bytes, never a socket: `PackageLoader` sits under `res://core`, where no network path may be opened. The bytes are hashed first and compared in lowercase hex; a mismatch stops the install with `V-43`, naming the url and both digests, and an empty fetch is `V-01` naming the url. A match goes on to `import_bytes`, so every install-time rule (the envelope, the capability check, the story's own validation) applies to a downloaded pack exactly as it does to an imported one.
 
+## 11.18 The engine proves itself with a package it owns
+
+The four built-in stories are content, not contract. `app/tests/run_tests.gd` therefore asks whether a story is staged before it opens one: absent, the case records a skip and the summary counts it; present, the case runs as before. `TC-NEUTRAL-001` builds a small package inside the suite — two cards, one resource, two actions, a turn limit — and walks install, play, save and resume on it, so the engine's own proof survives a world repository taking the stories away.
+
+With all four archives removed the suite reports `OK — 394 checks, 12 skipped`; with them staged it reports `OK — 526 checks, 0 skipped`. Defeating the guard and removing the archives gives twenty-six failures, which is what the guard is for.
+
 ## 12. Requirement mapping
 
 | REQ | Design |

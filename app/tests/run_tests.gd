@@ -17,6 +17,7 @@ const BUILTIN_JIANGHU := "res://builtin/jianghu.zip"
 const BUILTIN_DUEL := "res://builtin/duel.zip"
 
 var _failures: Array = []
+var _skipped: Array = []
 var _checks := 0
 
 
@@ -73,6 +74,7 @@ func _initialize() -> void:
 	_case_save_locale()
 	_case_capabilities()
 	_case_cards()
+	_case_neutral()
 	_case_pack_url()
 	_case_card_art()
 	_case_hand_layout()
@@ -89,12 +91,12 @@ func _initialize() -> void:
 
 	print("")
 	if _failures.is_empty():
-		print("OK — %d checks" % _checks)
+		print("OK — %d checks, %d skipped" % [_checks, _skipped.size()])
 		quit(0)
 	else:
 		for failure in _failures:
 			printerr("FAIL — %s" % failure)
-		print("FAILED — %d checks, %d failures" % [_checks, _failures.size()])
+		print("FAILED — %d checks, %d failures, %d skipped" % [_checks, _failures.size(), _skipped.size()])
 		quit(1)
 
 
@@ -301,6 +303,9 @@ func _case_proto_002() -> void:
 
 
 func _case_builtin_001() -> void:
+	if not _staged(BUILTIN_PACKAGE):
+		_skip("TC-BUILTIN-001", "the three-kingdoms story is not staged")
+		return
 	_section("TC-BUILTIN-001 Sanguo plays a twenty-four turn run over four resources")
 	var loader := PackageLoader.new()
 	var package := FileAccess.get_file_as_bytes(BUILTIN_PACKAGE)
@@ -421,6 +426,9 @@ func _case_builtin_001() -> void:
 
 
 func _case_builtin_002() -> void:
+	if not _staged(BUILTIN_XIUXIAN):
+		_skip("TC-BUILTIN-002", "the xiuxian story is not staged")
+		return
 	_section("TC-BUILTIN-002 Xiuxian plays its segment and reports progress")
 	var package := FileAccess.get_file_as_bytes(BUILTIN_XIUXIAN)
 	if package.is_empty():
@@ -681,6 +689,26 @@ func _section(title: String) -> void:
 	print("· %s" % title)
 
 
+func _staged(path: String) -> bool:
+	## True when a built-in story is staged. The engine's own proof must not
+	## depend on one (ADR-0010, fourth condition), so a case that opens a story
+	## asks first and skips instead of failing when the world has taken it away.
+	return FileAccess.file_exists(path)
+
+
+func _skip(label: String, why: String) -> void:
+	_skipped.append(label)
+	print("  skip  %s — %s" % [label, why])
+
+
+func _stories_staged(count: int) -> bool:
+	var staged := 0
+	for path in [BUILTIN_PACKAGE, BUILTIN_XIUXIAN, BUILTIN_JIANGHU, BUILTIN_DUEL]:
+		if _staged(String(path)):
+			staged += 1
+	return staged >= count
+
+
 func _check(label: String, condition: bool, detail: String = "") -> void:
 	_checks += 1
 	if condition:
@@ -918,6 +946,9 @@ func _clear_dir(path: String) -> void:
 
 
 func _case_ux_001() -> void:
+	if not _stories_staged(1):
+		_skip("TC-UX-001", "no story is staged")
+		return
 	_section("TC-UX-001 a first-time player reaches a game without instructions")
 	var shell := _shell()
 	_check("TC-UX-001: the app opens on the landing screen", shell.screen_name() == "landing")
@@ -998,6 +1029,9 @@ func _case_ux_001() -> void:
 
 
 func _case_save_clock() -> void:
+	if not _stories_staged(1):
+		_skip("TC-SAVE-002", "no story is staged")
+		return
 	# The payload records UTC. The list used to print that UTC time of day, so a
 	# save made at 14:20 in UTC+8 read `06:20` — the player's own clock is what it
 	# must show. Asserting against the machine clock catches a regression to UTC on
@@ -1053,6 +1087,9 @@ func _case_landing_without_saves() -> void:
 
 
 func _case_shell_refusal() -> void:
+	if not _stories_staged(1):
+		_skip("TC-PKG-001", "no story is staged")
+		return
 	_section("TC-PKG-001 a refused package leaves the shell usable")
 	var shell := _shell()
 	var view := shell.try_import("this is not a zip".to_utf8_buffer())
@@ -1065,6 +1102,9 @@ func _case_shell_refusal() -> void:
 
 
 func _case_import_control() -> void:
+	if not _stories_staged(1):
+		_skip("TC-OFF-004", "no story is staged")
+		return
 	# The player's half of TC-PKG-001: the pack list has an install control, and
 	# the bytes it hands over come back as base64 — the same shape the injected
 	# file input produces in the browser, so this covers the decode step too.
@@ -1154,6 +1194,9 @@ func _case_font_coverage() -> void:
 
 
 func _case_slot_layout() -> void:
+	if not _stories_staged(1):
+		_skip("TC-UX-001", "no story is staged")
+		return
 	# A manual run in a narrow window found what no assertion covered: the slot
 	# label asked for the width of the whole sentence, so Save and Load were
 	# pushed past the right edge and the player could not save at all. The
@@ -1385,6 +1428,9 @@ func _case_i18n() -> void:
 
 
 func _case_i18n_shipped() -> void:
+	if not _staged(BUILTIN_XIUXIAN):
+		_skip("TC-I18N-003", "the xiuxian story is not staged")
+		return
 	## B13. The mechanism was proved with fixtures; this proves the pack a player
 	## actually meets also speaks English. A translation that misses one node or
 	## one label is refused by V-22 at install time, so "it installs" is the first
@@ -2834,6 +2880,9 @@ func _case_shuffle() -> void:
 
 
 func _case_collection() -> void:
+	if not _stories_staged(2):
+		_skip("TC-COLLECTION-001", "fewer than two stories are staged")
+		return
 	# A repository is cut by world, and a world holds several packs. The screen
 	# has to say so before the player picks a story; a single world keeps the
 	# one-click path a repository with one theme has today (ADR-0012).
@@ -3093,6 +3142,9 @@ func _button_pressed_text(shell: Shell, prefix: String) -> Button:
 
 
 func _case_builtin_003() -> void:
+	if not _staged(BUILTIN_JIANGHU):
+		_skip("TC-BUILTIN-003", "the jianghu story is not staged")
+		return
 	# A third story, written only as data, proves the bricks carry a whole new
 	# kind of story: the ledger, the menu, the pool, the phase machine and the
 	# English table, with the engine untouched.
@@ -3168,6 +3220,9 @@ func _case_builtin_003() -> void:
 
 
 func _case_builtin_004() -> void:
+	if not _staged(BUILTIN_DUEL):
+		_skip("TC-BUILTIN-004", "the duel story is not staged")
+		return
 	# A fourth story, and the first one played with cards: the hand, the deck
 	# order, the discard pile and the refill all come from the package, and
 	# nothing under app/core knows a card exists beyond the brick it declares.
@@ -3709,14 +3764,17 @@ func _case_meta() -> void:
 		"%s %s %s %s" % [audience_issues, minutes_issues, pitch_issues, icon_issues],
 	)
 
-	for plugin_id in ["sanguo", "xiuxian", "jianghu"]:
-		var shipped_meta := _shipped_meta(plugin_id)
-		_check(
-			"TC-META-001: %s declares a pitch in both languages and a length" % plugin_id,
-			MetaLayer.pitch(shipped_meta, "en") != "" and MetaLayer.pitch(shipped_meta, "zh-CN") != ""
-				and int(shipped_meta.get("minutes", 0)) > 0,
-			str(shipped_meta),
-		)
+	if _stories_staged(3):
+		for plugin_id in ["sanguo", "xiuxian", "jianghu"]:
+			var shipped_meta := _shipped_meta(plugin_id)
+			_check(
+				"TC-META-001: %s declares a pitch in both languages and a length" % plugin_id,
+				MetaLayer.pitch(shipped_meta, "en") != "" and MetaLayer.pitch(shipped_meta, "zh-CN") != ""
+					and int(shipped_meta.get("minutes", 0)) > 0,
+				str(shipped_meta),
+			)
+	else:
+		_skip("TC-META-001", "the three stories are not staged")
 
 
 func _case_content() -> void:
@@ -3984,6 +4042,46 @@ func _cards_package(name: String, variant: String = "") -> PackedByteArray:
 		files,
 	)
 
+
+
+func _case_neutral() -> void:
+	## TC-NEUTRAL-001 — the engine proves itself with a package it owns, so a
+	## world repository can take the four built-in stories away (ADR-0010).
+	_section("TC-NEUTRAL-001 the engine plays a package it owns")
+	var shell := _shell()
+	var installed := shell.try_import(_cards_package("neutral-smoke"))
+	if shell.session == null:
+		_check("TC-NEUTRAL-001: the smoke package installs", false, str(installed.get("code", "")))
+		return
+	_check("TC-NEUTRAL-001: the smoke package installs", true, "neutral-smoke")
+	var session: Session = shell.session
+	_check(
+		"TC-NEUTRAL-001: the smoke package opens with a hand",
+		(session.hand as Array).size() == 2,
+		str(session.hand),
+	)
+	var first: String = String((session.hand as Array)[0])
+	session.play_card(first)
+	_check("TC-NEUTRAL-001: a card can be played", session.turn == 2, str(session.turn))
+	var payload: Dictionary = session.snapshot()
+	var store := SaveStore.new()
+	var written := store.write(shell.entry, 1, payload, "Neutral")
+	var read_back := store.read(shell.entry, 1)
+	var resumed: Session = null
+	if bool(written.get("ok", false)) and bool(read_back.get("ok", false)):
+		resumed = store.resume(shell.entry, read_back["payload"])
+	_check("TC-NEUTRAL-001: the run saves and resumes", resumed != null, str(written))
+	if resumed != null:
+		_check(
+			"TC-NEUTRAL-001: the resumed run keeps its turn and its hand",
+			resumed.turn == session.turn and str(resumed.hand) == str(session.hand),
+			"%d %s vs %d %s" % [resumed.turn, resumed.hand, session.turn, session.hand],
+		)
+	_check(
+		"TC-NEUTRAL-001: the smoke run opened the package it was given",
+		String(session.manifest.get("id", "")) == "neutral-smoke",
+		String(session.manifest.get("id", "")),
+	)
 
 
 func _case_pack_url() -> void:
