@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.4.0 - 2026-11-07
+
+### Added
+- An assembly entry may carry a `target` beside its id. A package that does so is a layer: it edits the package it names instead of adding another story, so one base can be played with and without the rule change it declares (REQ-042).
+- `data/disable.json` lets a layer remove actions, pools, cards and resource definitions by id, which is the one thing a package could not say before.
+- `V-34` refuses a layer whose target is not in the same assembly, a layer that sits on itself, a chain that returns to a package it already touched, and a package named twice.
+- A layer package names the package it edits in its own manifest: `target` is required when `kind` is `layer`, and an assembly entry may still carry one that wins over the manifest.
+- `V-35` refuses two layers that write the same field of the same target, naming both layers, the kind of field and its id.
+
+### Changed
+- `PackageLoader.assemble()` accepts either a package id or an `{id, target}` record and resolves the layer chain in list order, base first.
+- A session copies the lists it is handed. It used to share the arrays held by the installed package, so appending an action for one run changed the package for the next one — the layer work would have made that visible, the fix belongs here.
+- A package whose `kind` is not `layer` is refused with `V-23` when it declares a `target`, because that reads as a layer that forgot to say so.
+- The story is clicked by the name the current screen shows, not the one read from the landing screen before the world narrowed the list.
+
+### Fixed
+- The browser probe walks the world screen before it picks a story. A repository cut by world opens a world list first, so the old probe waited for a pack list that never appeared and reported a missing session on every release build since v0.3.0.
+- The probe now prefers a story whose picture actually reaches the scene band. A deck of cards declares one texture per face, and a picture count was being read as "the band will be visible".
+
 ## v0.3.0 - 2026-11-06
 
 ### Added
