@@ -6,7 +6,12 @@ at the repository root. This script packs every `content/builtin/<id>/`
 directory into `app/builtin/<id>.zip`, which the loader reads as an ordinary
 package. It runs before the headless assertions and before an export.
 
-The output directory is generated and git-ignored.
+The output directory is generated and git-ignored, and it is the only place
+the engine can see a package. That makes a stale archive a real defect rather
+than clutter: B59 deleted a story, staging rebuilt the three that remained, and
+the build happily shipped a fourth whose source no longer existed. So staging
+prunes: an archive whose source directory is gone is removed and named, and a
+removal that fails is an error rather than a line in a log.
 """
 
 from __future__ import annotations
@@ -57,6 +62,28 @@ def collect_characters(plugins: list[Path]) -> str:
     return "".join(sorted(character for character in characters if ord(character) > 0x1F))
 
 
+def prune(staged: set[str]) -> tuple[list[str], list[str]]:
+    """Remove archives the source no longer backs.
+
+    Returns what was removed and what could not be, so the caller can fail on a
+    removal that was blocked by a file handle rather than believe it happened.
+    """
+    removed: list[str] = []
+    failed: list[str] = []
+    if not TARGET.is_dir():
+        return removed, failed
+    for archive in sorted(TARGET.glob("*.zip")):
+        if archive.stem in staged:
+            continue
+        try:
+            archive.unlink()
+        except OSError:
+            failed.append(archive.stem)
+            continue
+        removed.append(archive.stem)
+    return removed, failed
+
+
 def main() -> int:
     if not SOURCE.is_dir():
         print(f"[stage] missing source directory: {SOURCE}")
@@ -70,6 +97,13 @@ def main() -> int:
         target = pack(plugin)
         size = target.stat().st_size
         print(f"[stage] {plugin.name} -> {target.relative_to(REPO).as_posix()} ({size} bytes)")
+    removed, failed = prune({plugin.name for plugin in plugins})
+    for name in removed:
+        print(f"[stage] removed {name}.zip (its source directory is gone)")
+    if failed:
+        for name in failed:
+            print(f"[stage] could not remove {name}.zip")
+        return 1
     characters = collect_characters(plugins)
     CHARS.write_text(characters, encoding="utf-8")
     print(f"[stage] {len(characters)} character(s) -> {CHARS.relative_to(REPO).as_posix()}")

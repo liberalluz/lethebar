@@ -8,14 +8,27 @@ Two rules are enforced:
 2. No tracked path comes from a tool. Generated files are ignored, never
    committed.
 
-The check reads the git index, not the working tree, so a local build does not
-change the outcome. Run it before opening a pull request.
+The check reads the git index for the layout rules, so a local build does not
+change the outcome. One rule cannot be answered from the index: whether a staged
+archive still has a source directory behind it. Archives are generated and
+ignored, so that question is asked of the filesystem instead, and it is a
+failure rather than a note because a stale archive is what a player actually
+downloads.
+
+`--profile` names which repository is being checked. The engine repository holds
+the code, the built-in sources and the tooling; an author repository holds
+`shared/` and `packs/` and no engine code. The two have different root sets and
+the same generated-file rules.
 """
 
 from __future__ import annotations
 
+import argparse
 import subprocess
 import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent.parent
 
 ROOT_DIRECTORIES = {
     "app",
@@ -52,6 +65,18 @@ GENERATED_PATTERNS = (
     (".test-tmp/", lambda path: "/.test-tmp/" in f"/{path}"),
 )
 
+# Root entries per profile. `engine` is this repository; `world` is what a
+# `lethebar-game-<world>` repository is expected to hold. Both are written down
+# here rather than in a per-repository file so there is one place to disagree
+# with.
+PROFILES = {
+    "engine": (ROOT_DIRECTORIES, ROOT_FILES),
+    "world": (
+        {"shared", "packs", "docs", ".github", "changelog.d"},
+        ROOT_FILES,
+    ),
+}
+
 
 def git(*args: str) -> list[str]:
     result = subprocess.run(
@@ -64,28 +89,51 @@ def git(*args: str) -> list[str]:
     return [line for line in result.stdout.splitlines() if line]
 
 
-def check_root_entries() -> list[str]:
+def check_root_entries(profile: str, root: Path) -> list[str]:
+    allowed_directories, allowed_files = PROFILES[profile]
     failures = []
     directories: set[str] = set()
     files: set[str] = set()
-    for path in git("ls-files"):
+    for path in git("-C", str(root), "ls-files"):
         parts = path.split("/")
         if len(parts) > 1:
             directories.add(parts[0])
         else:
             files.add(parts[0])
-    for name in sorted(directories - ROOT_DIRECTORIES):
+    for name in sorted(directories - allowed_directories):
         failures.append(f"[tree] unexpected root directory: {name}/")
-    for name in sorted(ROOT_DIRECTORIES - directories):
+    for name in sorted(allowed_directories - directories):
         failures.append(f"[tree] missing root directory: {name}/")
-    for name in sorted(files - ROOT_FILES):
+    for name in sorted(files - allowed_files):
         failures.append(f"[tree] unexpected root file: {name}")
     return failures
 
 
-def check_generated_tracked() -> list[str]:
+def check_staged_archives(root: Path) -> list[str]:
+    """Every staged archive must still have a source directory.
+
+    The engine reads `res://builtin/*.zip`, so an archive left behind by a
+    deleted story is a package the build ships and the repository cannot
+    explain. Staging prunes these; this rule is the second pair of eyes, in
+    case staging did not run or could not delete.
+    """
     failures = []
-    for path in git("ls-files"):
+    staged = root / "app" / "builtin"
+    sources = root / "content" / "builtin"
+    if not staged.is_dir():
+        return failures
+    for archive in sorted(staged.glob("*.zip")):
+        if not (sources / archive.stem).is_dir():
+            failures.append(
+                f"[tree] staged archive has no source directory: "
+                f"app/builtin/{archive.name} (content/builtin/{archive.stem}/ is gone)"
+            )
+    return failures
+
+
+def check_generated_tracked(root: Path) -> list[str]:
+    failures = []
+    for path in git("-C", str(root), "ls-files"):
         for label, matches in GENERATED_PATTERNS:
             if matches(path):
                 failures.append(f"[tree] generated file is tracked ({label}): {path}")
@@ -93,7 +141,23 @@ def check_generated_tracked() -> list[str]:
 
 
 def main() -> int:
-    failures = check_root_entries() + check_generated_tracked()
+    parser = argparse.ArgumentParser(description="Check the repository tree.")
+    parser.add_argument(
+        "--profile",
+        choices=sorted(PROFILES),
+        default="engine",
+        help="which repository is being checked (default: engine)",
+    )
+    parser.add_argument(
+        "--root",
+        default=".",
+        help="the repository root to check (default: the current directory)",
+    )
+    args = parser.parse_args()
+    root = Path(args.root).resolve()
+    failures = check_root_entries(args.profile, root) + check_generated_tracked(root)
+    if args.profile == "engine":
+        failures += check_staged_archives(root)
     for line in failures:
         print(line)
     if failures:

@@ -32,7 +32,9 @@
       "name": "tree",
       "command": [
         "python",
-        "infra/checks/check_tree.py"
+        "infra/checks/check_tree.py",
+        "--profile",
+        "engine"
       ],
       "cwd": "."
     },
@@ -78,6 +80,15 @@
         "app",
         "-s",
         "res://tests/run_tests.gd"
+      ],
+      "cwd": "."
+    },
+    {
+      "name": "release-tool",
+      "command": [
+        "python",
+        "infra/tool/release/pack.py",
+        "self-test"
       ],
       "cwd": "."
     },

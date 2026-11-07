@@ -1,0 +1,73 @@
+# A gate for a repository that publishes packs and nothing else.
+#
+# Copy this file to `.github/workflows/gate.yml` in a `lethebar-game-<world>` or
+# `lethebar-genre-<genre>` repository. It is not copied into this repository's
+# `.github/workflows/` on purpose: the engine has no CI, so a workflow here would
+# be the first one and would run against a tree this file does not describe.
+#
+# The four steps are the same four the engine runs by hand, in the same order,
+# because each one depends on the previous one's output:
+#
+#   tree    the layout is one a pack repository may have, and no generated file
+#           is tracked
+#   stage   every `packs/<id>/` becomes the archive the engine will read
+#   import  the engine can load what was staged
+#   test    the engine's headless suite accepts the staged set
+#
+# Only `stage` is supplied by the repository itself. The other three are the
+# engine's own checks, checked out at the tag this repository declares, so a
+# world cannot drift from the engine's idea of a valid pack without saying so.
+
+name: gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    env:
+      # Bump this together with the `engine` range in each pack's manifest.
+      ENGINE_REF: v0.6.0
+    steps:
+      - name: Check out this repository
+        uses: actions/checkout@v4
+        with:
+          path: world
+
+      - name: Check out the engine at the declared tag
+        uses: actions/checkout@v4
+        with:
+          repository: liberalluz/lethebar
+          ref: ${{ env.ENGINE_REF }}
+          path: engine
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: tree
+        working-directory: world
+        run: python ../engine/infra/checks/check_tree.py --root . --profile world
+
+      - name: stage
+        working-directory: world
+        run: python infra/stage_packs.py
+
+      - name: import
+        working-directory: world
+        run: python ../engine/infra/checks/run_godot.py --headless --editor --quit --path app
+
+      - name: test
+        working-directory: world
+        run: python ../engine/infra/checks/run_godot.py --headless --path app -s res://tests/run_tests.gd
+
+      - name: Upload what was built
+        uses: actions/upload-artifact@v4
+        with:
+          name: packs
+          path: world/app/builtin/*.zip
+          if-no-files-found: error
