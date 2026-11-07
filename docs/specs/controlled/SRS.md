@@ -10,8 +10,8 @@ English · [简体中文](SRS.zh-CN.md)
 
 A browser game whose gameplay comes from installed plugins. A player opens a
 link, imports a plugin package, picks it, plays a branch segment under that
-plugin's own protocol, and saves. Two built-in plugins ship, 三国 first and 修仙
-second.
+plugin's own protocol, and saves. One smoke story ships inside the engine; the two worlds, 三国 and
+修仙, ship as packages from their own repositories.
 
 ## 2. Requirements
 
@@ -30,8 +30,8 @@ second.
 | `REQ-011` | An unknown or missing asset degrades to a visible warning instead of a crash. | Loading a plugin that references an unknown asset type shows a warning naming the asset, and the session continues. |
 | `REQ-012` | Each plugin keeps its own save slots, three by default, and any slot can be loaded. | With three slots filled for one plugin, loading slot two restores the state saved in slot two, and a second plugin's slots are listed separately. |
 | `REQ-013` | Saves record a schema version, and incompatible saves are refused with a message. | Setting a save's schema version to an unsupported value and loading it shows a refusal message and starts no session. |
-| `REQ-014` | A built-in 三国 plugin ships with at least one playable segment played by its own protocol. | From a fresh install, selecting 三国 reaches the end of its first segment, saves, and resumes from that save. |
-| `REQ-015` | A built-in 修仙 plugin ships with at least one playable segment, delivered after 三国. | From a fresh install, selecting 修仙 reaches the end of its first segment, saves, and resumes from that save. |
+| `REQ-014` | A smoke story ships inside the engine, played by its own protocol, so a fresh install has something to play. | From a fresh install, selecting the smoke story reaches its end, saves, and resumes from that save. |
+| `REQ-015` | The two worlds ship as external packages, installed from their releases. | From a fresh install, installing the 三国 release and selecting 三国 reaches the end of its first segment, saves, and resumes from that save. |
 | `REQ-016` | The same input sequence reproduces the same result. | Replaying the same choices from a fresh session yields an identical sequence of scenes and values. |
 | `REQ-017` | A first-time player reaches a playable session within 10 minutes, and the author plays three sessions in a row. | In an unmoderated test, a first-time player reaches the first scene within 10 minutes of opening the link. |
 | `REQ-018` | The interface speaks the language the browser asks for, and the player can switch it. | A browser set to English shows English controls; a browser set to Chinese shows Chinese controls; the switch on the landing screen survives a reload. |
@@ -51,7 +51,7 @@ second.
 | `REQ-032` | A rule can move a relation, and a save keeps the result. | A rule names a pair the package declared and an `add` or `value` change; the session is the only writer of the faction map; the moved value survives a save and a resume; a rule that names an undeclared entity or a non-numeric change is refused at install with `V-31`. |
 | `REQ-033` | The scene states how the run stands. | The view carries the turns left, the entity the others lean toward, the entity they push against, and the resource closest to its declared floor; each section appears only when its source is declared; the scene draws one line from the catalog. |
 | `REQ-035` | An English run reads English wherever the package supplies text. | The menu labels, the rank title, the words a labelled resource reads as and the reason a run ended all come from the package table for the locale being played; a key the table leaves out falls back to the package text rather than an empty label; a package that ships a table must cover every action, rank, labelled value and failure it declares, or `V-22` refuses it. |
-| `REQ-034` | The built-in Sanguo story is a full run, not a sketch. | It is budgeted at twenty-four turns over four resources, shows five ranks as the turn number passes them, can be lost three declared ways, offers a menu of five actions, and lets a rule move a relation; all of it is package data, and installing it changes nothing under `app/core`. |
+| `REQ-034` | The released Sanguo package is a full run, not a sketch. | It is budgeted at twenty-four turns over four resources, shows five ranks as the turn number passes them, can be lost three declared ways, offers a menu of five actions, and lets a rule move a relation; all of it is package data, and installing it changes nothing under `app/core`. |
 | `REQ-036` | A package can deal a hand and hold a deck. | A package declares a hand, a small deck and the cards themselves; the scene shows the cards it can play and disables the ones it cannot pay for with the reason; playing a card spends what it costs, applies what it does, discards the card, draws a replacement and advances the turn by one; the hand, the deck and the discard pile survive a save and a resume; a deck that names a card the package never declares, a card that names a resource the ledger never declares, and a capability claimed without a deck file are refused at install with `V-38`, `V-37` and `V-36`. |
 | `REQ-037` | A card may name a picture its package declares; the hand draws it beside the label, and a card that names a picture nobody declared is refused at install. | P1 |
 | `REQ-038` | A hand wider than the window wraps into more rows, and every card and every menu button stays inside the window. | P1 |

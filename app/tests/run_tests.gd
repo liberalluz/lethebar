@@ -11,8 +11,6 @@ const ENGINE_VERSION := "4.7.2"
 const FIXTURE_DIR := "res://.test-tmp"
 ## Staged by infra/stage_builtin.py: the project root is app/, so the shipped
 ## packages under content/builtin/ are copied in as zips before the suite runs.
-const BUILTIN_PACKAGE := "res://builtin/sanguo.zip"
-const BUILTIN_XIUXIAN := "res://builtin/xiuxian.zip"
 const BUILTIN_DUEL := "res://builtin/duel.zip"
 
 var _failures: Array = []
@@ -36,8 +34,6 @@ func _initialize() -> void:
 	_case_pkg_005()
 	_case_proto_001()
 	_case_proto_002()
-	_case_builtin_001()
-	_case_builtin_002()
 	_case_builtin_004()
 	_case_det_001()
 	_case_save_001()
@@ -57,7 +53,6 @@ func _initialize() -> void:
 	_case_version()
 	_case_locale()
 	_case_i18n()
-	_case_i18n_shipped()
 	_case_i18n_labels()
 	_case_format()
 	_case_ledger()
@@ -301,223 +296,6 @@ func _case_proto_002() -> void:
 		_check("TC-PROTO-002: no default state is invented", bare_open["state"].is_empty(), str(bare_open["state"]))
 
 
-func _case_builtin_001() -> void:
-	if not _staged(BUILTIN_PACKAGE):
-		_skip("TC-BUILTIN-001", "the three-kingdoms story is not staged")
-		return
-	_section("TC-BUILTIN-001 Sanguo plays a twenty-four turn run over four resources")
-	var loader := PackageLoader.new()
-	var package := FileAccess.get_file_as_bytes(BUILTIN_PACKAGE)
-	if package.is_empty():
-		_failures.append("staged package missing at %s; run infra/stage_builtin.py" % BUILTIN_PACKAGE)
-		return
-	var result := loader.import_bytes(package, _context())
-	_check(
-		"TC-BUILTIN-001: the shipped package installs",
-		result["status"] == "installed",
-		"%s %s" % [String(result.get("code", "-")), String(result.get("message", ""))],
-	)
-	_check("TC-BUILTIN-001: it installs with no warnings", result.get("warnings", []).is_empty(), str(result.get("warnings", [])))
-	if result["status"] != "installed":
-		return
-	var entry: Dictionary = loader.registry.entry("sanguo")
-	var session := Session.create(entry, {"start_counter": 1})
-	_check("TC-BUILTIN-001: a Sanguo session starts", session != null)
-	if session == null:
-		return
-	var view := session.start()
-	_check("TC-BUILTIN-001: the opening scene shows text", String(view["text"]) != "")
-	for key in ["grain", "troops", "coin", "standing"]:
-		_check(
-			"TC-BUILTIN-001: the run keeps %s" % key,
-			(view["state"] as Dictionary).has(key),
-			str((view["state"] as Dictionary).keys()),
-		)
-	_check(
-		"TC-BUILTIN-001: the run is budgeted at twenty-four turns",
-		int((session.phase as Dictionary).get("turns", 0)) == 24,
-		str(session.phase),
-	)
-	_check(
-		"TC-BUILTIN-001: the scene counts down from the budget",
-		int((view.get("situation", {}) as Dictionary).get("turnsLeft", -1)) == 24,
-		str(view.get("situation", {})),
-	)
-	_check("TC-BUILTIN-001: the first turn carries the first rank", String(view["rank"]) == "校尉", String(view["rank"]))
-	for pair in [[6, "都尉"], [11, "偏将军"], [16, "将军"], [21, "大将军"], [24, "大将军"]]:
-		_check(
-			"TC-BUILTIN-001: turn %d is ranked %s" % [int(pair[0]), String(pair[1])],
-			Phases.rank(session.phase, int(pair[0])) == String(pair[1]),
-			Phases.rank(session.phase, int(pair[0])),
-		)
-	_check(
-		"TC-BUILTIN-001: the run can be lost three ways",
-		(session.phase.get("fail", []) as Array).size() == 3,
-		str((session.phase.get("fail", []) as Array).size()),
-	)
-	_check(
-		"TC-BUILTIN-001: the menu offers the story's actions",
-		(view["actions"] as Array).size() == 5,
-		str((view["actions"] as Array).size()),
-	)
-	var grain_before := float((session.state as Dictionary).get("grain", 0.0))
-	session.act("farm")
-	_check(
-		"TC-BUILTIN-001: farming feeds the army",
-		float((session.state as Dictionary).get("grain", 0.0)) > grain_before,
-		"%f then %f" % [grain_before, float((session.state as Dictionary).get("grain", 0.0))],
-	)
-	_check("TC-BUILTIN-001: taking an action spends a turn", session.turn == 2, str(session.turn))
-	var relation_before := Relations.value(session.factions, "cao", "shao")
-	session.act("envoys")
-	session.act("envoys")
-	_check(
-		"TC-BUILTIN-001: sending envoys raises the standing",
-		float((session.state as Dictionary).get("standing", 0.0)) >= 3.0,
-		str((session.state as Dictionary).get("standing", 0.0)),
-	)
-	_check(
-		"TC-BUILTIN-001: a rule moves Cao against Shao",
-		Relations.value(session.factions, "cao", "shao") < relation_before,
-		"%f then %f" % [relation_before, Relations.value(session.factions, "cao", "shao")],
-	)
-	MemoryBackend.reset()
-	var store := SaveStore.new()
-	var written := store.write(entry, 1, session.snapshot(), "三国")
-	_check("TC-BUILTIN-001: a run in progress saves to slot 1", bool(written.get("ok", false)), str(written))
-	var read_back := store.read(entry, 1)
-	var resumed: Session = null
-	if bool(read_back.get("ok", false)):
-		resumed = store.resume(entry, read_back["payload"])
-	_check(
-		"TC-BUILTIN-001: the resumed run keeps the turn",
-		resumed != null and resumed.turn == session.turn,
-		"resumed %s, saved %d" % [resumed.turn if resumed != null else "-", session.turn],
-	)
-	_check(
-		"TC-BUILTIN-001: the resumed run keeps the resources",
-		resumed != null and is_equal_approx(float((resumed.state as Dictionary).get("grain", -1.0)), float((session.state as Dictionary).get("grain", 0.0))),
-		str(resumed.state if resumed != null else {}),
-	)
-	_check(
-		"TC-BUILTIN-001: the resumed run keeps the relation",
-		resumed != null and is_equal_approx(Relations.value(resumed.factions, "cao", "shao"), Relations.value(session.factions, "cao", "shao")),
-		"resumed %f" % [Relations.value(resumed.factions, "cao", "shao") if resumed != null else -999.0],
-	)
-	var lost := Session.create(entry, {"start_counter": 2})
-	lost.start()
-	var guard := 0
-	while not lost.finished and guard < 30:
-		lost.act("recruit")
-		guard += 1
-	_check("TC-BUILTIN-001: running out of grain ends the run", lost.finished, str(guard))
-	_check(
-		"TC-BUILTIN-001: the end names the loss",
-		String(lost.fail_reason).contains("粮"),
-		String(lost.fail_reason),
-	)
-	var english := Session.create(entry, {"start_counter": 1, "locale": "en"}).start()
-	_check(
-		"TC-BUILTIN-001: the English run reads English",
-		String(english["text"]).begins_with("In the"),
-		String(english["text"]).left(48),
-	)
-
-
-func _case_builtin_002() -> void:
-	if not _staged(BUILTIN_XIUXIAN):
-		_skip("TC-BUILTIN-002", "the xiuxian story is not staged")
-		return
-	_section("TC-BUILTIN-002 Xiuxian plays its segment and reports progress")
-	var package := FileAccess.get_file_as_bytes(BUILTIN_XIUXIAN)
-	if package.is_empty():
-		_failures.append("staged package missing at %s; run infra/stage_builtin.py" % BUILTIN_XIUXIAN)
-		return
-	var loader := PackageLoader.new()
-	var result := loader.import_bytes(package, _context())
-	_check(
-		"TC-BUILTIN-002: the shipped package installs",
-		result["status"] == "installed",
-		"%s %s" % [String(result.get("code", "-")), String(result.get("message", ""))],
-	)
-	if result["status"] != "installed":
-		return
-	var entry: Dictionary = loader.registry.entry("xiuxian")
-	_check(
-		"TC-BUILTIN-002: it rides the linear protocol, not the one Sanguo uses",
-		String(entry["manifest"]["protocol"]) == "linear@1",
-		String(entry["manifest"]["protocol"]),
-	)
-	var session := Session.create(entry, {"start_counter": 1})
-	var view: Dictionary = session.start()
-	_check("TC-BUILTIN-002: the entry scene shows text", String(view.get("text", "")) != "")
-	var progress: Dictionary = view.get("progress", {})
-	_check("TC-BUILTIN-002: the progress readout is present", not progress.is_empty(), str(view.keys()))
-	_check(
-		"TC-BUILTIN-002: the readout knows the length of the segment",
-		int(progress.get("nodes", 0)) >= 4,
-		str(progress),
-	)
-	var steps: Array = [int(progress.get("steps", 0))]
-	var realms: Array = []
-	while not bool(view.get("finished", false)):
-		var offered: Array = view.get("choices", [])
-		if offered.is_empty():
-			break
-		view = session.choose(0)
-		progress = view.get("progress", {})
-		steps.append(int(progress.get("steps", 0)))
-		var state: Dictionary = view.get("state", {})
-		if state.has("realm"):
-			realms.append(String(state["realm"]))
-	_check("TC-BUILTIN-002: the segment is playable to its end", bool(view.get("finished", false)), str(steps))
-	_check("TC-BUILTIN-002: the end node shows its text", String(view.get("text", "")) != "")
-	_check("TC-BUILTIN-002: the end node offers nothing more", (view.get("choices", []) as Array).is_empty())
-	var growing := steps.size() >= 3
-	for index in range(1, steps.size()):
-		if int(steps[index]) <= int(steps[index - 1]):
-			growing = false
-	_check("TC-BUILTIN-002: progress grows with every step", growing, str(steps))
-	_check(
-		"TC-BUILTIN-002: the realm label follows the choices",
-		realms.size() >= 3 and String(realms[realms.size() - 1]) == "元婴",
-		str(realms),
-	)
-	MemoryBackend.reset()
-	var store := SaveStore.new()
-	var saved_node := session.current
-	var written := store.write(entry, 1, session.snapshot(), "修仙")
-	_check("TC-BUILTIN-002: the segment saves to slot 1", bool(written.get("ok", false)), str(written))
-	var read_back := store.read(entry, 1)
-	var resumed: Session = null
-	if bool(read_back.get("ok", false)):
-		resumed = store.resume(entry, read_back["payload"])
-	_check(
-		"TC-BUILTIN-002: resuming returns to the saved node",
-		resumed != null and resumed.current == saved_node,
-		"resumed %s, saved %s" % [resumed.current if resumed != null else "-", saved_node],
-	)
-	var shell := _shell()
-	shell.open_plugins()
-	_check(
-		"TC-BUILTIN-002: the list shows both built-in genres",
-		shell.builtin_ids.has("xiuxian") and shell.builtin_ids.has("sanguo"),
-		str(shell.builtin_ids),
-	)
-	shell.start_plugin("xiuxian")
-	_check(
-		"TC-BUILTIN-002: the progress readout is on screen",
-		shell.visible_text().contains("step 1/"),
-		shell.visible_text(),
-	)
-	shell.choose(0)
-	_check(
-		"TC-BUILTIN-002: the readout moves with the player",
-		shell.visible_text().contains("step 2/"),
-		shell.visible_text(),
-	)
-
-
 func _case_det_001() -> void:
 	_section("TC-DET-001 the same choices reproduce the same snapshot")
 	var loader := PackageLoader.new()
@@ -702,7 +480,7 @@ func _skip(label: String, why: String) -> void:
 
 func _stories_staged(count: int) -> bool:
 	var staged := 0
-	for path in [BUILTIN_PACKAGE, BUILTIN_XIUXIAN, BUILTIN_DUEL]:
+	for path in [BUILTIN_DUEL]:
 		if _staged(String(path)):
 			staged += 1
 	return staged >= count
@@ -923,13 +701,13 @@ func _case_file_backend() -> void:
 	var root := "%s/store-case" % FIXTURE_DIR
 	_clear_dir(root)
 	var first := FileBackend.new(root)
-	_check("TC-OFF-002: a write reports success", first.write("save:sanguo:1", "payload"))
-	_check("TC-OFF-002: the key is listed", first.keys().has("save:sanguo:1"), str(first.keys()))
+	_check("TC-OFF-002: a write reports success", first.write("save:duel:1", "payload"))
+	_check("TC-OFF-002: the key is listed", first.keys().has("save:duel:1"), str(first.keys()))
 	var second := FileBackend.new(root)
-	_check("TC-OFF-002: a fresh backend reads it back", second.read("save:sanguo:1") == "payload")
+	_check("TC-OFF-002: a fresh backend reads it back", second.read("save:duel:1") == "payload")
 	var store := SaveStore.new(second)
-	_check("TC-OFF-002: a store built over the folder sees the key", store.backend.keys().has("save:sanguo:1"))
-	_check("TC-OFF-002: erase removes it", second.erase("save:sanguo:1") and not second.has("save:sanguo:1"))
+	_check("TC-OFF-002: a store built over the folder sees the key", store.backend.keys().has("save:duel:1"))
+	_check("TC-OFF-002: erase removes it", second.erase("save:duel:1") and not second.has("save:duel:1"))
 	# A key with a separator must not escape the folder.
 	_check("TC-OFF-002: slashes in a key stay inside the folder", first.write("a/b", "x") and first.keys().has("a/b"))
 	_clear_dir(root)
@@ -954,20 +732,20 @@ func _case_ux_001() -> void:
 	_check("TC-UX-001: the landing screen names the product", shell.visible_text().contains("Lethebar"))
 	# The way in is `New game`, and the stories it leads to are named the way a
 	# player reads them: five first-time players asked what game this was while
-	# the pack list showed `sanguo — turn_based@1, 0.1.0`.
+	# the pack list showed `sanguo - turn_based@1, 0.1.0` before the stories left.
 	shell.open_plugins()
 	# The title now follows the interface language: the pack carries `三国` and
 	# `Three Kingdoms` in its manifest, and the player reads whichever one matches
 	# the language the rest of the screen is in.
-	var sanguo_title := "三国" if Locale.current() == "zh-CN" else "Three Kingdoms"
-	_check("TC-UX-001: new game lists a story by name", shell.visible_text().contains(sanguo_title), shell.visible_text())
+	var story_title := "校场决斗" if Locale.current() == "zh-CN" else "Duel at the drill ground"
+	_check("TC-UX-001: new game lists a story by name", shell.visible_text().contains(story_title), shell.visible_text())
 	_check(
 		"TC-UX-001: the pack list hides the protocol name",
 		not shell.visible_text().contains("turn_based"),
 		shell.visible_text(),
 	)
-	_check("TC-UX-001: the shipped pack is listed", shell.builtin_ids.has("sanguo"), str(shell.builtin_ids))
-	var view := shell.start_plugin("sanguo")
+	_check("TC-UX-001: the shipped pack is listed", shell.builtin_ids.has("duel"), str(shell.builtin_ids))
+	var view := shell.start_plugin("duel")
 	_check("TC-UX-001: picking a pack starts a session", shell.screen_name() == "session")
 	_check("TC-UX-001: the first scene shows its text", String(view.get("text", "")) != "")
 	_check(
@@ -975,15 +753,15 @@ func _case_ux_001() -> void:
 		(view.get("choices", []) as Array).size() >= 1 or (view.get("actions", []) as Array).size() >= 1,
 	)
 	var first_turn := int(shell.session.turn)
-	shell.act("farm")
+	shell.act("taunt")
 	_check("TC-UX-001: taking a step advances the scene", int(shell.session.turn) == first_turn + 1, str(shell.session.turn))
 	# The readout follows the ledger, so it is asserted after the first action has
 	# moved a number, not on the entry scene where nothing has happened yet.
-	_check("TC-UX-001: the mechanic readout is visible", shell.visible_text().contains("grain"), shell.visible_text())
+	_check("TC-UX-001: the mechanic readout is visible", shell.visible_text().contains("edge"), shell.visible_text())
 	shell.save_to(1)
 	_check("TC-UX-001: saving reports the slot", shell.visible_text().contains("Saved to slot 1"), shell.visible_text())
 	var saved_turn := int(shell.session.turn)
-	shell.act("farm")
+	shell.act("taunt")
 	shell.load_from(1)
 	_check(
 		"TC-UX-001: loading the slot restores the saved turn",
@@ -1012,13 +790,13 @@ func _case_ux_001() -> void:
 	)
 	var loads := shell.show_loads()
 	_check("TC-UX-001: continue opens the saves", shell.screen_name() == "loads")
-	var saved_title := "三国" if Locale.current() == "zh-CN" else "Three Kingdoms"
+	var saved_title := "校场决斗" if Locale.current() == "zh-CN" else "Duel at the drill ground"
 	_check(
 		"TC-UX-001: a saved slot is named by its story",
 		shell.visible_text().contains(saved_title),
 		shell.visible_text(),
 	)
-	var resumed := shell.resume_slot("sanguo", 1)
+	var resumed := shell.resume_slot("duel", 1)
 	_check(
 		"TC-UX-001: continue resumes at the saved turn",
 		int(resumed.get("turn", -1)) == saved_turn,
@@ -1037,11 +815,11 @@ func _case_save_clock() -> void:
 	# any machine that is not already on UTC.
 	_section("TC-UX-001 the save list shows the player's clock")
 	var shell := _shell()
-	shell.start_plugin("sanguo")
+	shell.start_plugin("duel")
 	shell.save_to(1)
 	var row: Dictionary = {}
 	for candidate in shell._saves_index():
-		if String(candidate.get("plugin", "")) == "sanguo" and int(candidate.get("slot", 0)) == 1:
+		if String(candidate.get("plugin", "")) == "duel" and int(candidate.get("slot", 0)) == 1:
 			row = candidate
 	_check("TC-UX-001: the saved slot is listed", not row.is_empty())
 	var clock := shell._local_clock(String(row.get("savedAt", "")))
@@ -1095,8 +873,8 @@ func _case_shell_refusal() -> void:
 	_check("TC-PKG-001: the shell shows a refusal screen", shell.screen_name() == "notice")
 	_check("TC-PKG-001: the refusal carries its V- code", String(view.get("code", "")) == "V-01", str(view.get("code", "")))
 	shell.open_plugins()
-	_check("TC-PKG-001: the packs are still listed after a refusal", shell.builtin_ids.has("sanguo"))
-	shell.start_plugin("sanguo")
+	_check("TC-PKG-001: the packs are still listed after a refusal", shell.builtin_ids.has("duel"))
+	shell.start_plugin("duel")
 	_check("TC-PKG-001: a pack still starts after a refusal", shell.screen_name() == "session")
 
 
@@ -1129,7 +907,7 @@ func _case_import_control() -> void:
 	shell.open_plugins()
 	_check(
 		"TC-PKG-001: an installed pack survives a refused file",
-		shell.builtin_ids.has("imported-pack") and shell.builtin_ids.has("sanguo"),
+		shell.builtin_ids.has("imported-pack") and shell.builtin_ids.has("duel"),
 		str(shell.builtin_ids),
 	)
 
@@ -1236,7 +1014,7 @@ func _case_font_coverage() -> void:
 	var screens := [shell.visible_text()]
 	shell.open_plugins()
 	screens.append(shell.visible_text())
-	shell.start_plugin("sanguo")
+	shell.start_plugin("duel")
 	screens.append(shell.visible_text())
 	shell.choose(0)
 	screens.append(shell.visible_text())
@@ -1275,7 +1053,7 @@ func _case_slot_layout() -> void:
 	# inside the window, and the stored preview has to stay short enough to fit.
 	_section("TC-UX-001 a slot row fits the window, buttons included")
 	var shell := _shell()
-	shell.start_plugin("sanguo")
+	shell.start_plugin("duel")
 	shell.choose(0)
 	shell.save_to(1)
 	_check("TC-UX-001: the slots screen is up", shell.screen_name() == "saves", shell.screen_name())
@@ -1495,56 +1273,6 @@ func _case_i18n() -> void:
 		"TC-PKG-001: a package with one language still plays in it",
 		String(solo.get("text", "")) == "A node.",
 		String(solo.get("text", ""))
-	)
-
-
-func _case_i18n_shipped() -> void:
-	if not _staged(BUILTIN_XIUXIAN):
-		_skip("TC-I18N-003", "the xiuxian story is not staged")
-		return
-	## B13. The mechanism was proved with fixtures; this proves the pack a player
-	## actually meets also speaks English. A translation that misses one node or
-	## one label is refused by V-22 at install time, so "it installs" is the first
-	## assertion, not a formality.
-	_section("TC-I18N-001 the shipped Xiuxian pack speaks English")
-	var package := FileAccess.get_file_as_bytes(BUILTIN_XIUXIAN)
-	if package.is_empty():
-		_failures.append("staged package missing at %s; run infra/stage_builtin.py" % BUILTIN_XIUXIAN)
-		return
-	var loader := PackageLoader.new()
-	var result := loader.import_bytes(package, _context())
-	_check(
-		"TC-I18N-001: the shipped pack passes the locale rule",
-		result["status"] == "installed",
-		"%s %s" % [String(result.get("code", "-")), String(result.get("message", ""))],
-	)
-	if result["status"] != "installed":
-		return
-	var entry: Dictionary = loader.registry.entry("xiuxian")
-	var english := Session.create(entry, {"locale": "en"}).start()
-	var english_text := String(english.get("text", ""))
-	_check(
-		"TC-I18N-001: the entry scene reads in English",
-		not english_text.is_empty() and _chinese_chars(english_text).is_empty(),
-		english_text,
-	)
-	var labels: Array = []
-	for choice in english.get("choices", []):
-		labels.append(String(choice.get("label", "")))
-	var chinese_labels := []
-	for label in labels:
-		if not _chinese_chars(String(label)).is_empty():
-			chinese_labels.append(label)
-	_check(
-		"TC-I18N-001: every entry choice reads in English",
-		not labels.is_empty() and chinese_labels.is_empty(),
-		"labels %s, still Chinese %s" % [str(labels), str(chinese_labels)],
-	)
-	var chinese := Session.create(entry, {"locale": "zh-CN"}).start()
-	_check(
-		"TC-I18N-001: a Chinese reader still meets the shipped text",
-		not _chinese_chars(String(chinese.get("text", ""))).is_empty(),
-		String(chinese.get("text", "")),
 	)
 
 
@@ -2603,8 +2331,10 @@ func _case_scene() -> void:
 		"%s %s" % [shell._sub.text, str(_button_labels(shell))]
 	)
 
+	var bare: PackedByteArray = _package("bare-story", {"id": "bare-story", "entry": "s1"}, [], [], nodes, {}, {})
 	var plain := _shell()
-	plain.start_plugin("xiuxian")
+	plain.loader.import_bytes(bare, plain._context())
+	plain.start_plugin("bare-story")
 	var plain_labels := _button_labels(plain)
 	var turn_prefix := Locale.text("ui.turn_rank").get_slice("%d", 0)
 	_check(
@@ -2951,15 +2681,22 @@ func _case_shuffle() -> void:
 
 
 func _case_collection() -> void:
-	if not _stories_staged(2):
-		_skip("TC-COLLECTION-001", "fewer than two stories are staged")
-		return
 	# A repository is cut by world, and a world holds several packs. The screen
 	# has to say so before the player picks a story; a single world keeps the
 	# one-click path a repository with one theme has today (ADR-0012).
 	_section("TC-COLLECTION-001 a package says which world it belongs to")
 	var shell := _shell()
-	shell.builtin_ids = ["sanguo", "xiuxian"]
+	shell.loader.import_bytes(_package("world-a", {
+		"id": "world-a",
+		"name": "World A",
+		"collection": {"id": "three-kingdoms", "names": {"en": "Three Kingdoms", "zh-CN": "三国"}},
+	}), shell._context())
+	shell.loader.import_bytes(_package("world-b", {
+		"id": "world-b",
+		"name": "World B",
+		"collection": {"id": "four-kingdoms", "names": {"en": "Four Kingdoms"}},
+	}), shell._context())
+	shell.builtin_ids = ["world-a", "world-b"]
 	_check(
 		"TC-COLLECTION-001: packs that share a world offer one world",
 		shell.worlds().size() == 2,
@@ -2985,7 +2722,7 @@ func _case_collection() -> void:
 	Locale.set_current("en")
 
 	var one := _shell()
-	one.builtin_ids = ["sanguo"]
+	one.builtin_ids = ["duel"]
 	_check(
 		"TC-COLLECTION-001: one world skips the world screen",
 		one.worlds().size() == 1 and one.start_game() == "plugins",
@@ -3757,17 +3494,18 @@ func _case_meta() -> void:
 		"%s %s %s %s" % [audience_issues, minutes_issues, pitch_issues, icon_issues],
 	)
 
-	if _stories_staged(2):
-		for plugin_id in ["sanguo", "xiuxian"]:
-			var shipped_meta := _shipped_meta(plugin_id)
-			_check(
-				"TC-META-001: %s declares a pitch in both languages and a length" % plugin_id,
-				MetaLayer.pitch(shipped_meta, "en") != "" and MetaLayer.pitch(shipped_meta, "zh-CN") != ""
-					and int(shipped_meta.get("minutes", 0)) > 0,
-				str(shipped_meta),
-			)
+	# The engine ships one smoke pack and it declares no meta, which is allowed:
+	# the block is optional, and a package that says nothing must not be dressed
+	# up with a line it never wrote.
+	if _staged("res://builtin/duel.zip"):
+		var shipped_meta := _shipped_meta("duel")
+		_check(
+			"TC-META-001: the smoke pack declares no meta and is still installable",
+			shipped_meta.is_empty(),
+			str(shipped_meta),
+		)
 	else:
-		_skip("TC-META-001", "the two stories are not staged")
+		_skip("TC-META-001", "the smoke pack is not staged")
 
 
 func _case_content() -> void:
