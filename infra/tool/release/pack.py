@@ -11,13 +11,16 @@ then byte-identical, which is what makes a hash worth writing down.
 
     python infra/tool/release/pack.py build content/builtin/<id> --out dist
     python infra/tool/release/pack.py hash dist/<id>.zip
-    python infra/tool/release/pack.py publish dist/<id>.zip --repo o/r --tag 1.0.0
+    python infra/tool/release/pack.py publish dist/<id>.zip --repo o/r --tag pack/<id>/vX.Y.Z
 
 `hash` writes `<id>-<version>.json` next to the zip: the id, the version, the byte
 count, the sha256, the specVersion and the engine range, which is what an engine
 needs to decide whether it can install the artifact at all.
 
-`publish` is dry by default and only touches the network with `--apply`.
+`publish` is dry by default and only touches the network with `--apply`. An upload
+attaches files to a release that already exists, so `publish` creates the release
+first when the tag has none: the first publication of any pack would otherwise fail
+with `release not found`.
 """
 
 from __future__ import annotations
@@ -25,6 +28,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -33,6 +37,11 @@ from pathlib import Path
 
 FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 MANIFEST = "manifest.json"
+
+
+def gh() -> str:
+    """The GitHub client, overridable so a test can prove the order of calls."""
+    return os.environ.get("LETHEBAR_GH", "gh")
 
 
 def files_of(root: Path) -> list[Path]:
@@ -98,9 +107,67 @@ def write_descriptor(target: Path) -> Path:
     return sidecar
 
 
-def publish_command(target: Path, repo: str, tag: str) -> list[str]:
+def release_exists(repo: str, tag: str) -> bool:
+    """Ask GitHub whether the tag already carries a release."""
+    probe = [gh(), "release", "view", tag, "--repo", repo]
+    return subprocess.run(
+        probe, check=False, capture_output=True, text=True
+    ).returncode == 0
+
+
+def create_command(repo: str, tag: str) -> list[str]:
+    return [
+        gh(),
+        "release",
+        "create",
+        tag,
+        "--repo",
+        repo,
+        "--title",
+        tag,
+        "--generate-notes",
+    ]
+
+
+def upload_command(target: Path, sidecar: Path, repo: str, tag: str) -> list[str]:
+    return [
+        gh(),
+        "release",
+        "upload",
+        tag,
+        str(target),
+        str(sidecar),
+        "--repo",
+        repo,
+        "--clobber",
+    ]
+
+
+def validate(target: Path) -> dict:
+    """Refuse a pack that cannot be named, before any command is built."""
+    described = describe(target)
+    missing = [field for field in ("id", "version") if not described.get(field)]
+    if missing:
+        raise SystemExit(f"{target} names no {', '.join(missing)}; preflight says the same")
+    if described["sha256"] != digest(target):
+        raise SystemExit(f"{target} hashed differently twice; refusing to publish")
+    return described
+
+
+def publish_commands(target: Path, repo: str, tag: str, exists: bool) -> list[list[str]]:
+    """The commands a publication needs, in the order it needs them.
+
+    The descriptor is written here, so the bytes a player will verify are the bytes
+    this run produced. A pack whose manifest carries no id or version cannot be
+    named in a descriptor, and is refused rather than published under an empty name.
+    """
+    validate(target)
     sidecar = write_descriptor(target)
-    return ["gh", "release", "upload", tag, str(target), str(sidecar), "--repo", repo, "--clobber"]
+    commands: list[list[str]] = []
+    if not exists:
+        commands.append(create_command(repo, tag))
+    commands.append(upload_command(target, sidecar, repo, tag))
+    return commands
 
 
 def write_fixture(directory: Path) -> Path:
@@ -153,11 +220,21 @@ def self_test() -> int:
         written = json.loads(sidecar.read_text(encoding="utf-8"))
         if written != described:
             problems.append("the sidecar disagrees with the descriptor")
-        command = publish_command(one, "liberalluz/example", "v0.0.0")
-        if command[:2] != ["gh", "release"]:
-            problems.append("the publish command is not a release upload")
-        if "--clobber" not in command:
-            problems.append("the publish command does not replace an artifact")
+        command = publish_commands(one, "liberalluz/example", "pack/fixture-pack/v0.1.0", False)
+        if len(command) != 2:
+            problems.append("a missing release does not produce a create and an upload")
+        if command[0][:3] != [gh(), "release", "create"]:
+            problems.append("the create command is not the first one")
+        if command[1][:3] != [gh(), "release", "upload"]:
+            problems.append("the upload command is not second")
+        if "--clobber" not in command[1]:
+            problems.append("the upload command does not replace an artifact")
+        if publish_commands(one, "liberalluz/example", "pack/fixture-pack/v0.1.0", True)[0][:3] != [
+            gh(),
+            "release",
+            "upload",
+        ]:
+            problems.append("an existing release is created again")
     if problems:
         for problem in problems:
             print(f"[fail] {problem}")
@@ -206,12 +283,21 @@ def main(argv: list[str]) -> int:
         target = Path(args.zip)
         if not target.is_file():
             raise SystemExit(f"{target} does not exist")
-        command = publish_command(target, args.repo, args.tag)
-        print(" ".join(command))
         if not args.apply:
-            print("dry run; pass --apply to upload")
+            for command in publish_commands(target, args.repo, args.tag, False):
+                print(" ".join(command))
+            print("dry run; pass --apply to create the release and upload")
             return 0
-        return subprocess.run(command, check=False).returncode
+        validate(target)
+        exists = release_exists(args.repo, args.tag)
+        print(f"release {args.tag} {'exists' if exists else 'is missing'}")
+        for command in publish_commands(target, args.repo, args.tag, exists):
+            print(" ".join(command))
+            code = subprocess.run(command, check=False).returncode
+            if code != 0:
+                print(f"[fail] {command[2]} exited {code}", file=sys.stderr)
+                return code
+        return 0
 
     return self_test()
 
