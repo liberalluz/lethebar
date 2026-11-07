@@ -1,0 +1,67 @@
+name: Capability request
+description: Ask the engine to learn a new behaviour, for a package you want to write
+title: "[capability] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A capability is engine behaviour a package can require (`docs/specs/capabilities.md`).
+        It is not content: officers, cards, cities and scenes are data a package carries.
+
+        Before filling this in, read the five tests a request has to pass. A request
+        that fails one of them is answered with the test it failed, so answering them
+        here saves a round trip.
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: What you want to happen
+      description: The player-visible behaviour. Describe the moment in the game, not the API you imagine.
+      placeholder: The player spends a turn moving a unit between two cities, and the reported outcome says how many days it took.
+    validations:
+      required: true
+  - type: textarea
+    id: why-data
+    attributes:
+      label: Why package data cannot express it
+      description: Which of the six declared dimensions comes closest, and where it stops. If a table could do it, this is content and the request will be closed as content.
+    validations:
+      required: true
+  - type: textarea
+    id: surface
+    attributes:
+      label: The smallest engine surface that would do it
+      description: One capability, not a framework. Name what it reads, what it writes, and what it refuses.
+      placeholder: Reads a table of cities with coordinates and adjacency; writes a travel event; refuses a move with no declared route.
+    validations:
+      required: true
+  - type: textarea
+    id: others
+    attributes:
+      label: Who else would use it
+      description: A capability with one package is a table in that package. Name the second author, the second genre, or why the second is certain rather than hoped for.
+    validations:
+      required: true
+  - type: textarea
+    id: fallback
+    attributes:
+      label: What you do if it is refused
+      description: The fallback you would ship instead. A request with a real fallback is easier to refuse honestly, and easier to accept.
+    validations:
+      required: true
+  - type: textarea
+    id: package
+    attributes:
+      label: A package that would use it
+      description: A link to a package, a draft manifest, or the repository you intend to write. A request with no package cannot be checked.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I read the five tests in `docs/specs/capabilities.md` and this request passes all of them.
+          required: true
+        - label: This is not content I could ship as a table, a condition or a rule today.
+          required: true
