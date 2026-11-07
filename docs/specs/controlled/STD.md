@@ -177,38 +177,6 @@ path, so the case survives fixture renames.
 - Exit: slot 1 is refused with a message naming the schema mismatch and is not
   overwritten; slot 2 loads normally; the game remains interactive.
 
-### `TC-BUILTIN-001`
-
-- Covers: `REQ-014`, `REQ-034`
-- Preconditions: Sanguo listed as a built-in plugin; fresh session.
-- Steps:
-  1. Start Sanguo and read the view: four resources, the turn budget, the rank
-     and the menu.
-  2. Take `farm`; read the grain and the turn number.
-  3. Take `envoys` twice; read the standing and the relation between Cao and
-     Shao.
-  4. Save to slot 1, reload, load slot 1; compare the turn, the grain and the
-     relation.
-  5. Start a second run and take `recruit` until the run ends; read the reason.
-  6. Start an English session and read the opening text.
-- Exit: the run is budgeted at twenty-four turns over four resources and five
-  ranks, `farm` feeds the army and spends a turn, the relation moves once the
-  standing crosses the declared threshold, the resumed run keeps the turn, the
-  resources and the relation, the second run ends by running out of grain and
-  says so, and the English session reads English.
-
-### `TC-BUILTIN-002`
-
-- Covers: `REQ-015`
-- Preconditions: Xiuxian listed as a built-in plugin; fresh session. If `SRS.md`
-  §4 cut order was applied, this case is recorded as not delivered.
-- Steps:
-  1. Start Xiuxian.
-  2. Advance to the end node.
-  3. Save and resume.
-- Exit: the end node is reached with its text, and resume returns to the saved
-  node; or the row records "not delivered per §4" with the cut decision linked.
-
 ### `TC-DET-001`
 
 - Covers: `REQ-016`
@@ -612,7 +580,7 @@ same three piles; the three bad packages are refused with `V-38`, `V-37` and `V-
 
 ## TC-BUILTIN-004 - a fourth story is played with cards
 
-- Covers: `TC-BUILTIN-001`, `TC-CARDS-001`
+- Covers: `REQ-014`, `TC-CARDS-001`
 - Fixture: the built-in `duel` package as it ships, without any edit: `linear@1`, capabilities
   `cards.hand@1`, `ledger@1`, `phases@1` and `text@1`, two resources (`guard`, `edge`), ten turns
   with three ranks, one failure on `guard lte 0`, two plain actions and a hand of four cards drawn
@@ -816,3 +784,25 @@ Exit criteria: step 1 shows a file entry and a link entry; step 2 is refused wit
 `V-01` and the address; step 3 is refused with `V-43` naming both digests and
 leaves the installed set unchanged; step 4 installs, starts the pack and reports
 `installed`; step 5 reports `already`; step 6 is refused with `V-43`.
+
+### `TC-WORLD-001`
+
+- Covers: `REQ-015`
+- Preconditions: a published 三国 release; a fresh engine with no installed pack of that id.
+- Steps:
+  1. Install the release artifact and assert the digest matches the descriptor.
+  2. Start 三国 and play to the end of the first segment.
+  3. Save to slot 1, resume, and assert the scene matches.
+- Exit: the run reaches its end and resumes; a mismatch names both digests.
+
+### `TC-WORLD-002`
+
+- Covers: `REQ-034`
+- Preconditions: the same release; the world repository's own gate.
+- Steps:
+  1. Read the ledger and assert four resources and a twenty-four turn budget.
+  2. Walk the ranks and assert five appear as the turn number passes them.
+  3. Trigger each declared failure and assert its reason.
+  4. Assert five actions and one rule that moves a relation.
+- Exit: every number comes from package data, and `app/core` is unchanged.
+
