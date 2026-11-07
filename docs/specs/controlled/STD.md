@@ -472,26 +472,6 @@ path, so the case survives fixture renames.
   with `V-25` and the one with the undeclared pool with `V-26`.
 
 
-### `TC-BUILTIN-003`
-
-- Covers: `TC-BUILTIN-001`, `TC-WIRE-001`
-- Preconditions: the shipped `jianghu` package, staged into the build. It declares
-  one node with no choices, a ledger of three resources, four actions, one pool
-  holding a single item, a phase machine with three ranks and one failure
-  condition, and an English table.
-- Steps:
-  1. Install the package and open its scene.
-  2. Read the buttons and the readout of the first turn.
-  3. Read the action that waits on the item, then take the drawing action and read
-     it again.
-  4. Keep taking the training action until the run ends.
-  5. Start a session with the English locale and read the entry text.
-- Exit: the package installs with no fatal finding; the scene draws six buttons
-  (four actions plus Saves and Back to packs); the readout names the first rank;
-  the waiting action is disabled before the draw and enabled after it, with the
-  drawn item named in the readout; the run ends with the declared failure reason;
-  the English session reads the English text.
-
 ## TC-SAVE-003 — a save is reportable only after storage settles
 
 - Covers: `REQ-028`.

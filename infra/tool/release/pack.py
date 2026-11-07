@@ -9,9 +9,9 @@ directory in whatever order the filesystem hands back, so a build fixes both: on
 timestamp for every entry and a sorted name list. Two builds of one directory are
 then byte-identical, which is what makes a hash worth writing down.
 
-    python infra/tool/release/pack.py build content/builtin/jianghu --out dist
-    python infra/tool/release/pack.py hash dist/jianghu.zip
-    python infra/tool/release/pack.py publish dist/jianghu.zip --repo o/r --tag v0.1.0
+    python infra/tool/release/pack.py build content/builtin/<id> --out dist
+    python infra/tool/release/pack.py hash dist/<id>.zip
+    python infra/tool/release/pack.py publish dist/<id>.zip --repo o/r --tag 1.0.0
 
 `hash` writes `<id>-<version>.json` next to the zip: the id, the version, the byte
 count, the sha256, the specVersion and the engine range, which is what an engine
@@ -103,14 +103,38 @@ def publish_command(target: Path, repo: str, tag: str) -> list[str]:
     return ["gh", "release", "upload", tag, str(target), str(sidecar), "--repo", repo, "--clobber"]
 
 
+def write_fixture(directory: Path) -> Path:
+    """Write a pack for the self-test, so the tool needs no shipped story."""
+    root = directory / "fixture-pack"
+    (root / "data").mkdir(parents=True)
+    manifest = {
+        "id": "fixture-pack",
+        "version": "0.1.0",
+        "specVersion": "2.0.0",
+        "engine": ">=4.7.0 <5.0.0",
+    }
+    (root / MANIFEST).write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    (root / "data" / "nodes.json").write_text(
+        '{"n1": {"text": "a fixture pack"}}\n',
+        encoding="utf-8",
+        newline="\n",
+    )
+    return root
+
+
 def self_test() -> int:
     """Assert the properties this tool exists for, without touching the network."""
     problems: list[str] = []
-    root = Path("content/builtin/jianghu")
-    if not root.is_dir():
-        print("self-test needs content/builtin/jianghu")
-        return 2
-    with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
+    with (
+        tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as source,
+        tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as first,
+        tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as second,
+    ):
+        root = write_fixture(Path(source))
         one = build(root, Path(first))
         two = build(root, Path(second))
         if one.read_bytes() != two.read_bytes():
