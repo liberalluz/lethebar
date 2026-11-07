@@ -1,25 +1,20 @@
 # This file is a template. Copy it to <world>/.github/workflows/gate.yml.
 # Do not enable it here: this repository has no .github/workflows/ on purpose,
-# and the steps below expect an engine checkout at ../engine or ./engine.
-# A gate for a repository that publishes packs and nothing else.
+# and the steps below expect the engine checked out beside this one.
 #
-# Copy this file to `.github/workflows/gate.yml` in a `lethebar-game-<world>` or
-# `lethebar-genre-<genre>` repository. It is not copied into this repository's
-# `.github/workflows/` on purpose: the engine has no CI, so a workflow here would
-# be the first one and would run against a tree this file does not describe.
+# A gate for a repository that publishes packs and nothing else. It never looks
+# at how this repository is laid out: it builds each `packs/<id>/` into the
+# archive that will travel, checks that archive against the envelope a pack has
+# to unpack to, and - only on a `pack/<id>/vX.Y.Z` tag - publishes it.
 #
-# The four steps are the same four the engine runs by hand, in the same order,
-# because each one depends on the previous one's output:
+# The three steps are the three things that can be wrong with a pack:
 #
-#   tree    the layout is one a pack repository may have, and no generated file
-#           is tracked
-#   stage   every `packs/<id>/` becomes the archive the engine will read
-#   import  the engine can load what was staged
-#   test    the engine's headless suite accepts the staged set
+#   build       the directory becomes `dist/<id>.zip` in a fixed shape
+#   check_pack  the archive holds only what the envelope allows
+#   publish     the tag's zip and descriptor go onto the release
 #
-# Only `stage` is supplied by the repository itself. The other three are the
-# engine's own checks, checked out at the tag this repository declares, so a
-# world cannot drift from the engine's idea of a valid pack without saying so.
+# Both checks come from the engine at the tag named below, so a world cannot
+# drift from the engine's idea of a valid pack without saying so out loud.
 
 name: gate
 
@@ -27,6 +22,7 @@ on:
   pull_request:
   push:
     branches: [main]
+    tags: ["pack/*"]
 
 jobs:
   gate:
@@ -52,25 +48,46 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: tree
+      - name: build
         working-directory: world
-        run: python ../engine/infra/checks/check_tree.py --root . --profile world
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          built=0
+          for dir in packs/*/; do
+            python ../engine/infra/tool/release/pack.py build "$dir" --out dist
+            built=$((built + 1))
+          done
+          test "$built" -gt 0
 
-      - name: stage
+      - name: check_pack
         working-directory: world
-        run: python infra/stage_packs.py
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          checked=0
+          for archive in dist/*.zip; do
+            python ../engine/infra/checks/check_pack.py "$archive"
+            checked=$((checked + 1))
+          done
+          test "$checked" -gt 0
 
-      - name: import
+      - name: publish
+        if: startsWith(github.ref, 'refs/tags/pack/')
         working-directory: world
-        run: python ../engine/infra/checks/run_godot.py --headless --editor --quit --path app
-
-      - name: test
-        working-directory: world
-        run: python ../engine/infra/checks/run_godot.py --headless --path app -s res://tests/run_tests.gd
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for archive in dist/*.zip; do
+            python ../engine/infra/tool/release/pack.py publish "$archive" \
+              --repo "$GITHUB_REPOSITORY" --tag "$GITHUB_REF_NAME" --apply
+          done
 
       - name: Upload what was built
         uses: actions/upload-artifact@v4
         with:
           name: packs
-          path: world/app/builtin/*.zip
+          path: world/dist/*.zip
           if-no-files-found: error

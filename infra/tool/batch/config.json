@@ -32,9 +32,7 @@
       "name": "tree",
       "command": [
         "python",
-        "infra/checks/check_tree.py",
-        "--profile",
-        "engine"
+        "infra/checks/check_tree.py"
       ],
       "cwd": "."
     },
@@ -97,6 +95,15 @@
         "python",
         "infra/tool/release/pack.py",
         "self-test"
+      ],
+      "cwd": "."
+    },
+    {
+      "name": "pack-envelope",
+      "command": [
+        "python",
+        "infra/checks/check_pack.py",
+        "--self-test"
       ],
       "cwd": "."
     },

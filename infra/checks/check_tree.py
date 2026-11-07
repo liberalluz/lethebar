@@ -1,24 +1,18 @@
 #!/usr/bin/env python3
-"""Check that the repository tree matches the layout in git-conventions.md §7.
+"""Check that this repository's tree matches the layout in git-conventions.md §7.
 
-Two rules are enforced:
+Two rules are enforced, and both are about **this** repository:
 
-1. The repository root holds a known set of entries. Anything else is a
-   directory or file that has no home in the layout.
+1. The root holds a known set of entries. Anything else is a directory or file
+   that has no home in the layout.
 2. No tracked path comes from a tool. Generated files are ignored, never
    committed.
 
-The check reads the git index for the layout rules, so a local build does not
-change the outcome. One rule cannot be answered from the index: whether a staged
-archive still has a source directory behind it. Archives are generated and
-ignored, so that question is asked of the filesystem instead, and it is a
-failure rather than a note because a stale archive is what a player actually
-downloads.
-
-`--profile` names which repository is being checked. The engine repository holds
-the code, the built-in sources and the tooling; an author repository holds
-`shared/` and `packs/` and no engine code. The two have different root sets and
-the same generated-file rules.
+An author repository is deliberately not checked here. A repository is a
+project: it may hold a build script, a scratch directory or its own CI, and none
+of that travels. What travels is the pack, so the pack is what gets checked
+(`check_pack.py`), and this file stops having an opinion about someone else's
+tree.
 """
 
 from __future__ import annotations
@@ -27,8 +21,6 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
-
-REPO = Path(__file__).resolve().parent.parent.parent
 
 ROOT_DIRECTORIES = {
     "app",
@@ -65,18 +57,6 @@ GENERATED_PATTERNS = (
     (".test-tmp/", lambda path: "/.test-tmp/" in f"/{path}"),
 )
 
-# Root entries per profile. `engine` is this repository; `world` is what a
-# `lethebar-game-<world>` repository is expected to hold. Both are written down
-# here rather than in a per-repository file so there is one place to disagree
-# with.
-PROFILES = {
-    "engine": (ROOT_DIRECTORIES, ROOT_FILES),
-    "world": (
-        {"shared", "packs", "docs", ".github", "changelog.d"},
-        ROOT_FILES,
-    ),
-}
-
 
 def git(*args: str) -> list[str]:
     result = subprocess.run(
@@ -89,8 +69,7 @@ def git(*args: str) -> list[str]:
     return [line for line in result.stdout.splitlines() if line]
 
 
-def check_root_entries(profile: str, root: Path) -> list[str]:
-    allowed_directories, allowed_files = PROFILES[profile]
+def check_root_entries(root: Path) -> list[str]:
     failures = []
     directories: set[str] = set()
     files: set[str] = set()
@@ -100,11 +79,11 @@ def check_root_entries(profile: str, root: Path) -> list[str]:
             directories.add(parts[0])
         else:
             files.add(parts[0])
-    for name in sorted(directories - allowed_directories):
+    for name in sorted(directories - ROOT_DIRECTORIES):
         failures.append(f"[tree] unexpected root directory: {name}/")
-    for name in sorted(allowed_directories - directories):
+    for name in sorted(ROOT_DIRECTORIES - directories):
         failures.append(f"[tree] missing root directory: {name}/")
-    for name in sorted(files - allowed_files):
+    for name in sorted(files - ROOT_FILES):
         failures.append(f"[tree] unexpected root file: {name}")
     return failures
 
@@ -141,12 +120,8 @@ def check_generated_tracked(root: Path) -> list[str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Check the repository tree.")
-    parser.add_argument(
-        "--profile",
-        choices=sorted(PROFILES),
-        default="engine",
-        help="which repository is being checked (default: engine)",
+    parser = argparse.ArgumentParser(
+        description="Check this repository's tree against the layout."
     )
     parser.add_argument(
         "--root",
@@ -155,9 +130,11 @@ def main() -> int:
     )
     args = parser.parse_args()
     root = Path(args.root).resolve()
-    failures = check_root_entries(args.profile, root) + check_generated_tracked(root)
-    if args.profile == "engine":
-        failures += check_staged_archives(root)
+    failures = (
+        check_root_entries(root)
+        + check_generated_tracked(root)
+        + check_staged_archives(root)
+    )
     for line in failures:
         print(line)
     if failures:
