@@ -41,6 +41,10 @@ def main() -> int:
         problems.append(
             f"[author-gate] steps are out of order: {' -> '.join(found)}"
         )
+    if "This file is a template" not in text:
+        problems.append(
+            "[author-gate] the template does not say it is a template to copy"
+        )
     if "--profile world" not in text:
         problems.append("[author-gate] the tree step does not check the world profile")
     if not problems:

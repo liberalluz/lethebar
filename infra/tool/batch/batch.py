@@ -45,7 +45,7 @@ DATED_ID_RE = re.compile(r"^[0-9]{8}-[0-9a-f]{6}$")
 CARD_ID_RE = re.compile(r"^B[0-9]+[a-z]?$")
 CARD_MARKER_RE = re.compile(r"<!--\s*batch-card\s*:\s*v1\s*-->")
 CARD_JSON_RE = re.compile(r"```json[ \t]*\r?\n(.*?)\r?\n```", re.DOTALL)
-CARD_TYPES = {"feat", "fix", "process", "docs"}
+CARD_TYPES = {"feat", "fix", "docs", "test", "refactor", "chore", "ci"}
 DOCS_PROCESS = "process"
 DOCS_SDP = "sdp.md"
 DOCS_BATCHES = "batches"
@@ -1079,51 +1079,41 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 0 if passed else 1
 
 
-def pr_body(root: Path, batch_id: str) -> str:
-    card = read_card(root, batch_id)
-    state = read_state(root, batch_id)
-    written = batch_dir(root, batch_id) / "pr-body.source.md"
-    if written.is_file():
-        return written.read_text(encoding="utf-8").strip()
-    changed = changed_paths(root, str(state.get("base", "main")), load_config(root))
-    lines = [
-        f"# {card.get('goal', '')}",
-        "",
-        "## Batch",
-        "",
-        f"- ID: `{batch_id}`",
-        f"- Branch: `{state.get('branch', '')}`",
-        f"- Base: `{state.get('base', '')}`",
-        "",
-        "## Scope",
-        "",
-        "Allowed:",
-        *[f"- `{item}`" for item in card.get("allowed", [])],
-        "",
-        f"Changed files: {len(changed)}",
-        *[f"- `{item}`" for item in changed],
-        "",
-        "## Checks",
-        "",
-    ]
-    checks = state.get("checks", {})
-    if checks:
-        lines.extend(f"- {name}: {result.get('status')}" for name, result in checks.items())
-    else:
-        lines.append("- none configured")
-    lines.extend(["", "## Acceptance", ""])
-    criteria = card.get("acceptance", card.get("exit_criteria", []))
-    lines.extend(f"- {item}" for item in criteria) if criteria else lines.append("- none recorded")
-    lines.extend(
-        [
-            "",
-            "## Evidence",
-            "",
-            f"- `.batch/{batch_id}/evidence.log`",
-            "",
-        ]
-    )
-    return "\n".join(lines)
+PR_BODY_SOURCE = "pr-body.source.md"
+PR_BODY_SECTIONS = (
+    "## Summary",
+    "## Impact",
+    "## Verification",
+    "## Risks",
+    "## Self-check",
+)
+
+
+def pr_body(root: Path, batch_id: str) -> str | None:
+    """Return the hand-written body, or ``None`` when the writer skipped it.
+
+    A generated body is not a substitute: the pull request template asks five
+    questions a generator cannot answer, so a missing source file is an error.
+    """
+    written = batch_dir(root, batch_id) / PR_BODY_SOURCE
+    if not written.is_file():
+        return None
+    text = written.read_text(encoding="utf-8").strip()
+    return text or None
+
+
+def missing_sections(body: str) -> list[str]:
+    """Name the sections of the template a body is missing, in template order."""
+    positions = []
+    for name in PR_BODY_SECTIONS:
+        if name not in body:
+            positions.append(name)
+    return positions
+
+
+def sections_out_of_order(body: str) -> bool:
+    seen = [body.index(name) for name in PR_BODY_SECTIONS if name in body]
+    return seen != sorted(seen)
 
 
 def scaffold_language(root: Path) -> dict[str, Any]:
@@ -1177,23 +1167,29 @@ def pr_translations(
     digest: str,
     config: dict[str, Any],
     state: dict[str, Any],
-) -> list[str]:
-    """Write PR body translations through ``config.translate``; best effort."""
+) -> tuple[list[str], list[str]]:
+    """Write PR body translations through ``config.translate``.
+
+    Returns the locales written and the problems found. A missing hook, a hook
+    that exits non-zero and a hook that writes nothing are all problems: the
+    English body is authoritative, but a reader who cannot get the other
+    language is a failure of the hand-over, not a warning.
+    """
     language = scaffold_language(root)
     source_locale = language["external"]
     targets = [item for item in language["supported"] if item != source_locale]
     if not targets:
-        return []
+        return [], []
     command = config.get("translate")
     if not command:
-        print(
-            "config.translate is empty; skipped PR body translations",
-            file=sys.stderr,
-        )
-        return []
+        return [], [
+            "config.translate is empty; the PR body has no translation "
+            "(set LETHEBAR_TRANSLATION_FILE for the offline hook)"
+        ]
     card = read_card(root, batch_id)
     directory = batch_dir(root, batch_id)
     translations: list[dict[str, Any]] = []
+    problems: list[str] = []
     for locale in targets:
         out = directory / f"pr-body.{locale}.md"
         out.unlink(missing_ok=True)
@@ -1213,12 +1209,11 @@ def pr_translations(
         if out_text:
             print(out_text)
         if code != 0:
-            print(f"translation {locale} failed (exit {code})", file=sys.stderr)
-            if err_text:
-                print(err_text, file=sys.stderr)
+            detail = err_text.strip() or "no message"
+            problems.append(f"translation {locale} failed (exit {code}): {detail}")
             continue
         if not out.exists() or not out.read_text(encoding="utf-8").strip():
-            print(f"translation {locale}: hook produced no output", file=sys.stderr)
+            problems.append(f"translation {locale}: the hook produced no output")
             continue
         translations.append(
             {
@@ -1229,7 +1224,7 @@ def pr_translations(
             }
         )
     if not translations:
-        return []
+        return [], problems or ["no translation was written"]
     write_json(
         directory / "pr-body.manifest.json",
         {
@@ -1242,13 +1237,41 @@ def pr_translations(
         },
     )
     print(f"translations: {', '.join(item['locale'] for item in translations)}")
-    return [item["locale"] for item in translations]
+    return [item["locale"] for item in translations], problems
+
+
+def redo_translations(root: Path, batch_id: str, state: dict[str, Any]) -> int:
+    """Regenerate the PR body translations from the body already on disk.
+
+    ``pr --prepare`` refuses to run once a batch is merged, but a translator
+    can be improved afterwards, and the translation is a file in the batch
+    directory, not a part of the pull request.
+    """
+    body_path = root / str(state.get("pr_body") or "")
+    if not state.get("pr_body") or not body_path.is_file():
+        print(
+            "no prepared PR body to translate; run 'pr --prepare' first",
+            file=sys.stderr,
+        )
+        return 1
+    digest = hashlib.sha256(body_path.read_bytes()).hexdigest()
+    config = load_config(root)
+    locales, problems = pr_translations(root, batch_id, body_path, digest, config, state)
+    state["pr_translations"] = locales
+    write_json(batch_dir(root, batch_id) / "state.json", state)
+    if problems:
+        for problem in problems:
+            print(problem, file=sys.stderr)
+        return 1
+    return 0
 
 
 def cmd_pr(args: argparse.Namespace) -> int:
     root = args.root.resolve()
     batch_id = resolve_id(root, args.id)
     state = read_state(root, batch_id)
+    if args.translations_only:
+        return redo_translations(root, batch_id, state)
     if state.get("status") not in {"checked", "pr_ready"}:
         print("run 'check' successfully before preparing a PR", file=sys.stderr)
         return 1
@@ -1265,6 +1288,29 @@ def cmd_pr(args: argparse.Namespace) -> int:
         print(message, file=sys.stderr)
         return 1
     body = pr_body(root, batch_id)
+    if body is None:
+        print(
+            f"missing .batch/{batch_id}/{PR_BODY_SOURCE}; write the body first. "
+            "The template asks five questions:",
+            file=sys.stderr,
+        )
+        for name in PR_BODY_SECTIONS:
+            print(f"  {name}", file=sys.stderr)
+        return 1
+    missing = missing_sections(body)
+    if missing:
+        print(
+            "the body is missing template sections: " + ", ".join(missing),
+            file=sys.stderr,
+        )
+        return 1
+    if sections_out_of_order(body):
+        print(
+            "the body has the template sections out of order: "
+            + " -> ".join(PR_BODY_SECTIONS),
+            file=sys.stderr,
+        )
+        return 1
     body_path = args.body_file or (batch_dir(root, batch_id) / "pr-body.md")
     body_path = body_path if body_path.is_absolute() else root / body_path
     write_text(body_path, body + "\n")
@@ -1275,10 +1321,20 @@ def cmd_pr(args: argparse.Namespace) -> int:
     state["pr_body"] = str(body_path.relative_to(root))
     state["pr_body_sha256"] = digest
     config = load_config(root)
-    state["pr_translations"] = pr_translations(
+    locales, problems = pr_translations(
         root, batch_id, body_path, digest, config, state
     )
+    state["pr_translations"] = locales
     write_json(batch_dir(root, batch_id) / "state.json", state)
+    if problems:
+        for problem in problems:
+            print(problem, file=sys.stderr)
+        print(
+            "the pull request body has no translation; fix the hook or set "
+            "LETHEBAR_TRANSLATION_FILE",
+            file=sys.stderr,
+        )
+        return 1
 
     if not args.create:
         return 0
@@ -1512,6 +1568,11 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("id", nargs="?")
     pr.add_argument("--prepare", action="store_true")
     pr.add_argument("--create", action="store_true")
+    pr.add_argument(
+        "--translations-only",
+        action="store_true",
+        help="redo the PR body translations from the body already on disk",
+    )
     pr.add_argument("--body-file", type=Path)
     pr.add_argument("--confirm")
     pr.set_defaults(func=cmd_pr)

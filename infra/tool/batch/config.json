@@ -39,6 +39,14 @@
       "cwd": "."
     },
     {
+      "name": "author-gate",
+      "command": [
+        "python",
+        "infra/checks/check_author_gate.py"
+      ],
+      "cwd": "."
+    },
+    {
       "name": "language",
       "command": [
         "python",
