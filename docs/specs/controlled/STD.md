@@ -812,3 +812,10 @@ one `W-05` and keeps the first value.
 - Steps: hash the fixture bytes; install with the right digest; install with sixty-four zeros; install with a fetcher that returns nothing; build `content/builtin/jianghu` twice with `infra/tool/release/pack.py build` and compare the two archives
 - Exit: the digest is sixty-four lowercase hex characters, the matching install reports `installed` and keeps the id, the mismatch reports `V-43` with both digests in the message, the empty fetch reports `V-01` with the url, and the two builds are byte-identical with a descriptor whose sha256 equals the file's
 
+## TC-NEUTRAL-001 — the engine plays a package it owns
+
+- Covers: none - the engine's own proof, not a requirement
+- Fixture: a package built inside the suite with two cards, one resource, two actions, a turn limit and one failure condition
+- Steps: install it; play the first card; save to slot 1; resume; and separately remove the four built-in archives and run the whole suite
+- Exit: the hand opens at its declared size, playing a card advances the turn, the save and resume keep the turn and the hand, the suite reports `OK — 394 checks, 12 skipped` with no story staged and `OK — 526 checks, 0 skipped` with them staged
+
