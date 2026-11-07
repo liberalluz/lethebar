@@ -45,3 +45,5 @@ ui.tight	最紧：%s
 ui.choose_world	选择世界
 ui.worlds_hint	每个世界各有自己的故事。
 ui.world_other	其他故事
+ui.arc_stage	弧光：%s（自第 %d 回合）
+ui.cast_line	登场：%s

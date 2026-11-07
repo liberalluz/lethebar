@@ -54,5 +54,48 @@
       "en": "Three Kingdoms",
       "zh-CN": "三国"
     }
+  },
+  "content": {
+    "view": "third",
+    "density": "dense",
+    "cast": [
+      {
+        "id": "cao",
+        "name": "曹操",
+        "role": "魏"
+      },
+      {
+        "id": "yuan",
+        "name": "袁绍",
+        "role": "盟主"
+      },
+      {
+        "id": "lv",
+        "name": "吕布",
+        "role": "骁将"
+      }
+    ],
+    "arc": [
+      {
+        "turn": 1,
+        "label": "初平元年 · 起兵"
+      },
+      {
+        "turn": 6,
+        "label": "群雄并起"
+      },
+      {
+        "turn": 11,
+        "label": "中原逐鹿"
+      },
+      {
+        "turn": 16,
+        "label": "三分之势"
+      },
+      {
+        "turn": 21,
+        "label": "天下归心"
+      }
+    ]
   }
 }

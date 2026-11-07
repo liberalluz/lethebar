@@ -331,7 +331,14 @@ func enter_session() -> Dictionary:
 	_heading.text = Locale.text("ui.playing")
 	_clear_options()
 	var view: Dictionary = current_view()
-	_sub.text = String(view.get("text", ""))
+	var content: Dictionary = view.get("content", {})
+	var cast := String(content.get("cast", ""))
+	if cast != "" and String(content.get("view", "first")) != "first":
+		# Who is in the story is said before the scene, and the ensemble view is
+		# the one that keeps the roles in front of the reader (REQ-044).
+		_sub.text = "%s\n%s" % [Locale.text("ui.cast_line") % cast, String(view.get("text", ""))]
+	else:
+		_sub.text = String(view.get("text", ""))
 	if _sub.text == "":
 		_sub.text = Locale.text("ui.no_scene")
 	var choices: Array = view.get("choices", [])
@@ -1361,25 +1368,33 @@ func _readout(view: Dictionary) -> String:
 		for item in items:
 			names.append(String(item))
 		parts.append(Locale.text("ui.drawn") % ", ".join(names))
-	if view.has("situation"):
-		# How the run stands, read from the same view the buttons use (REQ-033):
-		# the time left, who is leaned toward, who is pushed against, what is
-		# close to its floor. Every number came from the package, not from here.
-		var reading: Dictionary = view["situation"]
-		var entity_labels := _entity_labels(view)
-		if reading.has("turnsLeft"):
-			parts.append(Locale.text("ui.turns_left") % int(reading["turnsLeft"]))
-		if reading.has("leaning"):
-			var leaned := String(reading["leaning"])
-			parts.append(Locale.text("ui.leaning") % String(entity_labels.get(leaned, leaned)))
-		if reading.has("friction"):
-			var pushed := String(reading["friction"])
-			parts.append(Locale.text("ui.friction") % String(entity_labels.get(pushed, pushed)))
-		if reading.has("tight"):
-			var tight := String(reading["tight"])
-			parts.append(Locale.text("ui.tight") % String(labels.get(tight, tight)))
+	if String((view.get("content", {}) as Dictionary).get("density", "normal")) != "sparse":
+		if view.has("situation"):
+			# How the run stands, read from the same view the buttons use (REQ-033):
+			# the time left, who is leaned toward, who is pushed against, what is
+			# close to its floor. Every number came from the package, not from here.
+			var reading: Dictionary = view["situation"]
+			var entity_labels := _entity_labels(view)
+			if reading.has("turnsLeft"):
+				parts.append(Locale.text("ui.turns_left") % int(reading["turnsLeft"]))
+			if reading.has("leaning"):
+				var leaned := String(reading["leaning"])
+				parts.append(Locale.text("ui.leaning") % String(entity_labels.get(leaned, leaned)))
+			if reading.has("friction"):
+				var pushed := String(reading["friction"])
+				parts.append(Locale.text("ui.friction") % String(entity_labels.get(pushed, pushed)))
+			if reading.has("tight"):
+				var tight := String(reading["tight"])
+				parts.append(Locale.text("ui.tight") % String(labels.get(tight, tight)))
 	if parts.is_empty():
 		return ""
+	var content_for_arc: Dictionary = view.get("content", {})
+	if String(content_for_arc.get("density", "normal")) == "dense" and String(content_for_arc.get("stage", "")) != "":
+		# The dense readout says which stage of the arc this turn belongs to, and
+		# which turn started it (REQ-044).
+		parts.append(Locale.text("ui.arc_stage") % [
+			String(content_for_arc.get("stage", "")), int(content_for_arc.get("stageTurn", 0)),
+		])
 	return " · ".join(parts)
 
 

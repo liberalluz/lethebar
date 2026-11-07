@@ -213,6 +213,68 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 				true,
 			))
 
+	# V-40, V-41 — the content layer a package declares (REQ-044).
+	# The engine can only honour a view and a density it knows, and a cast or
+	# an arc that contradicts itself would read differently on every load, so
+	# both are refused where the package is installed rather than at play time.
+	var content_raw: Variant = context.get("content", {})
+	if ContentLayer.declares(content_raw):
+		var content_spec := ContentLayer.defines(content_raw)
+		var declared := content_raw as Dictionary
+		if declared.has("view") and String(declared.get("view", "")) != "":
+			if not ContentLayer.VIEWS.has(String(declared.get("view", ""))):
+				issues.append(_issue(
+					"V-40", "manifest.json",
+					"content view %s is not one of %s" % [
+						String(declared.get("view", "")), ", ".join(ContentLayer.VIEWS),
+					],
+					true,
+				))
+		if declared.has("density") and String(declared.get("density", "")) != "":
+			if not ContentLayer.DENSITIES.has(String(declared.get("density", ""))):
+				issues.append(_issue(
+					"V-40", "manifest.json",
+					"content density %s is not one of %s" % [
+						String(declared.get("density", "")), ", ".join(ContentLayer.DENSITIES),
+					],
+					true,
+				))
+		var cast_seen := {}
+		for member in content_spec.get("cast", []) as Array:
+			var cast_entry := member as Dictionary
+			var cast_id := String(cast_entry.get("id", ""))
+			var cast_name := String(cast_entry.get("name", ""))
+			if cast_id == "" or cast_name == "":
+				issues.append(_issue(
+					"V-41", "manifest.json",
+					"a cast member needs a name and an id: %s" % JSON.stringify(cast_entry),
+					true,
+				))
+				continue
+			if cast_seen.has(cast_id):
+				issues.append(_issue(
+					"V-41", "manifest.json",
+					"the cast names %s twice" % cast_id,
+					true,
+				))
+				continue
+			cast_seen[cast_id] = true
+		var previous := 0
+		for stage_entry in content_spec.get("arc", []) as Array:
+			var stage := stage_entry as Dictionary
+			var stage_turn := int(stage.get("turn", 0))
+			var stage_label := String(stage.get("label", ""))
+			if stage_turn <= previous or stage_label == "":
+				issues.append(_issue(
+					"V-41", "manifest.json",
+					"the arc must name a label at ascending turns; %d follows %d" % [
+						stage_turn, previous,
+					],
+					true,
+				))
+				continue
+			previous = stage_turn
+
 	# V-16, V-17, V-18 — the other three bricks, each refused where an author's
 	# typo would otherwise become a runtime surprise (engine-bricks, validation
 	# surface). They are only checked when the package declares them: a package

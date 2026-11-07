@@ -45,3 +45,5 @@ ui.tight	tightest: %s
 ui.choose_world	Choose a world
 ui.worlds_hint	Each world holds its own stories.
 ui.world_other	Other stories
+ui.arc_stage	arc: %s (from turn %d)
+ui.cast_line	Cast: %s

@@ -60,6 +60,7 @@ second.
 | `REQ-041` | A run can be opened from more than one package at once. The base package supplies the nodes, the phases and the entry; the others may add resources, actions, cards and pools, and the view shows one merged run. A package the assembly names but nothing installed provides is refused before the run starts, naming it (`V-33`). |
 | `REQ-042` | A layer package changes the package it names, through override, append and disable. | P1 |
 | `REQ-043` | A layer names the package it edits in its own manifest, and two layers that write the same field are refused with a stable code. | P1 |
+| `REQ-044` | A package declares how its story reads: the view, the density, the cast and the arc, and the scene follows it. |
 
 
 ## 3. Out of scope for v0.0.0
