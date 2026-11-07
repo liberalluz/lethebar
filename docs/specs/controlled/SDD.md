@@ -191,6 +191,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-35` | Two layers in one assembly write the same field of the same target. | fatal |
 | `V-40` | A `content` block names a view or a density the engine does not know. |
 | `V-41` | The cast repeats an id or carries an empty name, or the arc's turns do not ascend and stay unique. |
+| `V-42` | The `meta` block names an audience, a length, a pitch or an icon the engine cannot honour. |
 | `V-36` | a package that names `cards.hand@1` ships a `data/cards.json` with a `hand` and a `deck` | reject |
 | `V-37` | every card's `cost` and `effects` name resources the ledger declares | reject |
 | `V-38` | every card id in the deck is declared in the package's `cards` table | reject |
@@ -692,6 +693,10 @@ the conflict is reported at the assembly rather than discovered mid-run.
 
 A package may carry a `content` block in its manifest: the view a story is told from (`first`, `third`, `ensemble`), how much the readout shows (`sparse`, `normal`, `dense`), the cast with an id, a name and an optional role, and an arc of labelled turns. `ContentLayer` normalises the block at install time and the session carries it into the view, where the scene reads it: the ensemble view keeps the roles, the dense readout names the arc stage and the turn that started it, and the sparse readout drops the situation line. `V-40` refuses a view or a density the engine does not know, naming the field and the value; `V-41` refuses a cast with a repeated id or an empty name, and an arc whose turns are not ascending and unique. The declaration travels in the save, so a resumed run reads the way the saved one did.
 
+## 11.16 A package says who it is for
+
+A package may carry a `meta` block: a `pitch` in one or more languages, an `audience` from `kids`, `teens`, `adults`, a `minutes` length and an optional `icon` that must be a texture the manifest already declares. `MetaLayer` reads the block; the pack list renders the pitch in the reader's language, then the package default, then any language it has, together with the length. `V-42` refuses an audience the engine does not know, a length that is not positive, a pitch entry with no text and an icon no texture provides, naming the field in every message. The block is never read by a run, so declaring it cannot change a save.
+
 ## 12. Requirement mapping
 
 | REQ | Design |
@@ -740,6 +745,7 @@ A package may carry a `content` block in its manifest: the view a story is told 
 | `REQ-042` | §11.13 the layer, `PackageLoader.assemble()`, `Session._apply_layer()`, `V-34` |
 | `REQ-043` | §11.14 the declared target, `ManifestSchema.format_issues()`, `PackageLoader._layer_conflict()`, `V-35` |
 | `REQ-044` | §11.15 the declared view, `ContentLayer`, `V-40`, `V-41` |
+| `REQ-045` | §11.16 the declared meta, `MetaLayer`, `V-42` |
 
 ## 13. Decisions and open questions
 

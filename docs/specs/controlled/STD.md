@@ -797,3 +797,11 @@ one `W-05` and keeps the first value.
 - Fixture: `con-plain` (no `content`), `con-third` (`view: third`, `density: normal`, one cast member, a two-stage arc), `con-bad-view`, `con-bad-density`, `con-bad-cast`, `con-bad-arc`
 - Steps: install all four; open the plain and the declared package; take a turn; read the view; render the sparse and the dense readout; ask the arc for a turn before and after its first stage; import the four refused packages; save and resume the declared package
 - Exit: the plain view has no `content`, the declared view carries view/density/cast/stage, the sparse readout has no "turns left", the dense one names "arc: opening (from turn 1)", the arc is empty before its first stage and holds "middle" after it, `V-40` and `V-41` are reported with their codes, and the resumed run still reads `third`
+
+## TC-META-001 — a package says who it is for
+
+- Covers: `REQ-045`
+- Fixture: `meta-plain` (no `meta`), `meta-declared` (pitch in two languages, `teens`, 12 minutes, a declared texture), `meta-bad-audience`, `meta-bad-minutes`, `meta-bad-pitch`, `meta-bad-icon`
+- Steps: install all six; read the plain and the declared block; ask the pitch for `en`, `zh-CN` and a language the package does not have; build the list row; import the four refused packages; read the meta of the three shipped stories
+- Exit: the plain entry has no meta, the declared one carries pitch/audience/length/icon, `zh-CN` and the unknown language both resolve without a blank row, the row names the pitch and the length, the four refusals carry `V-42` and name their field, and every shipped story has a pitch in both languages and a positive length
+
