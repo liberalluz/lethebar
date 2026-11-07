@@ -275,6 +275,58 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 				continue
 			previous = stage_turn
 
+	# V-42 — the meta block a package declares about itself (REQ-045).
+	# The list has to render it, so an audience it cannot filter on, a length that
+	# is not a duration, a pitch that renders blank and an icon no texture provides
+	# are all refused where the package is installed.
+	var meta_raw: Variant = manifest.get("meta", {})
+	if meta_raw is Dictionary and not (meta_raw as Dictionary).is_empty():
+		var meta_block := meta_raw as Dictionary
+		var audience := String(meta_block.get("audience", ""))
+		if audience == "" or not MetaLayer.AUDIENCES.has(audience):
+			issues.append(_issue(
+				"V-42", "manifest.json",
+				"meta audience %s is not one of %s" % [audience, ", ".join(MetaLayer.AUDIENCES)],
+				true,
+			))
+		var minutes: Variant = meta_block.get("minutes", 0)
+		if not (minutes is int or minutes is float) or int(minutes) <= 0:
+			issues.append(_issue(
+				"V-42", "manifest.json",
+				"meta minutes is %s, not a positive length" % str(minutes),
+				true,
+			))
+		var pitches: Variant = meta_block.get("pitch", null)
+		if pitches != null:
+			if not (pitches is Dictionary) or (pitches as Dictionary).is_empty():
+				issues.append(_issue(
+					"V-42", "manifest.json",
+					"meta pitch is not a map of text by language",
+					true,
+				))
+			else:
+				for locale in pitches:
+					if String(pitches[locale]) == "":
+						issues.append(_issue(
+							"V-42", "manifest.json",
+							"meta pitch has no text for %s" % String(locale),
+							true,
+						))
+		var icon := String(meta_block.get("icon", ""))
+		if icon != "":
+			var photos := {}
+			var assets: Variant = manifest.get("assets", [])
+			if assets is Array:
+				for asset in assets:
+					if asset is Dictionary and String(asset.get("type", "")) == "texture":
+						photos[String(asset.get("path", ""))] = true
+			if not photos.has(icon):
+				issues.append(_issue(
+					"V-42", "manifest.json",
+					"meta icon %s is not a texture the manifest declares" % icon,
+					true,
+				))
+
 	# V-16, V-17, V-18 — the other three bricks, each refused where an author's
 	# typo would otherwise become a runtime surprise (engine-bricks, validation
 	# surface). They are only checked when the package declares them: a package

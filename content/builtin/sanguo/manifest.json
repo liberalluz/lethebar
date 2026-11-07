@@ -97,5 +97,13 @@
         "label": "天下归心"
       }
     ]
+  },
+  "meta": {
+    "pitch": {
+      "en": "A chronicle of three kingdoms, one turn at a time.",
+      "zh-CN": "一回合一步的三国编年史。"
+    },
+    "audience": "adults",
+    "minutes": 30
   }
 }

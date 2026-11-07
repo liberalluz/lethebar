@@ -28,5 +28,13 @@
       "en": "The Jianghu",
       "zh-CN": "江湖"
     }
+  },
+  "meta": {
+    "pitch": {
+      "en": "One night at an inn, one name to make.",
+      "zh-CN": "客栈一夜，江湖一名。"
+    },
+    "audience": "teens",
+    "minutes": 10
   }
 }

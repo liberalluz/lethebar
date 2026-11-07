@@ -275,7 +275,19 @@ func open_plugins() -> String:
 	for plugin_id in builtin_ids:
 		if _world_filter != "" and world_of(plugin_id) != _world_filter:
 			continue
-		_options.add_child(_button(_pack_title(plugin_id), start_plugin.bind(plugin_id)))
+		var row := _button(_pack_title(plugin_id), start_plugin.bind(plugin_id))
+		var meta := _meta_of(plugin_id)
+		var line := pack_line(meta, Locale.current())
+		if line != "":
+			# A reader choosing between stories sees how long one takes and who it
+			# was written for before opening it (REQ-045).
+			row.tooltip_text = line
+			var note := Label.new()
+			note.text = line
+			note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			note.add_theme_font_size_override("font_size", 13)
+			_options.add_child(note)
+		_options.add_child(row)
 	_options.add_child(_button(Locale.text("ui.install"), request_install))
 	_options.add_child(_button(Locale.text("ui.back"), show_landing))
 	_announce()
@@ -1039,6 +1051,27 @@ func world_title(world_id: String) -> String:
 			if not written.is_empty():
 				return written
 	return world_id
+
+
+func _meta_of(plugin_id: String) -> Dictionary:
+	## The meta block of an installed package, or nothing when it declared none.
+	var record: Dictionary = loader.registry.entry(plugin_id)
+	if record.is_empty():
+		return {}
+	return MetaLayer.of(record.get("manifest", {}))
+
+
+static func pack_line(meta: Dictionary, locale: String) -> String:
+	## What a list row says about a story it has not opened (REQ-045): the pitch in
+	## the reader's language, then how long a run takes. A package that declared
+	## nothing gets an empty row rather than a placeholder.
+	var pitch := MetaLayer.pitch(meta, locale)
+	var minutes := MetaLayer.length_line(meta)
+	if pitch == "" and minutes == "":
+		return ""
+	if minutes == "":
+		return pitch
+	return "%s · %s min" % [pitch, minutes]
 
 
 func _pack_title(plugin_id: String) -> String:

@@ -649,3 +649,11 @@ edge 为 5，牌进弃牌堆并补回一张，回合读到 2；「蓄势」被�
 - 夹具：`con-plain`（无 `content`）、`con-third`（`view: third`、`density: normal`、一个登场人物、两段弧光）、`con-bad-view`、`con-bad-density`、`con-bad-cast`、`con-bad-arc`
 - 步骤：四个包装上；打开无声明与有声明的包；走一回合；读视图；分别渲染 sparse 与 dense 读数；在第一段之前与之后各问一次弧光；导入四个被拒的包；存档后恢复有声明的包
 - 出口：无声明的视图里没有 `content`；有声明的视图带着视角/密度/登场/段；sparse 读数没有「剩余回合」；dense 读数写着「弧光：opening（自第 1 回合）」；弧光在第一段之前为空、之后保持「middle」；`V-40` 与 `V-41` 带着各自的码被报出；恢复后仍读到 `third`
+
+## TC-META-001 — 包说明它是给谁玩的
+
+- 覆盖：`REQ-045`
+- 夹具：`meta-plain`（无 `meta`）、`meta-declared`（两种语言的介绍、`teens`、12 分钟、一个已声明的纹理）、`meta-bad-audience`、`meta-bad-minutes`、`meta-bad-pitch`、`meta-bad-icon`
+- 步骤：六个包装上；读无声明与有声明的块；分别用 `en`、`zh-CN` 与包里没有的语言取介绍；拼出列表行；导入四个被拒的包；读三个内置故事的 meta
+- 出口：无声明的条目没有 meta；有声明的条目带着介绍/受众/时长/图标；`zh-CN` 与不存在的语言都不会得到空行；列表行写出介绍与时长；四条拒绝都带 `V-42` 并点名字段；每个内置故事都有两种语言的介绍与正数时长
+

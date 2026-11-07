@@ -80,6 +80,7 @@ func _initialize() -> void:
 	_case_assembly()
 	_case_layers()
 	_case_content()
+	_case_meta()
 	_case_wire3()
 	_case_limits()
 	_case_boot()
@@ -3586,6 +3587,135 @@ func _content_package(name: String, content: Dictionary) -> PackedByteArray:
 		}, "\t").to_utf8_buffer(),
 	}
 	return _package(name, overrides, [], [], {}, {}, files)
+
+
+func _meta_package(name: String, meta: Dictionary, with_icon: bool = true) -> PackedByteArray:
+	## A story that says who it is for (REQ-045). The icon, when asked for, is a
+	## real 1x1 picture the manifest declares, so the V-42 texture check has
+	## something true to look at.
+	var overrides := {"id": name}
+	if not meta.is_empty():
+		overrides["meta"] = meta
+	if with_icon:
+		overrides["assets"] = [{"type": "texture", "path": "assets/pack.png", "slot": "scene"}]
+	var pictures := {}
+	if with_icon:
+		pictures["assets/pack.png"] = _png_bytes(1, 1)
+	return _package(name, overrides, [], [], {}, {}, pictures)
+
+
+func _shipped_meta(plugin_id: String) -> Dictionary:
+	## Reads the meta block of a package as it ships, without a browser: the same
+	## loader the scene uses, pointed at the built-in zip.
+	var loader := PackageLoader.new()
+	var result := loader.import_bytes(
+		FileAccess.get_file_as_bytes("res://builtin/%s.zip" % plugin_id),
+		{"engine_version": "4.7.2", "work_dir": FIXTURE_DIR},
+	)
+	if String(result.get("status", "")) != "installed":
+		return {}
+	return MetaLayer.of(loader.registry.entry(plugin_id)["manifest"])
+
+
+func _case_meta() -> void:
+	## TC-META-001: the package says who it is for. The list shows the pitch and
+	## the length, the pitch follows the reader's language with a documented
+	## fallback, and a block the engine cannot honour is refused at install
+	## (REQ-045).
+	var loader := PackageLoader.new()
+	var context := {"engine_version": "4.7.2", "work_dir": FIXTURE_DIR}
+	var plain: Dictionary = loader.import_bytes(_meta_package("meta-plain", {}), context)
+	var declared: Dictionary = loader.import_bytes(
+		_meta_package("meta-declared", {
+			"pitch": {"en": "A duel in two turns.", "zh-CN": "两回合的决斗。"},
+			"audience": "teens",
+			"minutes": 12,
+			"icon": "assets/pack.png",
+		}),
+		context,
+	)
+	_check(
+		"TC-META-001: a package with and without a meta block both install",
+		String(plain.get("status", "")) == "installed" and String(declared.get("status", "")) == "installed",
+		"%s %s" % [plain.get("code", ""), declared.get("code", "")],
+	)
+	if String(declared.get("status", "")) != "installed":
+		return
+
+	var plain_meta := MetaLayer.of(loader.registry.entry("meta-plain")["manifest"])
+	_check(
+		"TC-META-001: a package that declares nothing carries an empty meta",
+		plain_meta.is_empty() and not MetaLayer.declared(loader.registry.entry("meta-plain")["manifest"]),
+		str(plain_meta),
+	)
+
+	var entry := loader.registry.entry("meta-declared")
+	var meta := MetaLayer.of(entry["manifest"])
+	_check(
+		"TC-META-001: the declared meta carries a pitch, an audience, a length and an icon",
+		String(MetaLayer.pitch(meta, "en")) == "A duel in two turns."
+			and String(meta.get("audience", "")) == "teens"
+			and int(meta.get("minutes", 0)) == 12
+			and String(meta.get("icon", "")) == "assets/pack.png",
+		str(meta),
+	)
+	_check(
+		"TC-META-001: the pitch follows the reader and falls back without going blank",
+		String(MetaLayer.pitch(meta, "zh-CN")) == "两回合的决斗。"
+			and String(MetaLayer.pitch(meta, "de")) == "A duel in two turns.",
+		"%s %s" % [MetaLayer.pitch(meta, "zh-CN"), MetaLayer.pitch(meta, "de")],
+	)
+
+	var row := Shell.pack_line(meta, "en")
+	_check(
+		"TC-META-001: the pack list shows the pitch and the length",
+		row.contains("A duel in two turns.") and row.contains("12"),
+		row,
+	)
+
+	var bad_audience: Dictionary = loader.import_bytes(
+		_meta_package("meta-bad-audience", {"audience": "everyone", "minutes": 5}),
+		context,
+	)
+	var bad_minutes: Dictionary = loader.import_bytes(
+		_meta_package("meta-bad-minutes", {"audience": "adults", "minutes": 0}),
+		context,
+	)
+	var bad_pitch: Dictionary = loader.import_bytes(
+		_meta_package("meta-bad-pitch", {"pitch": {"en": ""}, "minutes": 5}),
+		context,
+	)
+	var bad_icon: Dictionary = loader.import_bytes(
+		_meta_package("meta-bad-icon", {"minutes": 5, "icon": "assets/ghost.png"}),
+		context,
+	)
+	var audience_issues := JSON.stringify(bad_audience.get("issues", []))
+	var minutes_issues := JSON.stringify(bad_minutes.get("issues", []))
+	var pitch_issues := JSON.stringify(bad_pitch.get("issues", []))
+	var icon_issues := JSON.stringify(bad_icon.get("issues", []))
+	_check(
+		"TC-META-001: an audience, a length, a pitch and an icon the engine cannot honour are refused with V-42",
+		String(bad_audience.get("status", "")) == "rejected" and audience_issues.contains("V-42")
+			and String(bad_minutes.get("status", "")) == "rejected" and minutes_issues.contains("V-42")
+			and String(bad_pitch.get("status", "")) == "rejected" and pitch_issues.contains("V-42")
+			and String(bad_icon.get("status", "")) == "rejected" and icon_issues.contains("V-42"),
+		"%s %s %s %s" % [audience_issues, minutes_issues, pitch_issues, icon_issues],
+	)
+	_check(
+		"TC-META-001: the refusal names the field it is about",
+		audience_issues.contains("audience") and minutes_issues.contains("minutes")
+			and pitch_issues.contains("pitch") and icon_issues.contains("icon"),
+		"%s %s %s %s" % [audience_issues, minutes_issues, pitch_issues, icon_issues],
+	)
+
+	for plugin_id in ["sanguo", "xiuxian", "jianghu"]:
+		var shipped_meta := _shipped_meta(plugin_id)
+		_check(
+			"TC-META-001: %s declares a pitch in both languages and a length" % plugin_id,
+			MetaLayer.pitch(shipped_meta, "en") != "" and MetaLayer.pitch(shipped_meta, "zh-CN") != ""
+				and int(shipped_meta.get("minutes", 0)) > 0,
+			str(shipped_meta),
+		)
 
 
 func _case_content() -> void:
