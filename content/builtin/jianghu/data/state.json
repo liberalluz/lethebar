@@ -1,7 +1,0 @@
-{
-  "resources": [
-    {"id": "qi", "label": "气血", "init": 60, "min": 0, "max": 100},
-    {"id": "fame", "label": "声望", "init": 0, "min": 0, "max": 100},
-    {"id": "silver", "label": "银两", "init": 10, "min": 0, "max": 100}
-  ]
-}

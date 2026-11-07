@@ -13,7 +13,6 @@ const FIXTURE_DIR := "res://.test-tmp"
 ## packages under content/builtin/ are copied in as zips before the suite runs.
 const BUILTIN_PACKAGE := "res://builtin/sanguo.zip"
 const BUILTIN_XIUXIAN := "res://builtin/xiuxian.zip"
-const BUILTIN_JIANGHU := "res://builtin/jianghu.zip"
 const BUILTIN_DUEL := "res://builtin/duel.zip"
 
 var _failures: Array = []
@@ -39,7 +38,6 @@ func _initialize() -> void:
 	_case_proto_002()
 	_case_builtin_001()
 	_case_builtin_002()
-	_case_builtin_003()
 	_case_builtin_004()
 	_case_det_001()
 	_case_save_001()
@@ -703,7 +701,7 @@ func _skip(label: String, why: String) -> void:
 
 func _stories_staged(count: int) -> bool:
 	var staged := 0
-	for path in [BUILTIN_PACKAGE, BUILTIN_XIUXIAN, BUILTIN_JIANGHU, BUILTIN_DUEL]:
+	for path in [BUILTIN_PACKAGE, BUILTIN_XIUXIAN, BUILTIN_DUEL]:
 		if _staged(String(path)):
 			staged += 1
 	return staged >= count
@@ -2888,7 +2886,7 @@ func _case_collection() -> void:
 	# one-click path a repository with one theme has today (ADR-0012).
 	_section("TC-COLLECTION-001 a package says which world it belongs to")
 	var shell := _shell()
-	shell.builtin_ids = ["sanguo", "jianghu"]
+	shell.builtin_ids = ["sanguo", "xiuxian"]
 	_check(
 		"TC-COLLECTION-001: packs that share a world offer one world",
 		shell.worlds().size() == 2,
@@ -3139,84 +3137,6 @@ func _button_pressed_text(shell: Shell, prefix: String) -> Button:
 		if child is Button and String((child as Button).text).begins_with(prefix):
 			return child as Button
 	return null
-
-
-func _case_builtin_003() -> void:
-	if not _staged(BUILTIN_JIANGHU):
-		_skip("TC-BUILTIN-003", "the jianghu story is not staged")
-		return
-	# A third story, written only as data, proves the bricks carry a whole new
-	# kind of story: the ledger, the menu, the pool, the phase machine and the
-	# English table, with the engine untouched.
-	_section("TC-BUILTIN-003 Jianghu is played on the shipped bricks alone")
-	var package := FileAccess.get_file_as_bytes(BUILTIN_JIANGHU)
-	if package.is_empty():
-		_failures.append("staged package missing at %s; run infra/stage_builtin.py" % BUILTIN_JIANGHU)
-		return
-	var loader := PackageLoader.new()
-	var result := loader.import_bytes(package, _context())
-	_check(
-		"TC-BUILTIN-003: the package installs",
-		result["status"] == "installed",
-		"%s %s" % [String(result.get("code", "-")), String(result.get("message", ""))],
-	)
-	if result["status"] != "installed":
-		return
-	var shell := _shell()
-	shell.start_plugin("jianghu")
-	_check("TC-BUILTIN-003: the scene opens", shell.screen_name() == "session", shell.screen_name())
-	var labels := _button_labels(shell)
-	# Four actions plus Saves and Back to packs: the pack declares no choices.
-	# The waiting action carries its reason inside the label, so match its prefix.
-	var waiting := false
-	for label in labels:
-		if String(label).begins_with("Draw the old sword"):
-			waiting = true
-	_check(
-		"TC-BUILTIN-003: the scene draws one button per declared action",
-		labels.size() == 6 and labels.has("Search the back hill") and waiting,
-		str(labels),
-	)
-	_check(
-		"TC-BUILTIN-003: the first turn shows the first rank the package declared",
-		shell._status.text.contains("new to the road"),
-		shell._status.text,
-	)
-	var wield_before := _button_pressed_text(shell, "Draw the old sword")
-	_check(
-		"TC-BUILTIN-003: the action that waits on the item starts out unavailable",
-		wield_before != null and wield_before.disabled,
-		"disabled=%s" % str(wield_before.disabled if wield_before != null else "no button"),
-	)
-	shell.act("search")
-	_check(
-		"TC-BUILTIN-003: drawing from the pool tells the player what was found",
-		shell._status.text.contains("old_sword"),
-		shell._status.text,
-	)
-	var wield_after := _button_pressed_text(shell, "Draw the old sword")
-	_check(
-		"TC-BUILTIN-003: the drawn item unlocks the action that waits on it",
-		wield_after != null and not wield_after.disabled,
-		"disabled=%s" % str(wield_after.disabled if wield_after != null else "no button"),
-	)
-	var ended := {}
-	for step in range(12):
-		ended = shell.session.act("train")
-		if bool(ended.get("finished", false)):
-			break
-	_check(
-		"TC-BUILTIN-003: playing on ends the run with the failure reason the package declared",
-		bool(ended.get("finished", false)) and String(ended.get("failReason", "")) == "You are spent and turn back.",
-		"%s %s" % [str(ended.get("finished", false)), String(ended.get("failReason", ""))],
-	)
-	var english := Session.create(loader.registry.entry("jianghu"), {"start_counter": 1, "locale": "en"})
-	var english_view := english.start()
-	_check(
-		"TC-BUILTIN-003: an English session reads the English table",
-		String(english_view.get("text", "")).contains("last lamp in the inn"),
-		String(english_view.get("text", "")),
-	)
 
 
 func _case_builtin_004() -> void:
@@ -3764,8 +3684,8 @@ func _case_meta() -> void:
 		"%s %s %s %s" % [audience_issues, minutes_issues, pitch_issues, icon_issues],
 	)
 
-	if _stories_staged(3):
-		for plugin_id in ["sanguo", "xiuxian", "jianghu"]:
+	if _stories_staged(2):
+		for plugin_id in ["sanguo", "xiuxian"]:
 			var shipped_meta := _shipped_meta(plugin_id)
 			_check(
 				"TC-META-001: %s declares a pitch in both languages and a length" % plugin_id,
@@ -3774,7 +3694,7 @@ func _case_meta() -> void:
 				str(shipped_meta),
 			)
 	else:
-		_skip("TC-META-001", "the three stories are not staged")
+		_skip("TC-META-001", "the two stories are not staged")
 
 
 func _case_content() -> void:
