@@ -710,6 +710,23 @@ The four built-in stories are content, not contract. `app/tests/run_tests.gd` th
 
 With all four archives removed the suite reports `OK — 394 checks, 12 skipped`; with them staged it reports `OK — 526 checks, 0 skipped`. Defeating the guard and removing the archives gives twenty-six failures, which is what the guard is for.
 
+## 11.19 A link is a second way in
+
+`REQ-047`. The pack list offers two entries: a file, which the exporter injects
+as an `<input type="file">`, and a link, which asks for an address and the
+expected sha256.
+
+The socket lives in `app/render/downloader.gd`, not in `core`, because
+`TC-OFF-003` holds that no runtime source under `res://core` or
+`res://protocols` opens a network path. `PackageLoader.import_url` therefore
+takes a `Callable` and never a URL it can dial itself.
+
+Three outcomes are reported, and only three: `installed` when the digest
+matches, `already` when the id was already in the list, and `refused` when
+`V-01` (nothing arrived) or `V-43` (the digest disagreed) stopped the install.
+A refusal leaves the installed set untouched, and a link install without a
+digest is refused as `V-43` rather than installed unverified.
+
 ## 12. Requirement mapping
 
 | REQ | Design |
@@ -760,6 +777,7 @@ With all four archives removed the suite reports `OK — 394 checks, 12 skipped`
 | `REQ-044` | §11.15 the declared view, `ContentLayer`, `V-40`, `V-41` |
 | `REQ-045` | §11.16 the declared meta, `MetaLayer`, `V-42` |
 | `REQ-046` | §11.17 the artifact and the hash, `PackageLoader.import_url`, `V-43` |
+| `REQ-047` | §11.19 the link entry, `app/render/downloader.gd`, three outcomes |
 
 ## 13. Decisions and open questions
 
