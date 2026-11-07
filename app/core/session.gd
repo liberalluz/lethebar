@@ -43,6 +43,7 @@ var clock_per: String
 var used: Dictionary
 var fail_reason: String
 var hand_spec: Dictionary
+var content_spec: Dictionary
 var hand: Array
 var deck: Array
 var discard: Array
@@ -107,6 +108,8 @@ static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
 	# Dealt once from the declared order, so a save draws the same cards (REQ-036).
 	var hand_raw: Variant = data.get("hand", {})
 	session.hand_spec = Hand.defines(hand_raw) if hand_raw is Dictionary else {}
+	var content_raw: Variant = data.get("content", {})
+	session.content_spec = ContentLayer.defines(content_raw) if ContentLayer.declares(content_raw) else {}
 	if Hand.declared(session.hand_spec):
 		var dealt := Hand.deals(session.hand_spec)
 		session.hand = dealt["hand"]
@@ -739,9 +742,30 @@ func view() -> Dictionary:
 		out["rank"] = rank()
 		out["actions"] = menu()
 		out["failReason"] = fail_reason
+	if not content_spec.is_empty():
+		# How the story reads comes from the package, so a package that declares
+		# none keeps the payload shape it had before this rule (REQ-044).
+		out["content"] = content_layer_view()
 	var reading := situation()
 	if not reading.is_empty():
 		out["situation"] = reading
+	return out
+
+
+func content_layer_view() -> Dictionary:
+	## What the scene needs to honour the declared view, density, cast and arc.
+	## The arc stage is resolved here so the renderer never has to walk the table.
+	var out := {
+		"view": ContentLayer.view_of(content_spec),
+		"density": ContentLayer.density_of(content_spec),
+		"cast": ContentLayer.cast_line(content_spec, true),
+		"cast_names": ContentLayer.cast_line(content_spec, false),
+		"stage": ""
+	}
+	var stage := ContentLayer.arc_at(content_spec, turn)
+	if not stage.is_empty():
+		out["stage"] = String(stage.get("label", ""))
+		out["stageTurn"] = int(stage.get("turn", 0))
 	return out
 
 
@@ -830,6 +854,10 @@ func snapshot() -> Dictionary:
 		"drawn": drawn.duplicate(true),
 		"factions": factions.duplicate(true),
 	}
+	if not content_spec.is_empty():
+		# The declaration is part of the run, so a save that came from a layered
+		# session reads the same way when it is loaded (REQ-044).
+		out["content"] = content_spec.duplicate(true)
 	if Hand.declared(hand_spec):
 		# Only a package that dealt a hand carries the piles, so a story that
 		# never asked for one keeps the payload it always had (TC-DET-001).

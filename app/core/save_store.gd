@@ -90,6 +90,7 @@ func write(entry: Dictionary, slot: int, snapshot: Dictionary, preview: String =
 		# A run of several packages writes the list it was opened from, so the
 		# slot says what it needs rather than the screen guessing (REQ-041).
 		"assembly": snapshot.get("assembly", []).duplicate(),
+		"content": snapshot.get("content", {}).duplicate(true),
 		# The three piles of a hand travel with the run (REQ-036). A package
 		# without a hand writes three empty lists, which restores to what the
 		# package deals anyway.
@@ -164,6 +165,7 @@ func read(entry: Dictionary, slot: int) -> Dictionary:
 			"drawn": payload.get("drawn", []),
 			"factions": payload.get("factions", {}),
 			"assembly": payload.get("assembly", []),
+		"content": payload.get("content", {}),
 			"hand": payload.get("hand", []),
 			"deck": payload.get("deck", []),
 			"discard": payload.get("discard", []),
@@ -215,6 +217,11 @@ func resume(entry: Dictionary, payload: Dictionary, options: Dictionary = {}) ->
 	session.drawn = payload.get("drawn", []) if payload.get("drawn", null) is Array else []
 	session.restore_pools(payload.get("pools", {}))
 	session.restore_factions(payload.get("factions", {}))
+	var saved_content: Variant = payload.get("content", {})
+	if ContentLayer.declares(saved_content):
+		# A save made by a session that declared how it reads resumes with the same
+		# declaration, not with the one the package happens to declare today (REQ-044).
+		session.content_spec = ContentLayer.defines(saved_content)
 	session.restore_cards({
 		"hand": payload.get("hand", []),
 		"deck": payload.get("deck", []),

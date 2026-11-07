@@ -189,6 +189,8 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-33` | a package named in the assembly is not installed |
 | `V-34` | A layer names a target the assembly does not contain, sits on itself, closes a chain, or a package is named twice. | fatal |
 | `V-35` | Two layers in one assembly write the same field of the same target. | fatal |
+| `V-40` | A `content` block names a view or a density the engine does not know. |
+| `V-41` | The cast repeats an id or carries an empty name, or the arc's turns do not ascend and stay unique. |
 | `V-36` | a package that names `cards.hand@1` ships a `data/cards.json` with a `hand` and a `deck` | reject |
 | `V-37` | every card's `cost` and `effects` name resources the ledger declares | reject |
 | `V-38` | every card id in the deck is declared in the package's `cards` table | reject |
@@ -686,6 +688,10 @@ the second layer writes after the first is refused with `V-35`, naming both
 layers, the kind of field and its id. The check runs before the run opens, so
 the conflict is reported at the assembly rather than discovered mid-run.
 
+## 11.15 How a story reads is declared by the package
+
+A package may carry a `content` block in its manifest: the view a story is told from (`first`, `third`, `ensemble`), how much the readout shows (`sparse`, `normal`, `dense`), the cast with an id, a name and an optional role, and an arc of labelled turns. `ContentLayer` normalises the block at install time and the session carries it into the view, where the scene reads it: the ensemble view keeps the roles, the dense readout names the arc stage and the turn that started it, and the sparse readout drops the situation line. `V-40` refuses a view or a density the engine does not know, naming the field and the value; `V-41` refuses a cast with a repeated id or an empty name, and an arc whose turns are not ascending and unique. The declaration travels in the save, so a resumed run reads the way the saved one did.
+
 ## 12. Requirement mapping
 
 | REQ | Design |
@@ -733,6 +739,7 @@ the conflict is reported at the assembly rather than discovered mid-run.
 | `REQ-041` | §11.12 the assembly, `PackageLoader.assemble()`, `Session._merge_package()`, `V-33` |
 | `REQ-042` | §11.13 the layer, `PackageLoader.assemble()`, `Session._apply_layer()`, `V-34` |
 | `REQ-043` | §11.14 the declared target, `ManifestSchema.format_issues()`, `PackageLoader._layer_conflict()`, `V-35` |
+| `REQ-044` | §11.15 the declared view, `ContentLayer`, `V-40`, `V-41` |
 
 ## 13. Decisions and open questions
 

@@ -79,6 +79,7 @@ func _initialize() -> void:
 	_case_collection()
 	_case_assembly()
 	_case_layers()
+	_case_content()
 	_case_wire3()
 	_case_limits()
 	_case_boot()
@@ -3561,6 +3562,159 @@ func _layer_with_target(name: String, target: String, ledger: bool = true, actio
 			"actions": [{"id": action_id, "label": "Drill", "per_turn": 1, "effects": [{"grain": {"add": 1}}]}],
 		}, "\t").to_utf8_buffer()
 	return _package(name, overrides, [], [], {}, {}, files)
+
+
+func _content_package(name: String, content: Dictionary) -> PackedByteArray:
+	## A story that declares how it reads (REQ-044). The phase machine gives it a
+	## turn, so the arc has something to resolve against.
+	var overrides := {
+		"id": name,
+		"capabilities": ["ledger@1", "phases@1"],
+		"mechanics": ["ledger", "phases"],
+		"content": content,
+	}
+	var files := {
+		"data/state.json": JSON.stringify({
+			"resources": [{"id": "grain", "init": 10.0, "min": 0.0, "max": 20.0, "label": "粮"}],
+		}, "\t").to_utf8_buffer(),
+		"data/actions.json": JSON.stringify({
+			"actions": [{"id": "farm", "label": "Farm", "per_turn": 9, "effects": [{"grain": {"add": 1}}]}],
+		}, "\t").to_utf8_buffer(),
+		"data/phases.json": JSON.stringify({
+			"turns": 9,
+			"ranks": [{"at": 1, "title": "novice"}],
+		}, "\t").to_utf8_buffer(),
+	}
+	return _package(name, overrides, [], [], {}, {}, files)
+
+
+func _case_content() -> void:
+	## TC-CONTENT-001: the package says how its story reads. The engine honours a
+	## view, a density, a cast and an arc it knows, refuses the ones it does not,
+	## and carries the declaration through a save (REQ-044).
+	var loader := PackageLoader.new()
+	var context := {"engine_version": "4.7.2", "work_dir": FIXTURE_DIR}
+	var plain: Dictionary = loader.import_bytes(_content_package("con-plain", {}), context)
+	var third: Dictionary = loader.import_bytes(
+		_content_package("con-third", {
+			"view": "third",
+			"density": "normal",
+			"cast": [{"id": "guan", "name": "Guan", "role": "captain"}],
+			"arc": [{"turn": 1, "label": "opening"}, {"turn": 3, "label": "middle"}],
+		}),
+		context,
+	)
+	_check(
+		"TC-CONTENT-001: a package with and without a declaration both install",
+		String(plain.get("status", "")) == "installed" and String(third.get("status", "")) == "installed",
+		"%s %s" % [plain.get("code", ""), third.get("code", "")],
+	)
+	if String(third.get("status", "")) != "installed":
+		return
+
+	var quiet := Session.create(loader.registry.entry("con-plain"), {})
+	_check(
+		"TC-CONTENT-001: a package that declares nothing keeps the old view",
+		not quiet.view().has("content"),
+		str(quiet.view().keys()),
+	)
+
+	var declared := Session.create(loader.registry.entry("con-third"), {})
+	var view := declared.view()
+	var block: Dictionary = view.get("content", {})
+	_check(
+		"TC-CONTENT-001: the declared view, density, cast and stage reach the view",
+		String(block.get("view", "")) == "third"
+			and String(block.get("density", "")) == "normal"
+			and String(block.get("cast", "")).contains("Guan (captain)")
+			and String(block.get("cast_names", "")) == "Guan"
+			and String(block.get("stage", "")) == "opening",
+		str(block),
+	)
+
+	var shell := _shell()
+	var sparse := declared.view()
+	sparse["content"] = (sparse["content"] as Dictionary).duplicate(true)
+	sparse["content"]["density"] = "sparse"
+	sparse["situation"] = {"turnsLeft": 4}
+	_check(
+		"TC-CONTENT-001: the sparse density hides the situation line",
+		not shell._readout(sparse).contains("turns left"),
+		shell._readout(sparse),
+	)
+	var dense := declared.view()
+	dense["content"] = (dense["content"] as Dictionary).duplicate(true)
+	dense["content"]["density"] = "dense"
+	_check(
+		"TC-CONTENT-001: the dense density names the stage and its turn",
+		shell._readout(dense).contains("arc: opening (from turn 1)"),
+		shell._readout(dense),
+	)
+
+	var before := ContentLayer.arc_at(ContentLayer.defines({
+		"arc": [{"turn": 3, "label": "middle"}],
+	}), 2)
+	var after := ContentLayer.arc_at(ContentLayer.defines({
+		"arc": [{"turn": 3, "label": "middle"}],
+	}), 5)
+	_check(
+		"TC-CONTENT-001: the arc says nothing before its first stage and holds the last one",
+		before.is_empty() and String(after.get("label", "")) == "middle",
+		"%s %s" % [str(before), str(after)],
+	)
+
+	var bad_view: Dictionary = loader.import_bytes(
+		_content_package("con-bad-view", {"view": "second"}),
+		context,
+	)
+	var bad_density: Dictionary = loader.import_bytes(
+		_content_package("con-bad-density", {"density": "dense-ish"}),
+		context,
+	)
+	var view_issues := JSON.stringify(bad_view.get("issues", []))
+	var density_issues := JSON.stringify(bad_density.get("issues", []))
+	_check(
+		"TC-CONTENT-001: a view or a density the engine does not know is refused with V-40",
+		String(bad_view.get("status", "")) == "rejected" and view_issues.contains("V-40")
+			and String(bad_density.get("status", "")) == "rejected" and density_issues.contains("V-40"),
+		"%s %s" % [view_issues, density_issues],
+	)
+
+	var bad_cast: Dictionary = loader.import_bytes(
+		_content_package("con-bad-cast", {
+			"cast": [{"id": "guan", "name": "Guan"}, {"id": "guan", "name": "Guan again"}],
+		}),
+		context,
+	)
+	var bad_arc: Dictionary = loader.import_bytes(
+		_content_package("con-bad-arc", {
+			"arc": [{"turn": 5, "label": "late"}, {"turn": 3, "label": "early"}],
+		}),
+		context,
+	)
+	var cast_issues := JSON.stringify(bad_cast.get("issues", []))
+	var arc_issues := JSON.stringify(bad_arc.get("issues", []))
+	_check(
+		"TC-CONTENT-001: a repeated cast id and a falling arc are refused with V-41",
+		String(bad_cast.get("status", "")) == "rejected" and cast_issues.contains("V-41")
+			and String(bad_arc.get("status", "")) == "rejected" and arc_issues.contains("V-41"),
+		"%s %s" % [cast_issues, arc_issues],
+	)
+
+	MemoryBackend.reset()
+	var store := SaveStore.new(MemoryBackend.new())
+	declared.start()
+	declared.act("farm")
+	var payload := declared.snapshot()
+	var saved := store.write(loader.registry.entry("con-third"), 1, payload, "con-third")
+	_check("TC-CONTENT-001: the declared story saves", String(saved.get("code", "")) == "", str(saved.get("code", "")))
+	var loaded := store.read(loader.registry.entry("con-third"), 1)
+	var resumed := store.resume(loader.registry.entry("con-third"), loaded.get("payload", {}), {"locale": "en"})
+	_check(
+		"TC-CONTENT-001: the declaration comes back with the resumed run",
+		resumed != null and String((resumed.view().get("content", {}) as Dictionary).get("view", "")) == "third",
+		str(resumed.view().get("content", {})) if resumed != null else "null",
+	)
 
 
 func _case_wire3() -> void:

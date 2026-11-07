@@ -790,3 +790,10 @@ one `W-05` and keeps the first value.
   assembly target wins over the manifest; two layers writing different fields
   both apply; two layers writing the same field return `V-35` naming both; the
   reloaded run keeps the same menu and assembly.
+
+## TC-CONTENT-001 — how a story reads is declared
+
+- Covers: `REQ-044`
+- Fixture: `con-plain` (no `content`), `con-third` (`view: third`, `density: normal`, one cast member, a two-stage arc), `con-bad-view`, `con-bad-density`, `con-bad-cast`, `con-bad-arc`
+- Steps: install all four; open the plain and the declared package; take a turn; read the view; render the sparse and the dense readout; ask the arc for a turn before and after its first stage; import the four refused packages; save and resume the declared package
+- Exit: the plain view has no `content`, the declared view carries view/density/cast/stage, the sparse readout has no "turns left", the dense one names "arc: opening (from turn 1)", the arc is empty before its first stage and holds "middle" after it, `V-40` and `V-41` are reported with their codes, and the resumed run still reads `third`

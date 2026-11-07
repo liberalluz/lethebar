@@ -4,7 +4,7 @@ English · [简体中文](STP.zh-CN.md)
 
 ## Scope
 
-Covers the forty-three P1 requirements
+Covers the forty-four P1 requirements
 `SDD.md`. Does not cover the plugin market, the plugin editor, 3D, multiplayer,
 accounts, cloud saves, or the native iOS build; those are out of scope for
 v0.0.0 and have no tests here by design.
@@ -86,6 +86,7 @@ claims: if they fail, the architecture claim fails, not just a feature.
 | `TC-ASSEMBLY-001` | `REQ-041` | Two packages in one session show both sets of resources, the menu carries both sets of actions, a missing package is refused, a shared key keeps the first value with one warning, and a resume rebuilds both |
 | `TC-WIRE-002` | `REQ-042` | A layer overrides a declared resource, appends an action and disables a name; the base without the layer is untouched; a target outside the assembly, a layer on itself, two layers closing a chain and a package named twice are refused. |
 | `TC-WIRE-003` | `REQ-043` | A layer declares its target in its manifest and the assembly carries it; a layer that omits the target and a bundle that declares one are both refused at install; two layers writing the same field are refused with `V-35` naming both, two writing different fields both apply, and a saved layered run comes back with the same assembly. |
+| `TC-CONTENT-001` | `REQ-044` | A package that declares nothing keeps the old view; the declared view, density, cast and stage reach the view; the sparse density hides the situation line and the dense one names the stage and its turn; the arc says nothing before its first stage and holds the last one; an unknown view or density is refused with `V-40`; a repeated cast id and a falling arc are refused with `V-41`; the declaration comes back with the resumed run. |
 | `TC-CARDS-001` | `REQ-036` | A package that declares a hand deals it, a card spends its cost and applies its effect as one turn, an unaffordable card is refused by name and stays in the hand, the three piles survive a save and a resume, and a deck naming an undeclared card, a card naming an undeclared resource and a claimed `cards.hand@1` without a deck file are refused at install with `V-38`, `V-37` and `V-36`. |
 | `TC-CARDS-002` | `REQ-037` | A card that names a texture its package declares shows that picture beside its label and reports it in the view, a card that names none is drawn without a picture, a declared texture whose bytes do not decode keeps the label and leaves one warning, and a card naming an icon no texture asset declares is refused at install with `V-39` naming the missing path. |
 | `TC-HAND-001` | `REQ-038` | A hand of eight wraps into rows inside the window, every card is laid out once, a wider window needs fewer rows, and a short hand keeps its whole label. |

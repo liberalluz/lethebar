@@ -69,7 +69,7 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 
 	var manifest: Dictionary = manifest_variant
 	var node_ids: Array = []
-	var data := {"nodes": [], "mechanics": {}, "assets": {}, "i18n": {}, "ledger": {}, "rules": [], "actions": [], "phases": {}, "checks": [], "pools": [], "factions": {}, "hand": {}}
+	var data := {"nodes": [], "mechanics": {}, "assets": {}, "i18n": {}, "ledger": {}, "rules": [], "actions": [], "phases": {}, "checks": [], "pools": [], "factions": {}, "hand": {}, "content": {}}
 
 	if files.has(NODES_PATH):
 		var nodes_variant: Variant = JSON.parse_string(reader.read_file(NODES_PATH).get_string_from_utf8())
@@ -127,6 +127,8 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 		var cards_variant: Variant = JSON.parse_string(reader.read_file(CARDS_PATH).get_string_from_utf8())
 		if cards_variant is Dictionary:
 			data["hand"] = cards_variant
+	var content_variant: Variant = manifest.get("content", {})
+	data["content"] = content_variant if content_variant is Dictionary else {}
 	# A layer removes entries by name instead of replacing the list that holds
 	# them (ADR-0013), so the names it wants gone travel in their own file.
 	if files.has(DISABLE_PATH):
@@ -186,6 +188,7 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 	check_context["pools"] = data["pools"]
 	check_context["factions"] = data["factions"]
 	check_context["hand"] = data["hand"]
+	check_context["content"] = data["content"]
 	check_context["installed"] = registry.versions()
 	check_context["collections"] = registry.collections()
 	if not check_context.has("protocols"):
