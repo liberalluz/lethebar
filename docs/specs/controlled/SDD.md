@@ -188,6 +188,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-31` | a rule's relation change names entities the package declared and carries an `add` or `value` number | reject |
 | `V-33` | a package named in the assembly is not installed |
 | `V-34` | A layer names a target the assembly does not contain, sits on itself, closes a chain, or a package is named twice. | fatal |
+| `V-35` | Two layers in one assembly write the same field of the same target. | fatal |
 | `V-36` | a package that names `cards.hand@1` ships a `data/cards.json` with a `hand` and a `deck` | reject |
 | `V-37` | every card's `cost` and `effects` name resources the ledger declares | reject |
 | `V-38` | every card id in the deck is declared in the package's `cards` table | reject |
@@ -670,6 +671,21 @@ The target is resolved at assembly time, not in the manifest, because
 sits on itself, a chain that returns to a package it already touched, and a
 package named twice are all refused with `V-34` before a run opens.
 
+## 11.14 A layer says what it edits
+
+A layer package names its target in its own manifest (REQ-043). The format
+requires a `target` on a package whose `kind` is `layer`, and refuses a
+`target` on any other kind with `V-23`, because a target on a bundle would
+read as a layer that forgot to say so. An assembly entry may still carry a
+`target`; when it does and the manifest disagrees, the assembly wins, so a
+tester can point the same layer at a different base without editing the
+package.
+
+Two layers over the same target are resolved in assembly order, and a field
+the second layer writes after the first is refused with `V-35`, naming both
+layers, the kind of field and its id. The check runs before the run opens, so
+the conflict is reported at the assembly rather than discovered mid-run.
+
 ## 12. Requirement mapping
 
 | REQ | Design |
@@ -716,6 +732,7 @@ package named twice are all refused with `V-34` before a run opens.
 | `REQ-040` | §11.11 the world a package declares, `ManifestSchema.collection_of()`, `V-32`, `W-04`, `Shell.worlds()` |
 | `REQ-041` | §11.12 the assembly, `PackageLoader.assemble()`, `Session._merge_package()`, `V-33` |
 | `REQ-042` | §11.13 the layer, `PackageLoader.assemble()`, `Session._apply_layer()`, `V-34` |
+| `REQ-043` | §11.14 the declared target, `ManifestSchema.format_issues()`, `PackageLoader._layer_conflict()`, `V-35` |
 
 ## 13. Decisions and open questions
 

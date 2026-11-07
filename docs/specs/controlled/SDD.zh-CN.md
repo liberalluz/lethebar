@@ -175,6 +175,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-31` | 规则里的关系变化点名包裹声明过的实体，并带 `add` 或 `value` 数字 | 拒绝 |
 | `V-33` | 装配里点名的包没有安装 |
 | `V-34` | 层的目标不在装配内、指向自身、链成环，或同一个包被命名两次。 | fatal |
+| `V-35` | 同一次装配里两个层写了同一个目标的同一个字段。 | fatal |
 | `V-36` | 声明 `cards.hand@1` 的包裹带有 `hand` 与 `deck` 的 `data/cards.json` | 拒绝 |
 | `V-37` | 每张牌的 `cost` 与 `effects` 都点名账本声明过的资源 | 拒绝 |
 | `V-38` | 牌库里的每个牌 id 都在包裹的 `cards` 表里声明过 | 拒绝 |
@@ -554,6 +555,17 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 哪一层（ADR-0007）。目标不在同一装配里、层指向自身、链回到已经走过的包、同一个包
 出现两次，都在开局前以 `V-34` 拒绝。
 
+## 11.14 层包说明它改哪个包
+
+层包在自己的 manifest 里写明目标（REQ-043）。`kind` 是 `layer` 的包必须有
+`target`；别的 `kind` 带了 `target` 会被 `V-23` 拒掉，因为包上的目标读起来就是
+一个忘了声明自己是层的包。装配条目仍然可以带 `target`；两者不一致时以装配为准，
+这样测试者可以让同一个层指向另一个基座，而不必改包。
+
+同一个目标上的两个层按装配顺序解析；第二个层写第一个层写过的字段时，以 `V-35`
+拒绝，并点名两个层、字段的种类和 id。这项检查在开局前跑完，所以冲突在装配处报告，
+而不是玩到中途才发现。
+
 ## 12. 需求映射
 
 | REQ | 设计 |
@@ -598,7 +610,7 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 | `REQ-040` | §11.11 包裹声明的世界，`ManifestSchema.collection_of()`，`V-32`、`W-04`、`Shell.worlds()` |
 | `REQ-041` | §11.12 装配，`PackageLoader.assemble()`、`Session._merge_package()`、`V-33` |
 | `REQ-042` | §11.13 层包，`PackageLoader.assemble()`，`Session._apply_layer()`，`V-34` |
-| `REQ-040` | §11.11 包裹声明的世界，`ManifestSchema.collection_of()`，`V-32`、`W-04`、`Shell.worlds()` |
+| `REQ-043` | §11.14 声明的目标，`ManifestSchema.format_issues()`，`PackageLoader._layer_conflict()`，`V-35` |
 | `REQ-034` | §10.1 三国的一局、`content/builtin/sanguo/**` 的数据 |
 | `REQ-031` | §11.4 首访提示、`infra/export_web.py` 的缓存探针 |
 

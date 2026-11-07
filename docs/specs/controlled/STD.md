@@ -766,3 +766,27 @@ one `W-05` and keeps the first value.
 - Exit: the layered run carries the 0..99 bound, the menu holds only `drill`,
   and the assembly records `lay-base` then `lay-mod`; the base alone still holds
   `farm` and the 0..20 bound; each of the four bad assemblies returns `V-34`.
+
+## TC-WIRE-003 — a layer names the package it edits
+
+- Covers: `REQ-043`
+- Fixture: `w3-base` (a bundle with `grain` 10/0..20, one action `farm`, one node),
+  `w3-mod` (a layer whose manifest declares `target: w3-base`, raising the bound to
+  99 and appending `drill`), `w3-orphan` (a layer with no target), `w3-bundle`
+  (a bundle that declares a target), and `w3-neighbour` (a second layer over the
+  same base appending `scout`).
+1. Install all five packages and read what the install said about each.
+2. Open the base alone and read its bound and its menu.
+3. Assemble `w3-base` plus `w3-mod` by id only, and read the bound, the menu and
+   the recorded assembly order.
+4. Assemble the same pair naming `w3-mod` with an explicit different target, and
+   read which target the entry kept.
+5. Assemble `w3-base` with `w3-mod` and `w3-neighbour` twice over: once as they
+   are, once after pointing `w3-neighbour` at a field `w3-mod` already wrote.
+6. Save the layered run, reload it and read the menu and the assembly.
+- Exit: `w3-base` and `w3-mod` install and the other three are refused with
+  `V-23` or `V-33`; the base alone holds 0..20 and `farm`; the layered run holds
+  0..99 and `farm` plus `drill` and records `w3-base` then `w3-mod`; the explicit
+  assembly target wins over the manifest; two layers writing different fields
+  both apply; two layers writing the same field return `V-35` naming both; the
+  reloaded run keeps the same menu and assembly.
