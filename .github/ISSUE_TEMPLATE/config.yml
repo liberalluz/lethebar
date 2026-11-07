@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security
-    url: https://github.com/liberal/lethebar/security/policy
+    url: https://github.com/liberalluz/lethebar/security/policy
     about: Report vulnerabilities privately
+  - name: Ask for a capability
+    url: https://github.com/liberalluz/lethebar/issues/new?template=capability_request.yml
+    about: Engine behaviour a package needs, answered against the five tests

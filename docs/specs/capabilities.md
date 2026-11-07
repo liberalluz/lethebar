@@ -65,10 +65,50 @@ that changes `SDD.md` §4.2 (or the equivalent section) and this table. If the
 addition changes what an existing capability guarantees, it is a new major
 version and an ADR, not an edit here.
 
-Two rules keep the list honest:
+Anyone can ask for one. The request is the form in
+`.github/ISSUE_TEMPLATE/capability_request.yml`; it asks for six things, because a
+request that cannot answer them is a wish rather than a contract:
 
-- **One capability serves more than one package, or it is content.** If only one
-  story could ever use it, it is a table in that story's data, not engine code.
-- **A capability the engine does not provide does not appear as implemented.**
-  A package that needs it is refused by name; a package that omits it keeps
-  working.
+| Field | Why it is asked |
+| --- | --- |
+| what you want to happen | the player-visible behaviour, not the API |
+| why data cannot express it | if a table can, the answer is a table |
+| the smallest engine surface | one capability, not a framework |
+| who else would use it | one package is content wearing an engine costume |
+| what you do if it is refused | a fallback that keeps the request honest |
+| a package that would use it | a request with no package cannot be checked |
+
+### Five tests a request has to pass
+
+1. **Data cannot express it.** If a table, a condition or a rule can produce the
+   behaviour, the answer is content, and the request is closed as content.
+2. **A second consumer exists, or is named.** A capability with one package is a
+   table in that package. The request names the second author, the second genre, or
+   the reason the second is certain rather than hoped for.
+3. **It is world-agnostic.** No officer, no realm, no named place, no story's
+   vocabulary. "The three kingdoms' morale rule" is content; "a resource that
+   decays each turn unless a table raises it" is a capability.
+4. **It does not break what exists.** An existing package keeps installing and
+   playing. Growing a capability compatibly keeps its major version; changing what
+   it guarantees starts a new one and needs an ADR.
+5. **The cost is paid once.** The engine gains the behaviour; every world uses it
+   without a second implementation. A capability that only moves complexity from
+   one package into another is not accepted.
+
+### Three answers, each written down
+
+- **Accepted.** The request becomes a batch: this table gains a row with the batch
+  that will prove it, the batch adds the behaviour, and the acceptance case is the
+  one the request named.
+- **Deferred.** The request stays open with the condition that would revive it —
+  a second consumer appearing, a format change landing, a world asking twice. It
+  goes in `capabilities.md` under Planned with "not scheduled" and that condition,
+  so nobody has to remember it.
+- **Refused.** The answer says which of the five tests failed and what would change
+  it. A refusal is written where the request is, not in a conversation, because the
+  next person will ask the same thing.
+
+The list stays honest by the same two rules it always had: one capability serves
+more than one package, or it is content; and a capability the engine does not
+provide never appears as implemented — a package that needs it is refused by name,
+and a package that omits it keeps working.

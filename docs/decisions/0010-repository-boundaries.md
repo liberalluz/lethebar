@@ -3,6 +3,11 @@
 Amended: 2026-11-06 — repositories are cut by world, not by genre; a genre
 repository holds material, never a runtime.
 
+Amended: 2026-11-07 — a package has three axes rather than one field; the
+marketplace holds an index and a review record and never the packages themselves;
+and no author repository may hold engine code, which is a narrower rule than "no
+code" and a wider one than "no files that the engine reads".
+
 ## Context
 
 This repository contains the engine (`app/`), the contracts (`docs/specs/`), the
@@ -39,17 +44,51 @@ lethebar-game-sanguo/
 The packages share the tables, so a corrected officer number is corrected once.
 One CI builds all three. Three packages, one repository, one version number.
 
+### The three axes of a package
+
+`kind` is not a taxonomy of packages; it is one of three axes that answer
+different questions, and collapsing them into one list is how the earlier drafts
+of this record went wrong.
+
+| Axis | Values | The question it answers |
+| --- | --- | --- |
+| form | `bundle`, `layer` | is this a whole game, or a patch over another package? |
+| dimension | `profession`, `genre`, `mod`, `content`, `meta`, `assets` | which part of the game does it fill? |
+| trust | `data-only@1`, `scripted@1` | may it run code, and under what conditions? (`ADR-0009`) |
+
+A `bundle` is the case where one package fills all six dimensions at once: a
+world's story that is playable on its own. It is a form, not a fourth axis, and a
+`bundle` author is not a different kind of contributor from a `layer` author.
+
+The six dimensions in plain words, because the field names do not explain
+themselves to someone who has not read the code:
+
+| Dimension | In plain words |
+| --- | --- |
+| `profession` | what the world is: its factions, its realms, its ranks |
+| `genre` | how the player takes part: read and choose, a turn of orders, a hand of cards |
+| `mod` | a patch that changes a number or a cost another layer declared, never a story |
+| `content` | how this story is told: person, density, who appears, how it is divided |
+| `meta` | the few lines on the cover: audience, length, one sentence, icon |
+| `assets` | the pictures, sounds and text files a pack brings with it |
+
 ### Two kinds of author repository
 
 A genre is a **capability**, and a capability lives in the engine (`ADR-0008`).
 What a genre needs in a repository is not a runtime but the material that teaches
 someone to write a package of that genre.
 
-| Repository | Holds | Who it serves | Installable |
-| --- | --- | --- | --- |
-| `lethebar-game-<world>` | `shared/` and `packs/*`: worlds, art, translations | players | yes, each pack |
-| `lethebar-genre-<genre>` | `example/`, `template/`, `acceptance/`, `notes.md` | authors | the example only |
-| `lethebar-mod-<family>` | `mods/*`, each with `kind: mod` and a `layer` target | players, after `ADR-0013` | yes, as a variant |
+| Repository | Holds | Who it serves | Installable | Must never hold |
+| --- | --- | --- | --- | --- |
+| `lethebar-game-<world>` | `shared/` and `packs/*`: worlds, art, translations | players | yes, each pack | engine code, an executable entry point at the root |
+| `lethebar-genre-<genre>` | `example/`, `template/`, `acceptance/`, `notes.md` | authors | the example only | engine code, a copy of another world's content |
+| `lethebar-mod-<family>` | `mods/*`, each with `kind: layer`, `layer: mod` and a `target` | players, after `ADR-0013` | yes, as a variant | engine code, content of its own |
+| `lethebar-marketplace` | the index and the review record: every published version, every withdrawal, every decision | players and authors | nothing | any package archive, any engine code |
+
+The marketplace is the one repository whose job is to point at artifacts it does
+not contain: a release asset lives in the repository that built it, and the index
+records its hash so a download can be checked. It is opened when a third author
+wants to publish without a maintainer copying files by hand, not on a schedule.
 
 A world repository may also carry built-in packs of several genres — that is the
 normal case, not an exception. A genre repository is opened when a **second
@@ -58,8 +97,18 @@ template; opening it earlier means maintaining a tutorial nobody reads.
 
 ### Three hard lines
 
-1. **No code in either repository.** `app/core` and `app/render` are the engine
-   (`ADR-0009`). A repository that grows a `.gd` file has started a second engine.
+1. **No engine code in an author repository.** `app/core` and `app/render` are the
+   engine (`ADR-0009`); a repository that carries a copy of them, or a patched
+   `.gd` that expects them, has started a second engine. Two narrower rules follow
+   from that, and they are not the same rule:
+   - a **script inside a pack** is allowed, but only under `packs/<id>/`, only in a
+     package that declares the `scripted` trust, and only under the conditions
+     `ADR-0009` sets (signed, confirmed by the player, reviewed on its own lane) —
+     the engine is not extended to run it, it is asked to run it;
+   - an **executable entry point at the repository root** — a build script that
+     boots the game, a launcher, a copy of the export presets — is a violation
+     even when it contains no `.gd` file, because it makes the repository look
+     runnable when only the engine is.
 2. **The capability comes first.** A genre repository can only teach what the
    engine already provides; a package that names a capability the engine lacks is
    refused at install (`V-27`).
@@ -91,7 +140,7 @@ are recorded in `ADR-0014`.
 | `lethebar-game-<world>` | a world: shared tables and one pack per genre it ships |
 | `lethebar-genre-<genre>` | material for one genre: example, template, acceptance list |
 | `lethebar-mod-<family>` | a family of mods over the same targets (after `ADR-0013`) |
-| `lethebar-marketplace` | the index a player or author can browse (later) |
+| `lethebar-marketplace` | the index and the review record; it never hosts a package (later) |
 
 A repository name is for people; a package id is for the engine. `lethebar-game-sanguo`
 may ship `liberalluz.sanguo-cards`; the two are deliberately unrelated, so a package can
@@ -118,7 +167,33 @@ the day someone wants to merge it back.
 **Order:** the world repository first — `lethebar-game-sanguo`, because it has the
 most content and therefore proves the multi-genre layout. `lethebar-game-xiuxian`
 follows. Genre material repositories open only when a second author appears; mod
-repositories only after the assembly layer lands.
+repositories only after the assembly layer lands; the marketplace only when a
+third author wants to publish without a maintainer copying files by hand.
+
+None of these opens on a schedule. A repository created before its condition holds
+is a maintenance cost with no reader, and moving content back out of it later costs
+more than waiting did.
+
+### Three misreadings
+
+Three readings of this record keep coming up, so they are answered here rather
+than in a discussion thread.
+
+1. **"The marketplace is where packages are stored."** It is an index plus a
+   review record. The archive stays in the release of the repository that built
+   it; the index stores its hash so a download can be checked, and stores the
+   decision that admitted it. Hosting the archives would make the marketplace a
+   second distribution path that has to be kept in step with the first.
+2. **"The index has a handful of fields."** It has fourteen per version — id,
+   version, sha256, specVersion, engine, capabilities, author, license, homepage,
+   tags, collection, layer, publishedAt, status — and a version, once published,
+   is never rewritten; a correction is a new version. `ADR-0011` is the authority
+   on those fields; this record only says where the file lives.
+3. **"A genre repository is a folder inside a world repository."** It is a
+   separate repository holding material — an example, a template, an acceptance
+   list, notes — for authors. Worlds copy the template once and own the copy. A
+   world's own packages may cover several genres; that does not make the world's
+   repository a genre repository.
 
 ## Consequences
 
