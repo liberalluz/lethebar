@@ -21,6 +21,7 @@ process/<topic>      process/tooling only
 ```
 
 Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `ci`.
+A batch card's `type` uses the same seven values; `process` is not one of them.
 Scopes: pick exactly one from the closed list below.
 
 | Scope | Covers |
@@ -96,7 +97,9 @@ Scopes: pick exactly one from the closed list below.
 - Version lives in the declared manifest.
 - Tag: `vX.Y.Z`.
 - `CHANGELOG.md` must have the matching version before tagging.
-- Content packs use `pack/<space>/vX.Y.Z` when tagged.
+- A pack's version lives in its manifest, and each pack is tagged on its own:
+  `pack/<id>/vX.Y.Z`. A repository version covers what that repository holds and
+  is bookkeeping only; it is not the version of the packs inside it.
 
 ## 6. Language
 

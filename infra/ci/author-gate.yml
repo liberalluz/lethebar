@@ -1,3 +1,6 @@
+# This file is a template. Copy it to <world>/.github/workflows/gate.yml.
+# Do not enable it here: this repository has no .github/workflows/ on purpose,
+# and the steps below expect an engine checkout at ../engine or ./engine.
 # A gate for a repository that publishes packs and nothing else.
 #
 # Copy this file to `.github/workflows/gate.yml` in a `lethebar-game-<world>` or
