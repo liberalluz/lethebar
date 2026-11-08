@@ -78,6 +78,47 @@ An empty `choices` list is how a story ends. The engine does not need a flag for
 `templates/pack-turn/` is the same story with the other protocol: one node, no choices, a menu
 under it, and three more data files — see [the eight bricks](bricks.md).
 
+## A bundle and a layer, side by side
+
+A layer is a pack of the same shape whose manifest names what it changes. The
+smallest one, in full, against the bundle above:
+
+```json
+{
+  "id": "sanguo-content",
+  "version": "1.0.0",
+  "specVersion": "2.0.0",
+  "kind": "layer",
+  "layer": "content",
+  "target": "sanguo",
+  "requires": ["sanguo"],
+  "engine": ">=4.7.0 <5.0.0",
+  "name": "Three Kingdoms, in the first person",
+  "defaultLocale": "en",
+  "protocol": "linear@1",
+  "capabilities": ["text@1"],
+  "mechanics": [],
+  "entry": "placeholder",
+  "saveSchema": 1,
+  "assets": [],
+  "content": { "view": "first", "density": "sparse", "cast": [], "arc": [] }
+}
+```
+
+Three questions tell the two apart, in this order:
+
+1. **Does it start a run on its own?** Only a `bundle` does. If the answer is no,
+   the pack is a layer.
+2. **Which dimension of another pack does it fill?** That is `layer`:
+   `profession`, `genre`, `mod`, `content`, `meta` or `assets`.
+3. **Which pack is that?** That is `target`, and it is the id of a bundle the
+   player has to install as well.
+
+A layer still repeats the fields a bundle needs — `protocol`, `mechanics`,
+`entry`, `saveSchema`, `assets` — even though most of them are ignored when it
+is merged. That is today's shape, not the intended one; the last page of
+[the guide](README.md) lists what is still rough.
+
 ## What happens when a player installs it
 
 1. The archive is read; `check_pack`'s rules run again on the bytes.
