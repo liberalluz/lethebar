@@ -77,6 +77,7 @@ func _initialize() -> void:
 	_case_collection()
 	_case_assembly()
 	_case_assembly_entry()
+	_case_assembly_reload()
 	_case_layers()
 	_case_content()
 	_case_meta()
@@ -3215,6 +3216,79 @@ func _case_assembly() -> void:
 			codes.count("W-05") == 1 and float(dupe_session.view()["state"]["grain"]) == 10.0,
 			str(codes),
 		)
+
+
+func _rules_layer(name: String, target: String) -> PackedByteArray:
+	## A layer as a world repository publishes one: the manifest names its own
+	## kind and target, because that is what `V-35` and the format require, and
+	## the record a save replays has to carry the same two facts (REQ-043).
+	return _package(
+		name,
+		{
+			"id": name,
+			"kind": "layer",
+			"layer": "mod",
+			"target": target,
+			"capabilities": ["ledger@1"],
+			"mechanics": ["ledger"],
+		},
+		[],
+		[],
+		{},
+		{},
+		{
+			"data/state.json": JSON.stringify({"resources": [
+				{"id": "grain", "init": 10.0, "min": 0.0, "max": 99.0, "label": "粮"},
+			]}, "\t").to_utf8_buffer(),
+			"data/actions.json": JSON.stringify({"actions": [
+				{"id": "drill", "label": "Drill", "per_turn": 1, "effects": [{"grain": {"add": 1}}]},
+			]}, "\t").to_utf8_buffer(),
+			"data/disable.json": JSON.stringify({"actions": ["farm"]}, "\t").to_utf8_buffer(),
+		},
+	)
+
+
+func _case_assembly_reload() -> void:
+	## TC-ASSEMBLY-003: a save records the assembly, and replaying it must rebuild
+	## the same run. Additions are the easy half; the removals and the overridden
+	## definitions are the half that a record without `target` silently loses.
+	var loader := PackageLoader.new()
+	var context := {"engine_version": "4.7.2", "work_dir": FIXTURE_DIR}
+	loader.import_bytes(_base_package("rl-base"), context)
+	loader.import_bytes(_rules_layer("rl-mod", "rl-base"), context)
+
+	var built: Dictionary = loader.assemble(["rl-base", "rl-mod"])
+	var entries: Array = built.get("entries", [])
+	var opened := Session.create(entries[0], {"start_counter": 1, "assembly": entries.slice(1)})
+	opened.start()
+
+	var store := SaveStore.new(MemoryBackend.new())
+	var written := store.write(entries[0], 1, opened.snapshot(), "rl-base")
+	_check("TC-ASSEMBLY-003: a layered run saves", written.get("ok", false), str(written.get("code", "")))
+	var payload: Dictionary = store.read(entries[0], 1).get("payload", {})
+	_check(
+		"TC-ASSEMBLY-003: the save names the layer it ran with",
+		(payload.get("assembly", []) as Array) == ["rl-base", "rl-mod"],
+		str(payload.get("assembly", [])),
+	)
+
+	var records: Array = []
+	for name in payload.get("assembly", []):
+		records.append(loader.registry.entry(String(name)))
+	var replayed := store.resume(entries[0], payload, {"assembly": records})
+	var replay_ids: Array = []
+	for action in replayed.actions:
+		replay_ids.append(String(action.get("id", "")))
+	_check(
+		"TC-ASSEMBLY-003: replaying the assembly keeps the action the layer removed out",
+		replay_ids == ["drill"],
+		str(replay_ids),
+	)
+	_check(
+		"TC-ASSEMBLY-003: replaying the assembly keeps the definition the layer overrode",
+		float(replayed.ledger_defs["grain"]["max"]) == 99.0,
+		str(replayed.ledger_defs.get("grain", {})),
+	)
 
 
 func _layer_package(name: String, ignore: String = "") -> PackedByteArray:
