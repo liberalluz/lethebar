@@ -1,5 +1,63 @@
 # Changelog
 
+## v0.6.0 - 2026-11-08
+
+### Added
+- `infra/tool/release/pack.py` builds a pack directory into a reproducible zip, writes a descriptor with the id, version, bytes, sha256, `specVersion` and engine range, and uploads both to a release (dry by default).
+- `PackageLoader.import_url(url, expected_sha256, context, fetch)` installs a downloaded pack after checking its digest, and `PackageLoader.digest_of(bytes)` is the shared hash.
+- `V-43` refuses bytes whose hash differs from the expected value, naming the url and both digests.
+- `TC-NEUTRAL-001` builds a package inside the suite and walks install, play, save and resume on it, so the engine path is proved by a package the engine owns.
+- A capability request form, so a package author can ask the engine for behaviour instead of being told to wait for a batch, and `docs/specs/capabilities.md` answers with one of three written outcomes.
+- An install entry that takes a link as well as a file. `app/render/downloader.gd` fetches the bytes and `PackageLoader.import_url` hashes them before anything is written, so a truncated download stops at `V-01` and a wrong digest at `V-43`, both naming what disagreed.
+- Three reported outcomes for an install: `installed`, `already` and `refused`. A refusal leaves the installed set untouched, and a link install with no digest is refused rather than trusted.
+- `verify_web.py --min-packs N`: the browser check fails when the build offers fewer stories than asked for, which is how a batch that removes a story can prove the stories it kept still ship.
+- `infra/ci/author-gate.yml`: the gate a pack repository copies into `.github/workflows/`, with its four steps in the order each one depends on.
+- `infra/checks/check_author_gate.py`: the template is checked for shape, since the only thing that can be wrong with it here is a step that moved or vanished.
+- `infra/checks/check_pr_body.py`: reads a pull request body by file or number and refuses one that lacks Summary, Impact, Verification, Risks or Self-check, that orders them differently, or that leaves a section empty.
+- `batch.py pr <id> --translations-only`: redoes the pull request translations after the batch merged, for the case where only the translated body was wrong.
+- `infra/tool/release/preflight.py`: six numbered items that say what a pack repository is missing before it publishes — manifest, version and contract, artifact, descriptor, release, and whether a browser can actually fetch the asset. Each failure names the command that fixes it, and the last item fetches the published zip over the network instead of assuming it is reachable.
+- `pack.py publish --apply` creates the release when the tag has none. `gh release upload` only attaches files to a release that already exists, so the first publication of every pack used to fail with `release not found`.
+- `pack.py` validates a pack before it builds any command: a descriptor with no id or version is refused, and nothing reaches `gh`.
+- `infra/checks/check_pack.py` reads the archive a package publishes to and nothing else: `manifest.json` alone at the root, every other entry under `data/`, `assets/` or `i18n/`, no `..`, no absolute path, no symbolic link, no executable suffix, and caps on entry count and bytes. Ten negative cases run in `--self-test`, one per rule, and the gate runs them.
+
+### Changed
+- Nothing in a run changes: the new path ends in the same `import_bytes` every install already used.
+- The suite asks whether a built-in story is staged before it opens one, and reports how many cases it skipped, so the four stories can move to a world repository without taking the engine's proof with them.
+- `ADR-0010` now describes a package by three axes (form, dimension, trust), says what each kind of repository must never hold, and closes with the three misreadings the earlier wording invited.
+- `infra/tool/release/pack.py self-test` writes its own two-file fixture in a temporary directory instead of reading a shipped story, so the tool that proves the release pipeline no longer depends on content that is scheduled for removal.
+- `TC-COLLECTION-001` builds its two worlds from `sanguo` and `xiuxian`, and `TC-META-001` covers the two stories that remain.
+- The pack list draws two entries where it drew one: `Install a pack (.zip)…` and `Install from a link…`.
+- The probe reports `stories`, the count it read on the landing screen, so the check above has a number to compare.
+- `infra/stage_builtin.py`: staging now removes an archive whose source directory is gone, names what it removed, and fails when a removal is blocked. `B59` shipped a deleted story for exactly one release because staging only wrote.
+- `infra/checks/check_tree.py`: gains `--profile engine|world` and `--root`, and refuses an `app/builtin/*.zip` that no `content/builtin/<id>/` backs.
+- `infra/checks/run_godot.py`: reads the suite's summary line and fails when more cases were skipped than `LETHEBAR_MAX_SKIPS` allows, so a green run has to mean something ran.
+- `infra/tool/batch/config.json`: the tree check names the engine profile, and a `release-tool` step runs `pack.py self-test` before the translation check.
+- `batch.py pr --prepare` no longer invents a body when `.batch/<id>/pr-body.source.md` is missing. It exits 1 and names the five sections the template asks for, instead of shipping the stand-in body that B58 carried into its pull request.
+- Missing pull request translations are a failure now, not a note. A batch whose translation hook is not configured cannot prepare a pull request.
+- `CARD_TYPES` matches the seven commit types the conventions list. `process` is gone from the tool; it was never a type, only a branch prefix, and `B57` and `B61` both wrote it because the tool accepted it.
+- `infra/ci/author-gate.yml` says at the top that it is a template to copy into a world repository's `.github/workflows/gate.yml`, and `infra/checks/check_author_gate.py` refuses the file if that sentence is missing.
+- `infra/tool/batch/config.json` runs the author-gate check right after the tree check.
+- `docs/specs/git-conventions.md` says a batch card's type uses the seven commit types, and replaces the `pack/<space>/vX.Y.Z` line with the rule that each pack is tagged on its own and a repository version is bookkeeping only.
+- `pack.py` reads the GitHub client from `LETHEBAR_GH` (default `gh`), which is what lets a test prove that the create runs before the upload.
+- The docstring example tags a pack as `pack/<id>/vX.Y.Z`, matching the release section of `docs/specs/git-conventions.md`.
+- `preflight.py` and `pack.py` share the reachability rule: an asset that answers without `Access-Control-Allow-Origin` is reported, because a browser install depends on that header and a terminal does not.
+- `REQ-014` asks for one smoke story instead of a built-in 三国, `REQ-015` says the two worlds ship as external packages, and `REQ-034` describes the released package rather than one compiled into the engine.
+- The shell cases that used to open 三国 now open `duel`, so the engine is still proven without a world: `TC-UX-001`, `TC-SAVE-002`, `TC-PKG-001`, `TC-INSTALL-001`, `TC-COLLECTION-001` and `TC-META-001`.
+- The author gate is three steps now - `build` -> `check_pack` -> `publish` - and mentions no `infra/stage_packs.py`, no `--path app` and no `app/builtin`. A plugin repository is a project; only its archive is checked.
+- `infra/checks/check_tree.py` stops having an opinion about an author's repository: the `world` profile is gone and `--profile` with it. The engine's own layout rules are unchanged.
+- `ADR-0010` records the move: what may not exist is an executable entry inside a pack, not a build script in someone's repository.
+- The cultivation pack is called `cultivation` everywhere. `SDD` section 10.2 lost the pinyin in both languages, `ADR-0007` names the pack the same way the repository does, and `ADR-0010` points at `lethebar-game-cultivation`.
+- `ADR-0012` draws its worked example with `cultivation` instead of `xiuxian`, so the two-level menu example matches what a reader can install.
+
+### Fixed
+- Installing a world package used to fail with `V-03: already installed at 0.1.0; re-import that version or uninstall first`, because the engine shipped the same id at an older version and there is no uninstall control. With the built-in story gone, an external `sanguo` installs into a fresh engine.
+
+### Removed
+- The `jianghu` story, which demonstrated that a third pack could be written as data and then stayed as a dependency of every count in the specification documents, of every staging run, and of the release tool's own self-test.
+- `TC-BUILTIN-003` and the case that opened the removed story, in both languages of the test plan and the test design.
+- The engine no longer ships the 三国 and 修仙 stories: `content/builtin/` holds `duel` only, and both worlds arrive as packages from their own repositories. `TC-BUILTIN-001` and `TC-BUILTIN-002` left with them, and their assertions now live in the world repositories' gates as `TC-WORLD-001` and `TC-WORLD-002`.
+- The save key of the built-in copy that `B65` removed is no longer readable: those keys were shaped `save:xiuxian:<slot>`. No published package ever used the pinyin.
+
 ## v0.5.0 - 2026-11-07
 
 ### Added
