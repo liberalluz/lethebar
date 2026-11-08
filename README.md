@@ -9,7 +9,7 @@ English · [简体中文](README.zh-CN.md)
 
 ## Status
 
-**v0.6.0 is out, and the engine no longer ships a story.** Three Kingdoms and Cultivation
+**v0.6.1 is out, and the engine no longer ships a story.** Three Kingdoms and Cultivation
 are published from their own repositories as installable packs — `pack/sanguo/v1.0.0` and
 `pack/cultivation/v1.0.0` — and this repository keeps one smoke pack (`duel`) so that the
 engine's own tests have something to open. Each world repository builds its pack, checks the
@@ -33,9 +33,14 @@ as boxes; faction names and arc stages are package text and do not follow the re
 yet; the audience is validated but nothing filters on it yet; and two layers changing
 different fields of the same entry are not treated as a conflict.
 
-Next: the author's way in — a handbook that explains a pack, its manifest, the eight bricks
-and the errors, plus a template repository someone can start from. The iOS build is not
-scheduled; it returns when a device run costs more than it saves.
+The author's way in shipped with this version: `docs/guide/` explains a pack, its manifest,
+the eight bricks, the two protocols and every refusal code, `templates/` holds two packs
+small enough to read in one screen, and `github.com/liberalluz/lethebar-pack-template` is a
+repository to start from with the gate already wired. `v0.6.0` did not contain any of it.
+
+Next: the first real assembly — one run built from packs of two repositories, with a mod and
+a content layer over them. The iOS build is not scheduled; it returns when a device run costs
+more than it saves.
 
 ## What it does
 
