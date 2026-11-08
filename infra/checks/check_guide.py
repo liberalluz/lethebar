@@ -23,8 +23,9 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
+
+from fixtures import fixture_dir, leftovers
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "app"
@@ -221,8 +222,7 @@ def main() -> int:
         return 1
     print("[guide] tables match the source")
 
-    with tempfile.TemporaryDirectory(dir=ROOT / ".test-tmp", prefix="guide-") as raw:
-        work = Path(raw)
+    with fixture_dir("guide") as work:
         for template in TEMPLATES:
             archive, build_problems = built_zip(template, work)
             if build_problems:
@@ -251,6 +251,11 @@ def main() -> int:
 
     if args.no_probe:
         print("[guide] probes skipped")
+
+    strays = leftovers()
+    if strays:
+        print(f"[guide] left behind {', '.join(strays)}")
+        return 1
     return 0
 
 

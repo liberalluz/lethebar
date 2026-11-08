@@ -29,11 +29,14 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
-import tempfile
+import uuid
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 MANIFEST = "manifest.json"
@@ -170,6 +173,28 @@ def publish_commands(target: Path, repo: str, tag: str, exists: bool) -> list[li
     return commands
 
 
+@contextmanager
+def scratch(tag: str) -> Iterator[Path]:
+    """A directory this tool removes itself.
+
+    `tempfile.mkdtemp()` stamps the directory with mode 0o700, which on Windows
+    replaces the access control entry it would have inherited: under a
+    restricted token the creator cannot write inside it and cannot delete it,
+    which is exactly what a self-test must never do. This file travels into
+    world repositories on its own, so the helper is inline rather than imported.
+    """
+
+    base = Path(__file__).resolve().parents[2] / ".test-tmp"
+    base.mkdir(parents=True, exist_ok=True)
+    path = base / f"fixtures-{tag}-{os.getpid()}-{uuid.uuid4().hex[:8]}"
+    path.mkdir(exist_ok=False)
+    try:
+        yield path
+    finally:
+        shutil.rmtree(path, ignore_errors=False)
+
+
+
 def write_fixture(directory: Path) -> Path:
     """Write a pack for the self-test, so the tool needs no shipped story."""
     root = directory / "fixture-pack"
@@ -197,9 +222,9 @@ def self_test() -> int:
     """Assert the properties this tool exists for, without touching the network."""
     problems: list[str] = []
     with (
-        tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as source,
-        tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as first,
-        tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as second,
+        scratch("source") as source,
+        scratch("first") as first,
+        scratch("second") as second,
     ):
         root = write_fixture(Path(source))
         one = build(root, Path(first))
