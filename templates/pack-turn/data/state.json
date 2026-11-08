@@ -1,0 +1,6 @@
+{
+  "resources": [
+    {"id": "coin", "label": "Coin", "init": 6, "min": 0, "max": 20},
+    {"id": "fame", "label": "Fame", "init": 0, "min": 0, "max": 10}
+  ]
+}
