@@ -97,6 +97,25 @@ This is `templates/pack-min/manifest.json`, byte for byte:
 `entry` names a node in `data/nodes.json`, `capabilities` says which engine features the pack uses,
 and `mechanics` is empty because this story has no resources to track.
 
+## `kind`, `layer` and `target` go together, unevenly
+
+`kind` is always required and has two values. What follows depends on which one
+you wrote:
+
+- **`kind: layer`** — `layer` and `target` are both required. A layer that names
+  no dimension is refused, and so is one that names no target.
+- **`kind: bundle`** — a `target` is refused outright (`only a layer package may
+  name a target`), because a bundle has nothing to sit on. A `layer` on a bundle
+  is **not** refused: it is silently ignored.
+
+That asymmetry is worth remembering when you turn a layer into a bundle: the id,
+the story and the protocol are all that matters, but the leftover `layer` line
+stays in the file looking as if it still does something.
+
+`layer` says which of the six dimensions of the target you fill; `target` says
+which pack that is. [One repository, several packs](repositories.md) describes
+both, and lists what the engine does not enforce.
+
 ## What the engine refuses, and with which code
 
 | You did | The engine says |
@@ -113,3 +132,20 @@ and `mechanics` is empty because this story has no resources to track.
 Two of these are worth failing early on purpose. `V-05` is the only code that tells a player their
 engine is too old; `V-27` is the only one that tells an author they asked for a feature this build
 does not have. Both are cheaper to see on your own machine than in someone's browser.
+
+## What does not work yet
+
+Four things a manifest can declare that the engine will not honour, in the order
+they are likely to bite:
+
+- a layer still needs an `entry` node inside its own `data/nodes.json` (`V-07`),
+  so it carries a placeholder node nothing ever reads;
+- a `target` that names another layer — or a pack that is not a bundle — is not
+  refused at assembly; the run simply will not start;
+- `layer: content` takes effect, `layer: mod` mostly does, and `genre`,
+  `profession`, `meta` and `assets` install without changing anything;
+- a `layer` left on a bundle is ignored, as described above.
+
+None of these are promises about the format; they are the state of this build,
+and each one is a defect to fix rather than a rule to design around. When one is
+fixed it is fixed for every pack, old ones included.
