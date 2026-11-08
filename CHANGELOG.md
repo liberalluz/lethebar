@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.6.1 - 2026-11-08
+
+### Added
+- `docs/guide/pack-anatomy.md`, `docs/guide/manifest.md` and `docs/guide/publishing.md`: what a pack is, what every manifest field means, and the six commands that turn a directory into a release.
+- `templates/pack-min/`: a pack small enough to read in one screen that installs, walks one choice and saves.
+- `infra/tool/docs/gen_guide.py`: rewrites the field and vocabulary tables from the const arrays in `app/core/manifest_schema.gd`; `--check` reports drift instead.
+- `infra/checks/check_guide.py`: checks the tables, builds the template, runs the envelope check and installs the zip in a headless probe. Wired into the gate as the `guide` step.
+- `docs/guide/bricks.md`: the eight bricks, each one named with the data file that turns it on and the engine file that reads it.
+- `docs/guide/protocols.md`: the two protocols the engine implements, and a section saying that `cards.hand@1` is a capability rather than a third one.
+- `docs/guide/errors.md`: every refusal code with the line that raises it and the sentence a player sees, generated from the source.
+- `templates/pack-turn/`: a turn-based template with a menu, a limited run and two ranks, next to the linear one.
+- `infra/checks/check_guide.py` now builds, installs and plays both templates, so a template that stops installing breaks the gate.
+- `github.com/liberalluz/lethebar-pack-template`, a public template repository with the two release tools, the three-step author gate, and a working example pack. Its gate ran on the example before it was offered, so a new author starts from a repository that already builds, checks and publishes.
+- `docs/guide/README.md`, the guide's front door: reading order, three ways in, and the two pages to read if you read only two.
+- `docs/guide/repositories.md`, on a world repository that holds several packs: one folder per pack, one tag and one release per pack, the id as save key, and layers declared with `requires` and `target`.
+- The minimal manifest in `docs/guide/pack-anatomy.md`, quoted whole so the smallest pack can be copied by hand.
+
+### Changed
+- `infra/tool/docs/gen_guide.py` fills five tables across four pages instead of two tables on one page; the brick and protocol tables fail the generator when the source loses a file or a protocol it describes.
+- `docs/README.md` and the root README link to the guide, which shipped without an entry point.
+
 ## v0.6.0 - 2026-11-08
 
 ### Added
