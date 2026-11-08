@@ -62,6 +62,7 @@ func _initialize() -> void:
 	_case_clock()
 	_case_scene()
 	_case_wire()
+	_case_layer_content()
 	_case_writable_relations()
 	_case_situation()
 	_case_save_flush()
@@ -3331,6 +3332,90 @@ func _case_layers() -> void:
 		not twice.get("ok", true) and String(twice.get("code", "")) == "V-34",
 		"%s %s" % [twice.get("code", ""), twice.get("message", "")],
 	)
+
+
+func _layer_with_content(name: String, target: String, content: Dictionary) -> PackedByteArray:
+	## A layer that carries a content block instead of resources, so the assembly
+	## has to decide what happens to a block that replaces rather than appends.
+	var overrides := {
+		"id": name,
+		"kind": "layer",
+		"layer": "content",
+		"target": target,
+		"capabilities": ["text@1"],
+		"content": content,
+	}
+	return _package(name, overrides, [], [], {}, {}, {})
+
+
+func _case_layer_content() -> void:
+	## TC-CONTENT-002 — a layer that declares content changes how the assembled
+	## story reads (REQ-042 with REQ-044). Only the content block moves: the nodes
+	## and the phase machine stay the base package's, because a story with two
+	## entry points is not a story (ADR-0013).
+	var loader := PackageLoader.new()
+	var context := _context()
+	var base: Dictionary = loader.import_bytes(
+		_content_package("lc-base", {
+			"view": "first",
+			"density": "sparse",
+			"cast": [{"id": "solo", "name": "A lone teller", "role": "narrator"}],
+			"arc": [{"turn": 1, "label": "Opening"}],
+		}),
+		context,
+	)
+	var layer: Dictionary = loader.import_bytes(
+		_layer_with_content("lc-layer", "lc-base", {
+			"view": "third",
+			"density": "dense",
+			"cast": [{"id": "a", "name": "甲", "role": "host"}, {"id": "b", "name": "乙", "role": "guest"}],
+			"arc": [{"turn": 1, "label": "开席"}, {"turn": 3, "label": "散席"}],
+		}),
+		context,
+	)
+	_check(
+		"TC-CONTENT-002: a base and a layer that carries content both install",
+		base["status"] == "installed" and layer["status"] == "installed",
+		"%s %s" % [base.get("code", ""), layer.get("code", "")],
+	)
+
+	var plain: Dictionary = loader.assemble(["lc-base"])
+	var plain_entries: Array = plain.get("entries", [])
+	var alone := Session.create(plain_entries[0]) if plain.get("ok", false) else null
+	var alone_view: Dictionary = alone.view() if alone != null else {}
+	var alone_content: Dictionary = alone_view.get("content", {})
+	_check(
+		"TC-CONTENT-002: without the layer the base package's own content is what the player sees",
+		alone_content.get("view", "") == "first" and alone_content.get("density", "") == "sparse",
+		str(alone_content),
+	)
+
+	var joined: Dictionary = loader.assemble(["lc-base", "lc-layer"])
+	var joined_entries: Array = joined.get("entries", [])
+	var layered := Session.create(joined_entries[0], {"assembly": joined_entries.slice(1)}) if joined.get("ok", false) else null
+	var layered_view: Dictionary = layered.view() if layered != null else {}
+	var layered_content: Dictionary = layered_view.get("content", {})
+	_check(
+		"TC-CONTENT-002: the layer's content replaces the base package's block",
+		layered_content.get("view", "") == "third" and layered_content.get("density", "") == "dense",
+		str(layered_content),
+	)
+	_check(
+		"TC-CONTENT-002: the cast the layer names is the cast the player reads",
+		layered_content.get("cast", "") == "甲（host）、乙（guest）" or String(layered_content.get("cast", "")).contains("甲"),
+		str(layered_content.get("cast", "")),
+	)
+	_check(
+		"TC-CONTENT-002: the arc the layer names is the arc the player reads",
+		String(layered_content.get("stage", "")) == "开席",
+		str(layered_content.get("stage", "")),
+	)
+	_check(
+		"TC-CONTENT-002: the nodes and the phase machine stay the base package's",
+		layered.current == "n1" and String(layered.title) == String(alone.title),
+		"%s %s" % [layered.current, layered.title],
+	)
+
 
 
 func _layer_with_target(name: String, target: String, ledger: bool = true, action: bool = true, action_id: String = "drill") -> PackedByteArray:
