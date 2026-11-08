@@ -290,7 +290,7 @@ func open_plugins() -> String:
 			continue
 		if _world_filter != "" and world_of(plugin_id) != _world_filter:
 			continue
-		var row := _button(_pack_title(plugin_id), start_plugin.bind(plugin_id))
+		var row := _button(_pack_title(plugin_id), start_plugin.bind(plugin_id, ticked_for(plugin_id)))
 		var meta := _meta_of(plugin_id)
 		var line := pack_line(meta, Locale.current())
 		if line != "":
@@ -362,6 +362,12 @@ func _is_layer(plugin_id: String) -> bool:
 func start_plugin(plugin_id: String, ticked: Array = []) -> Dictionary:
 	## Opens a plugin and starts a session. A player never sees a package that
 	## is not on this list, so a failure here is a defect, not a refusal.
+	if _is_layer(plugin_id):
+		# A layer changes the run of the pack it names; it has no story of its
+		# own, so opening it would build a session on its placeholder node and
+		# end immediately (REQ-042).
+		open_notice("E-03", Locale.text("ui.layer_not_story") % plugin_id)
+		return current_view()
 	var record: Dictionary = loader.registry.entry(plugin_id)
 	if record.is_empty():
 		open_notice("E-01", "pack %s is not installed" % plugin_id)

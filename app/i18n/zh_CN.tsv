@@ -51,3 +51,4 @@ ui.install_link	从链接安装…
 ui.link_ask	粘贴一个 .zip 包的地址。
 ui.link_digest	粘贴它的 sha256（64 个十六进制字符）。
 ui.link_refused	没有装任何东西。地址和摘要不足以接受这个文件。
+ui.layer_not_story	%s 是插件层，不是故事。请在包页把它勾上。

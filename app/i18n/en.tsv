@@ -51,3 +51,4 @@ ui.install_link	Install from a link…
 ui.link_ask	Paste the address of a .zip package.
 ui.link_digest	Paste its sha256 (64 hex characters).
 ui.link_refused	Nothing was installed. The address and the digest were not enough to accept this file.
+ui.layer_not_story	%s is a layer, not a story. Tick it on the pack page.
