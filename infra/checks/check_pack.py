@@ -14,11 +14,11 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 import sys
-import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath
+
+from fixtures import fixture_dir, leftovers
 
 ALLOWED_ROOTS = {"data", "assets", "i18n"}
 MANIFEST = "manifest.json"
@@ -180,12 +180,9 @@ def self_test() -> int:
 
     # The fixtures live beside the checker rather than in the system temporary
     # directory: a sandboxed or locked-down runner can refuse that one, and a
-    # self-test that cannot write its own fixtures proves nothing.
-    scratch = Path(__file__).resolve().parents[2] / ".test-tmp"
-    scratch.mkdir(parents=True, exist_ok=True)
-    temporary = tempfile.mkdtemp(prefix="lethebar-pack-", dir=scratch)
-    try:
-        directory = Path(temporary)
+    # self-test that cannot write its own fixtures proves nothing. See
+    # fixtures.py for why the mode `tempfile` picks is the bug, not the fix.
+    with fixture_dir("pack") as directory:
         cases: list[tuple[str, Path, str, bool]] = [
             ("a clean pack", fixture(directory, "clean", good), "", True),
             (
@@ -275,10 +272,12 @@ def self_test() -> int:
                 detail = "; ".join(problems) or "no problem reported"
             print(f"[{'ok' if ok else 'fail'}] {title}: {detail}")
             failures += 0 if ok else 1
-    finally:
-        shutil.rmtree(temporary, ignore_errors=True)
 
     print(f"self-test: {len(cases)} cases, {failures} failure(s)")
+    strays = leftovers()
+    if strays:
+        print(f"self-test: left behind {', '.join(strays)}")
+        return 1
     return 0 if failures == 0 else 1
 
 
