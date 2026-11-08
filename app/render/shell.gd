@@ -241,6 +241,9 @@ func show_loads() -> String:
 	return screen
 
 
+var _ticked: Dictionary = {}
+
+
 func resume_slot(plugin_id: String, slot: int) -> Dictionary:
 	## A save names its own plugin, so this is the only entry point that does not
 	## start from a pack list. A slot that no longer makes sense in this build
@@ -253,7 +256,16 @@ func resume_slot(plugin_id: String, slot: int) -> Dictionary:
 	if not bool(result.get("ok", false)):
 		open_notice(String(result.get("code", "")), String(result.get("message", "")))
 		return current_view()
-	var restored := saves.resume(record, result["payload"], {"locale": Locale.current()})
+	var layers: Array = []
+	for name in (result["payload"].get("assembly", []) as Array):
+		var layer_record: Dictionary = loader.registry.entry(String(name))
+		if layer_record.is_empty():
+			open_notice("E-02", "the save needs %s, which is not installed" % name)
+			return current_view()
+		layers.append(layer_record)
+	var restored := saves.resume(
+		record, result["payload"], {"locale": Locale.current(), "assembly": layers}
+	)
 	if restored == null:
 		open_notice(
 			SaveStore.CODE_NODE, "slot %d points at a scene this pack no longer has" % slot
@@ -274,6 +286,8 @@ func open_plugins() -> String:
 	_status.text = "" if not builtin_ids.is_empty() else Locale.text("ui.no_pack_installed")
 	_clear_options()
 	for plugin_id in builtin_ids:
+		if _is_layer(plugin_id):
+			continue
 		if _world_filter != "" and world_of(plugin_id) != _world_filter:
 			continue
 		var row := _button(_pack_title(plugin_id), start_plugin.bind(plugin_id))
@@ -289,6 +303,14 @@ func open_plugins() -> String:
 			note.add_theme_font_size_override("font_size", 13)
 			_options.add_child(note)
 		_options.add_child(row)
+		for layer_id in layers_for(plugin_id):
+			# Off by default: a layer changes the rules of the run, so a player
+			# who never asked for one keeps the run the pack describes.
+			var tick := CheckBox.new()
+			tick.text = _pack_title(layer_id)
+			tick.button_pressed = (_ticked.get(plugin_id, []) as Array).has(layer_id)
+			tick.pressed.connect(toggle_layer.bind(plugin_id, layer_id))
+			_options.add_child(tick)
 	_options.add_child(_button(Locale.text("ui.install"), request_install))
 	_options.add_child(_button(Locale.text("ui.install_link"), request_link_install))
 	_options.add_child(_button(Locale.text("ui.back"), show_landing))
@@ -296,7 +318,48 @@ func open_plugins() -> String:
 	return screen
 
 
-func start_plugin(plugin_id: String) -> Dictionary:
+func layers_for(plugin_id: String) -> Array:
+	## The layers installed against one pack, sorted so the page does not move
+	## between visits. A layer names its target, so this is a lookup, not a guess.
+	var found: Array = []
+	for candidate in loader.registry.ids():
+		var name := String(candidate)
+		if name == plugin_id or not _is_layer(name):
+			continue
+		var manifest: Dictionary = loader.registry.entry(name).get("manifest", {})
+		if String(manifest.get("target", "")) != plugin_id:
+			continue
+		found.append(name)
+	found.sort()
+	return found
+
+
+func ticked_for(plugin_id: String) -> Array:
+	## What the player ticked for this pack. Nothing is ticked until asked: a
+	## layer changes the rules of a run, so the default is the run they had.
+	return (_ticked.get(plugin_id, []) as Array).duplicate()
+
+
+func toggle_layer(plugin_id: String, layer_id: String) -> String:
+	## One tick, then the page redraws: the set is memory, not a setting. The save
+	## it produces is the only record, which is what makes resume exact.
+	var chosen: Array = _ticked.get(plugin_id, [])
+	if chosen.has(layer_id):
+		chosen.erase(layer_id)
+	else:
+		chosen.append(layer_id)
+	_ticked[plugin_id] = chosen
+	return open_plugins()
+
+
+func _is_layer(plugin_id: String) -> bool:
+	## A layer is not a story: it has no scene of its own, so it never appears in
+	## the list a player picks a story from (ADR-0013).
+	var manifest: Dictionary = loader.registry.entry(plugin_id).get("manifest", {})
+	return String(manifest.get("kind", "bundle")) == "layer"
+
+
+func start_plugin(plugin_id: String, ticked: Array = []) -> Dictionary:
 	## Opens a plugin and starts a session. A player never sees a package that
 	## is not on this list, so a failure here is a defect, not a refusal.
 	var record: Dictionary = loader.registry.entry(plugin_id)
@@ -304,7 +367,20 @@ func start_plugin(plugin_id: String) -> Dictionary:
 		open_notice("E-01", "pack %s is not installed" % plugin_id)
 		return current_view()
 	entry = record
-	session = Session.create(entry, {"start_counter": 1, "locale": Locale.current()})
+	var entries: Array = [record]
+	if not ticked.is_empty():
+		var joined: Dictionary = loader.assemble([plugin_id] + ticked)
+		if not bool(joined.get("ok", false)):
+			# Two layers writing one field is refused here, before a run exists
+			# (V-35): a half-applied assembly is not a run a player can leave.
+			open_notice(String(joined.get("code", "")), String(joined.get("message", "")))
+			return current_view()
+		entries = joined.get("entries", [])
+	session = Session.create(entries[0], {
+		"start_counter": 1,
+		"locale": Locale.current(),
+		"assembly": entries.slice(1),
+	})
 	if session == null:
 		open_notice("E-02", "pack %s has no usable protocol" % plugin_id)
 		return current_view()
