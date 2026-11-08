@@ -584,7 +584,19 @@ func _apply_layer(extra: Dictionary) -> void:
 	_merge_actions(data.get("actions", []))
 	_merge_pools(data.get("pools", []))
 	_merge_cards(data.get("hand", {}))
+	_merge_content(data.get("content", {}))
 	_disable(data.get("disable", {}))
+
+
+func _merge_content(raw: Variant) -> void:
+	## A layer that declares content says how the assembled story reads: the cast,
+	## the arc, the view and the density (REQ-044). The block is one object rather
+	## than a list, so it replaces the base package's block wholesale; adding two
+	## casts to one scene would invent an ordering nobody asked for, and the merge
+	## vocabulary in ADR-0013 has no fourth word.
+	if not ContentLayer.declares(raw):
+		return
+	content_spec = ContentLayer.defines(raw)
 
 
 func _override_resources(ledger: Variant) -> void:
