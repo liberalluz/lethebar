@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.7.0 - 2026-11-08
+
+### Added
+- The pack page offers the layers installed against that pack. None of them starts ticked, so a player who never asks for one keeps the run the pack describes.
+- Starting with layers ticked builds the run from the assembly of the pack and those layers, and the scene reads what the assembly resolved.
+- A save records the set it was written with. Continuing rebuilds that set, not what happens to be ticked now, so resume means the run the player left.
+- `docs/guide/repositories.md` says what a package is: the two `kind` values, why every run needs exactly one bundle, the six dimensions a layer can fill, the three refusals the assembler makes, and the naming rule that puts the world first and the form nowhere.
+- `docs/guide/repositories.md` shows one repository holding two bundles and two layers, and says which row of the interface each one appears on.
+- `docs/guide/mod-layer.md` walks a `mod` layer from folder to release: the manifest, the five inputs a mod may write, the two codes a clash produces, the four commands that publish it, how a player ticks it, and three checks that prove it changed a run rather than only that it installed.
+- The guide index lists the page and points at it from the "several packs" way in.
+- `TC-ASSEMBLY-003`: a save written in a layered run, replayed through the registry the way the interface does it, still refuses the disabled action and still reads the layer's on the ledger.
+
+### Changed
+- `docs/guide/pack-anatomy.md` sets the minimal manifest of a bundle beside the minimal manifest of a layer, and adds the three questions that tell them apart.
+- `docs/guide/manifest.md` explains how `kind`, `layer` and `target` depend on each other, including the asymmetry that a `layer` on a bundle is ignored while a `target` on a bundle is refused, and closes with what this build does not honour yet.
+- The guide index now describes `repositories.md` as covering the two kinds and the six dimensions, which it has done since `#119`.
+
+### Fixed
+- `check_pack.py`, `check_guide.py` and `pack.py` make their self-test directories with a plain `mkdir` under `.test-tmp` and remove them themselves. `tempfile.mkdtemp()` stamps the directory with mode `0o700`, which on Windows replaces the access control entry it would have inherited, so under a restricted token the self-test died with `PermissionError: [WinError 5]` and left a directory behind that nothing could delete. Three such directories had accumulated in the checkout.
+- `check_pack.py --self-test` and `check_guide.py` now fail when a fixture directory is still in `.test-tmp` when they finish, so the next leak is reported by the check that caused it instead of being found by hand.
+- An assembly now applies the `content` block a layer declares. `_apply_layer()` merged resources, actions, pools, cards and disabled names, and dropped content on the floor, so a published `layer: content` package installed, assembled, and changed nothing. The block is one object rather than a list, so a layer that declares it replaces the base package's block; a layer that declares none leaves it alone.
+- `TC-CONTENT-002` covers the case: the same base package assembled without the layer reads its own cast and arc, and with the layer reads the layer's, while the nodes and the phase machine stay the base package's.
+- Two ticked layers that write the same field are refused before a run starts, with the message the assembly produces rather than a generic failure.
+- A save whose layer is no longer installed is refused with `E-02` and the name of the missing package, instead of opening a run that is missing a layer.
+- A save that recorded a layer now replays it as a layer. `InstallRegistry.entry()` copies the manifest's `layer` and `target` onto the record it returns, so a run rebuilt from a save keeps the actions the layer disabled and the definitions it overrode instead of treating it as one more additive package.
+
 ## v0.6.1 - 2026-11-08
 
 ### Added

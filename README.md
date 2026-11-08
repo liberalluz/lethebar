@@ -9,14 +9,20 @@ English · [简体中文](README.zh-CN.md)
 
 ## Status
 
-**v0.6.1 is out, and the engine no longer ships a story.** Three Kingdoms and Cultivation
-are published from their own repositories as installable packs — `pack/sanguo/v1.0.0` and
-`pack/cultivation/v1.0.0` — and this repository keeps one smoke pack (`duel`) so that the
-engine's own tests have something to open. Each world repository builds its pack, checks the
-archive envelope before anything is published, and puts two files on a release: `<id>.zip`
-and `<id>-<version>.json`, the descriptor that names the hash of those bytes. The engine
-repeats that check at install, so a pack that arrives truncated or hand-edited is refused
-before it can be played.
+**v0.7.0 is out, and one run can be built from more than one package.** Three Kingdoms and
+Cultivation are published from their own repositories — `pack/sanguo/v1.0.0`,
+`pack/sanguo-content/v1.0.0`, `pack/sanguo-hard/v1.0.1` and `pack/cultivation/v1.0.0` — and
+this repository keeps one smoke pack (`duel`) so that the engine's own tests have something
+to open. A world pack is a bundle: it supplies the story and the rules. A layer package names
+a bundle with `target` and changes it — a `content` layer says how the story reads, a `mod`
+layer changes how it plays. The pack page lists the layers that name a pack; a layer starts
+unticked, because it changes rules nobody asked to change, and the save records the set that
+was played with, so a reload rebuilds the run it came from.
+
+Every world repository builds its pack, checks the archive envelope before anything is
+published, and puts two files on a release: `<id>.zip` and `<id>-<version>.json`, the
+descriptor that names the hash of those bytes. The engine repeats that check at install, so a
+pack that arrives truncated or hand-edited is refused before it can be played.
 
 A player installs a pack from a file: download the zip from the world's release, then pick it
 in the interface. Installing straight from a release URL is not offered, because GitHub does
