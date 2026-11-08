@@ -108,6 +108,14 @@
       "cwd": "."
     },
     {
+      "name": "guide",
+      "command": [
+        "python",
+        "infra/checks/check_guide.py"
+      ],
+      "cwd": "."
+    },
+    {
       "name": "translation",
       "command": [
         "python",

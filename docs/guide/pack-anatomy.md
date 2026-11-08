@@ -1,0 +1,64 @@
+# What a pack is
+
+A pack is a zip. Inside it is data: text, numbers, and the occasional picture or sound. It holds
+no program. The engine reads the data, decides what it means, and draws it.
+
+That is the whole reason a pack can be written by someone who has never built the engine.
+
+## The envelope, in one sentence
+
+At the root of the archive there is exactly one file, `manifest.json`; everything else lives under
+`data/`, `assets/` or `i18n/`.
+
+Anything else — a stray `README.md`, a `dist/` folder zipped by accident, a `.DS_Store` — is
+refused before upload, because a pack whose shape is guesswork is a pack whose install failures
+are guesswork too.
+
+## Four hard rules
+
+| Rule | Why | Who refuses it |
+| --- | --- | --- |
+| only `manifest.json` at the root, and `data/`, `assets/`, `i18n/` below it | the engine knows where to look, so it never scans | `check_pack.py`, before you upload |
+| no executables, no symlinks, no absolute paths, no `..` | a pack is data; the engine never runs anything from it | `check_pack.py` |
+| the id is a lowercase slug and never changes | it is the save key, `save:<id>:<slot>` | `V-03` at install |
+| `engine` names a range that contains the running build | an old engine cannot read a new format, and should say so | `V-05` at install |
+
+The envelope is checked twice on purpose: once by you, on the bytes you are about to publish, and
+once by the engine, on the bytes a player's browser just downloaded. Only the second one protects
+a player, so it exists even if you skipped the first.
+
+Limits: 512 entries, 8 MiB per file, 32 MiB for the archive. They are generous for text and mean
+for video; if a pack needs more, it needs a second pack.
+
+## A worked tree
+
+This is `templates/pack-min/`, the smallest pack that installs and plays:
+
+```
+templates/pack-min/
+├── manifest.json
+└── data/
+    └── nodes.json
+```
+
+`manifest.json` names the entry node, the protocol and the format. `data/nodes.json` holds three
+nodes: the first offers two choices, and each choice ends the story.
+
+```text
+data/nodes.json
+  nodes[0] open   — text, choices: [ {label, next: "river"}, {label, next: "ridge"} ]
+  nodes[1] river  — text, choices: []
+  nodes[2] ridge  — text, choices: []
+```
+
+An empty `choices` list is how a story ends. The engine does not need a flag for it.
+
+## What happens when a player installs it
+
+1. The archive is read; `check_pack`'s rules run again on the bytes.
+2. `manifest.json` is validated field by field, `V-02` through `V-42`.
+3. The pack is written to browser storage, so it survives a reload.
+4. Starting a run creates a session at `entry` and reads `data/nodes.json`.
+
+Nothing in that list reads the network. Installing is a local operation on a file the player chose;
+that is also why a pack works offline the moment it is installed.
