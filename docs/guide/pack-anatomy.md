@@ -41,8 +41,30 @@ templates/pack-min/
     └── nodes.json
 ```
 
-`manifest.json` names the entry node, the protocol and the format. `data/nodes.json` holds three
-nodes: the first offers two choices, and each choice ends the story.
+Both files are short enough to copy by hand. This is the whole manifest:
+
+```json
+{
+  "id": "pack-min",
+  "version": "0.1.0",
+  "specVersion": "2.0.0",
+  "kind": "bundle",
+  "requires": [],
+  "engine": ">=4.7.0 <5.0.0",
+  "name": "The shortest story",
+  "defaultLocale": "en",
+  "protocol": "linear@1",
+  "capabilities": ["text@1"],
+  "mechanics": [],
+  "entry": "open",
+  "saveSchema": 1,
+  "assets": []
+}
+```
+
+Rename `id` to something of your own before you publish; everything else can stay until a pack
+needs it. `manifest.json` names the entry node, the protocol and the format. `data/nodes.json`
+holds three nodes: the first offers two choices, and each choice ends the story.
 
 ```text
 data/nodes.json
