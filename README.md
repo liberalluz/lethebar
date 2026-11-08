@@ -9,15 +9,22 @@ English · [简体中文](README.zh-CN.md)
 
 ## Status
 
-**v0.5.0 is out and playable in a browser.** A package now says how its story reads:
-`content` declares the narrative view (first person, third person or ensemble), the
-information density, the cast that is named on screen, and an arc whose stages change
-the line under the text as the run advances. A package also says who it is for: `meta`
-carries a pitch in one or more languages, an audience, a length in minutes and an
-optional icon, and the pack list shows the pitch and the length before a reader picks a
-story. Both blocks are declared by the package, validated at install (`V-40`, `V-41`
-and `V-42` each name the field they refuse) and recorded in the save, so a reloaded run
-reads the way it read before.
+**v0.6.0 is out, and the engine no longer ships a story.** Three Kingdoms and Cultivation
+are published from their own repositories as installable packs — `pack/sanguo/v1.0.0` and
+`pack/cultivation/v1.0.0` — and this repository keeps one smoke pack (`duel`) so that the
+engine's own tests have something to open. Each world repository builds its pack, checks the
+archive envelope before anything is published, and puts two files on a release: `<id>.zip`
+and `<id>-<version>.json`, the descriptor that names the hash of those bytes. The engine
+repeats that check at install, so a pack that arrives truncated or hand-edited is refused
+before it can be played.
+
+A player installs a pack from a file: download the zip from the world's release, then pick it
+in the interface. Installing straight from a release URL is not offered, because GitHub does
+not send a CORS header with its release assets and the browser refuses the fetch.
+
+Upgrading: a browser that played the old built-in packs still holds them at version `0.1.0`,
+and `V-03` refuses any other version of the same id. Clear the site's data once; after that
+the world packs install normally.
 
 Known limits: pictures and sound are drawn into one band and one portrait column, and
 only from PNG, JPEG and WAV; a run's clock is counted in turns or nodes, never in wall
@@ -26,8 +33,9 @@ as boxes; faction names and arc stages are package text and do not follow the re
 yet; the audience is validated but nothing filters on it yet; and two layers changing
 different fields of the same entry are not treated as a conflict.
 
-Next: v0.5.0 is the last feature release before the phone build — v0.6.0 adds an iOS
-build so a device installs the game once instead of fetching the payload again.
+Next: the author's way in — a handbook that explains a pack, its manifest, the eight bricks
+and the errors, plus a template repository someone can start from. The iOS build is not
+scheduled; it returns when a device run costs more than it saves.
 
 ## What it does
 
