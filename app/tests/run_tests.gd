@@ -76,6 +76,7 @@ func _initialize() -> void:
 	_case_shuffle()
 	_case_collection()
 	_case_assembly()
+	_case_assembly_entry()
 	_case_layers()
 	_case_content()
 	_case_meta()
@@ -3348,6 +3349,129 @@ func _layer_with_content(name: String, target: String, content: Dictionary) -> P
 	return _package(name, overrides, [], [], {}, {}, {})
 
 
+
+func _assembly_base_with_content(name: String) -> PackedByteArray:
+	## The pack says how it reads; the layer in the cases says something else, so
+	## "the layer replaced it" is a visible difference and not two empty blocks.
+	return _package(
+		name,
+		{
+			"id": name,
+			"entry": "camp",
+			"capabilities": ["ledger@1"],
+			"mechanics": ["ledger"],
+			"content": {
+				"view": "third",
+				"density": "dense",
+				"cast": [{"id": "bing", "name": "Bing", "role": "host"}],
+				"arc": [{"turn": 1, "label": "Opening"}],
+			},
+		},
+		[],
+		[],
+		{"nodes": [{"id": "camp", "text": "A camp.", "choices": []}]},
+		{},
+		{"data/state.json": JSON.stringify({"resources": [
+			{"id": "grain", "init": 10, "min": 0, "max": 20},
+		]}).to_utf8_buffer()},
+	)
+
+
+func _layer_story(name: String, target: String, cast_name: String) -> PackedByteArray:
+	## A layer that only describes the scene: what the pack list offers a reader
+	## who wants the same story told with someone else at the table.
+	return _layer_with_content(name, target, {
+		"view": "first",
+		"density": "sparse",
+		"cast": [{"id": "host", "name": cast_name}],
+		"arc": [{"turn": 1, "label": "Opening"}],
+	})
+
+
+func _case_assembly_entry() -> void:
+	## TC-ASSEMBLY-002 — a player picks the layers of a run on the pack page.
+	## Three rules ship together: nothing is ticked until asked, a ticked layer
+	## changes the scene it names, and a save carries the set it was written
+	## with so continuing means the run the player left (ADR-0013).
+	_section("TC-ASSEMBLY-002 a player chooses the layers of a run")
+	var shell := _shell()
+	shell.loader.import_bytes(_assembly_base_with_content("b77-base"), _context())
+	shell.builtin_ids.append("b77-base")
+	shell.loader.import_bytes(_layer_story("b77-layer", "b77-base", "Jia"), _context())
+	_check(
+		"TC-ASSEMBLY-002: the layer installs beside the pack it names",
+		not shell.loader.registry.entry("b77-layer").is_empty(),
+	)
+	_check(
+		"TC-ASSEMBLY-002: the pack page offers the layer that names this pack",
+		shell.layers_for("b77-base") == ["b77-layer"],
+		str(shell.layers_for("b77-base")),
+	)
+	_check(
+		"TC-ASSEMBLY-002: nothing starts ticked",
+		shell.ticked_for("b77-base").is_empty(),
+		str(shell.ticked_for("b77-base")),
+	)
+	_check(
+		"TC-ASSEMBLY-002: a pack nothing targets offers no layer",
+		shell.layers_for("b77-absent").is_empty(),
+	)
+	shell.start_plugin("b77-base")
+	var bare: Dictionary = shell.current_view().get("content", {})
+	_check(
+		"TC-ASSEMBLY-002: starting with nothing ticked runs the pack alone",
+		String(bare.get("view", "")) == "third" and String(bare.get("cast_names", "")).contains("Bing"),
+		str(bare),
+	)
+	shell.start_plugin("b77-base", ["b77-layer"])
+	var layered: Dictionary = shell.current_view().get("content", {})
+	_check(
+		"TC-ASSEMBLY-002: a ticked layer changes how the scene reads",
+		String(layered.get("view", "")) == "first" and String(layered.get("cast_names", "")).contains("Jia"),
+		str(layered),
+	)
+	# Two mod layers both write `grain`, which is the case the assembly refuses
+	# before a run exists (V-35). A content layer is not used here: content
+	# replaces a whole block, so it has no field to collide on.
+	shell.loader.import_bytes(_layer_with_target("b77-w1", "b77-base"), _context())
+	shell.loader.import_bytes(_layer_with_target("b77-w2", "b77-base"), _context())
+	var clash := shell.start_plugin("b77-base", ["b77-w1", "b77-w2"])
+	_check(
+		"TC-ASSEMBLY-002: two layers that write the same field are refused",
+		String(clash.get("code", "")).begins_with("V-3")
+			and String(shell.notice.get("message", "")).contains("b77-w1"),
+		"%s %s" % [clash.get("code", ""), shell.notice.get("message", "")],
+	)
+	# The save carries the content it had; it does not carry the actions a layer
+	# added, so the action is what proves the set was rebuilt on resume.
+	shell.start_plugin("b77-base", ["b77-w1"])
+	shell.save_to(1)
+	shell.start_plugin("b77-base")
+	shell.resume_slot("b77-base", 1)
+	var actions: Array = []
+	for item in shell.session.menu():
+		actions.append(String(item.get("id", "")))
+	_check(
+		"TC-ASSEMBLY-002: a save restores the set it was written with",
+		actions.has("drill"),
+		str(actions),
+	)
+	var record: Dictionary = shell.loader.registry.entry("b77-base")
+	# A save is a snapshot plus the set it was written with; the ghost is a
+	# set whose layer is gone, which is what a player sees after uninstalling
+	# one by hand. Written from a real snapshot so only the layer is wrong.
+	var orphan: Dictionary = shell.session.snapshot().duplicate(true) if shell.session != null else {}
+	orphan["assembly"] = ["b77-ghost"]
+	shell.saves.write(record, 2, orphan, "ghost")
+	shell.resume_slot("b77-base", 2)
+	_check(
+		"TC-ASSEMBLY-002: a save whose layer is gone is refused with its name",
+		String(shell.notice.get("code", "")) == "E-02"
+			and String(shell.notice.get("message", "")).contains("b77-ghost"),
+		"%s %s" % [shell.notice.get("code", ""), shell.notice.get("message", "")],
+	)
+
+
 func _case_layer_content() -> void:
 	## TC-CONTENT-002 — a layer that declares content changes how the assembled
 	## story reads (REQ-042 with REQ-044). Only the content block moves: the nodes
@@ -3412,8 +3536,14 @@ func _case_layer_content() -> void:
 	)
 	_check(
 		"TC-CONTENT-002: the nodes and the phase machine stay the base package's",
-		layered.current == "n1" and String(layered.title) == String(alone.title),
-		"%s %s" % [layered.current, layered.title],
+		String(layered_view.get("node", "")) == String(alone_view.get("node", ""))
+			and String(layered_view.get("title", "")) == String(alone_view.get("title", "")),
+		"%s/%s vs %s/%s" % [
+			layered_view.get("node", ""),
+			layered_view.get("title", ""),
+			alone_view.get("node", ""),
+			alone_view.get("title", ""),
+		],
 	)
 
 
