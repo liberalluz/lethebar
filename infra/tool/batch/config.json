@@ -1,6 +1,7 @@
 {
   "base": "main",
   "branch_prefix": "batch/",
+  "docs_root": "../lethebar-docs",
   "scope": {
     "ignore": [
       "**/.godot/**",
@@ -9,6 +10,31 @@
     "generated": [
       "**/.godot/**",
       "**/build/**"
+    ]
+  },
+  "commit": {
+    "convention": "team",
+    "types": [
+      "feat",
+      "fix",
+      "docs",
+      "test",
+      "refactor",
+      "chore",
+      "ci"
+    ],
+    "scopes": [
+      "app",
+      "plugin",
+      "content",
+      "infra",
+      "docs",
+      "repo",
+      "tools"
+    ],
+    "body": [
+      "Why:",
+      "Batch:"
     ]
   },
   "checks": [
@@ -90,6 +116,16 @@
       "cwd": "."
     },
     {
+      "name": "translation",
+      "command": [
+        "python",
+        "infra/checks/check_translation.py"
+      ],
+      "cwd": "."
+    }
+  ],
+  "release_checks": [
+    {
       "name": "release-tool",
       "command": [
         "python",
@@ -112,14 +148,6 @@
       "command": [
         "python",
         "infra/checks/check_guide.py"
-      ],
-      "cwd": "."
-    },
-    {
-      "name": "translation",
-      "command": [
-        "python",
-        "infra/checks/check_translation.py"
       ],
       "cwd": "."
     }
