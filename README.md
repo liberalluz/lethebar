@@ -102,6 +102,7 @@ The engine validates a pack against `V-01`…`V-09` on load: missing assets warn
 | Why this exists | [docs/intent/](docs/intent/) |
 | How it should be | [docs/specs/](docs/specs/) |
 | What was decided and rejected | [docs/decisions/](docs/decisions/) |
+| How to write a pack | [docs/guide/](docs/guide/) |
 
 Where a document goes: how it should be → `specs/`; decided or not → `decisions/`; why → `intent/`; how to operate → `runbooks/`.
 

@@ -6,6 +6,7 @@
 | `specs/controlled/` | baseline-versioned SRS / SDD / STP / STD / SCMP |
 | `decisions/` | ADR |
 | `intent/` | why |
+| `guide/` | how to write a pack |
 | `ideas/` | unaccepted candidates |
 | `runbooks/` | operations |
 
