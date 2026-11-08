@@ -9,7 +9,7 @@ English · [简体中文](README.zh-CN.md)
 
 ## Status
 
-**v0.7.0 is out, and one run can be built from more than one package.** Three Kingdoms and
+**v0.7.1 is out, and one run can be built from more than one package.** Three Kingdoms and
 Cultivation are published from their own repositories — `pack/sanguo/v1.0.0`,
 `pack/sanguo-content/v1.0.0`, `pack/sanguo-hard/v1.0.1` and `pack/cultivation/v1.0.0` — and
 this repository keeps one smoke pack (`duel`) so that the engine's own tests have something
@@ -17,7 +17,8 @@ to open. A world pack is a bundle: it supplies the story and the rules. A layer 
 a bundle with `target` and changes it — a `content` layer says how the story reads, a `mod`
 layer changes how it plays. The pack page lists the layers that name a pack; a layer starts
 unticked, because it changes rules nobody asked to change, and the save records the set that
-was played with, so a reload rebuilds the run it came from.
+was played with, so a reload rebuilds the run it came from. v0.7.1 fixes the tick itself: until it, a ticked
+layer never reached the run, and a layer could be opened as a story.
 
 Every world repository builds its pack, checks the archive envelope before anything is
 published, and puts two files on a release: `<id>.zip` and `<id>-<version>.json`, the
