@@ -9,7 +9,7 @@ config/name="Lethebar"
 ; The product version, and the only place it is written down. The tag, the
 ; release notes and the shell all read it from here, so a release does not have
 ; to keep three numbers in step by hand.
-config/version="0.6.1"
+config/version="0.7.0"
 config/description="An engine that ships no gameplay, plus plugins that carry both the story and the rules for playing it."
 run/main_scene="res://render/main.tscn"
 
