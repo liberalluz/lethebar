@@ -27,6 +27,7 @@ ROOT_DIRECTORIES = {
     "content",
     "docs",
     "infra",
+    "templates",
     ".github",
     "changelog.d",
 }
