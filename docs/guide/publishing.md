@@ -69,3 +69,19 @@ a fresh install shows one smoke pack that has no gameplay worth reading. Yours r
 | the asset is reachable over the network | the repository is private, or the release is still a draft |
 
 If all six pass, a player who downloads the zip can install it. That is the whole test.
+
+## Which template to start from
+
+Two templates ship, and both are checked on every pass: each one is built, read
+by `check_pack`, installed into the engine and played before a release goes out.
+
+| Template | Protocol | What it adds |
+| --- | --- | --- |
+| `templates/pack-min/` | `linear@1` | a manifest and `data/nodes.json`; three nodes, two choices |
+| `templates/pack-turn/` | `turn_based@1` | the same node, plus `data/state.json`, `data/actions.json` and `data/phases.json` |
+
+Start from `pack-min` if the story moves from one scene to the next and that is
+all it does. Start from `pack-turn` if a scene has a menu of actions under it, or
+if the run needs a limit of turns. Copying one of them and rewriting the data
+files is faster than starting from an empty directory, because the fields you
+would otherwise forget are already in place.

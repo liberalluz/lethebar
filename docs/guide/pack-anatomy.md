@@ -53,6 +53,9 @@ data/nodes.json
 
 An empty `choices` list is how a story ends. The engine does not need a flag for it.
 
+`templates/pack-turn/` is the same story with the other protocol: one node, no choices, a menu
+under it, and three more data files — see [the eight bricks](bricks.md).
+
 ## What happens when a player installs it
 
 1. The archive is read; `check_pack`'s rules run again on the bytes.

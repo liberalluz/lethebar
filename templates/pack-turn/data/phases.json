@@ -1,0 +1,11 @@
+{
+  "turns": 8,
+  "ranks": [
+    {"at": 1, "title": "Traveller"},
+    {"at": 3, "title": "Guide"},
+    {"at": 5, "title": "Road-worn"}
+  ],
+  "fail": [
+    {"when": {"key": "coin", "op": "lte", "value": 0}, "reason": "Nothing left to spend"}
+  ]
+}

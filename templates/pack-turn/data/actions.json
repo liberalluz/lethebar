@@ -1,0 +1,16 @@
+{
+  "actions": [
+    {
+      "id": "gather",
+      "label": "Gather what the road offers",
+      "effects": [{"coin": {"add": 2}}],
+      "limit": {"per_turn": 1}
+    },
+    {
+      "id": "talk",
+      "label": "Talk to the people you meet",
+      "effects": [{"fame": {"add": 1}}],
+      "limit": {"per_turn": 1}
+    }
+  ]
+}

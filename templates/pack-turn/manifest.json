@@ -1,0 +1,24 @@
+{
+  "id": "pack-turn",
+  "version": "0.1.0",
+  "specVersion": "2.0.0",
+  "kind": "bundle",
+  "requires": [],
+  "engine": ">=4.7.0 <5.0.0",
+  "name": "The Long Road",
+  "defaultLocale": "en",
+  "locales": [],
+  "names": {
+    "en": "The Long Road"
+  },
+  "protocol": "turn_based@1",
+  "capabilities": [
+    "ledger@1",
+    "phases@1",
+    "text@1"
+  ],
+  "mechanics": [],
+  "entry": "road",
+  "saveSchema": 1,
+  "assets": []
+}

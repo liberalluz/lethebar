@@ -1,8 +1,9 @@
-"""Rewrite the reference tables in the author guide from the manifest schema.
+"""Rewrite the reference tables in the author guide from the engine source.
 
-The tables a page shows about fields, kinds, layers and asset types are the ones
-the engine enforces. Typing them by hand means the page can describe a schema the
-code no longer has, so the page carries markers and this tool fills them.
+Three pages carry tables that describe what the engine enforces: the manifest
+fields, the refusal codes, the bricks, and the protocols. Typing those by hand
+means a page can describe a schema or a code list the source no longer has, so
+each table sits between markers and this tool fills it.
 
 Usage:
     python infra/tool/docs/gen_guide.py --check
@@ -20,11 +21,69 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 SCHEMA = ROOT / "app" / "core" / "manifest_schema.gd"
-PAGE = ROOT / "docs" / "guide" / "manifest.md"
+REGISTRY = ROOT / "app" / "core" / "protocol_registry.gd"
+VALIDATOR = ROOT / "app" / "core" / "package_validator.gd"
+GUIDE = ROOT / "docs" / "guide"
 
 SCALAR = re.compile(r'^const (?P<name>[A-Z_0-9]+) := "(?P<value>[^"]*)"', re.MULTILINE)
 ARRAY = re.compile(r"^const (?P<name>[A-Z_0-9]+) := \[(?P<body>[^\]]*)\]", re.MULTILINE)
 ITEMS = re.compile(r'"([^"]*)"|([A-Za-z_][A-Za-z_0-9]*)')
+
+# A line that raises a refusal carries the code and, usually, the sentence a
+# player sees next to it. Taking the last quoted string on the line covers the
+# three shapes the source uses: `_issue("V-03", "id", "must match ...")`,
+# `reject("S-05", "%s is not available: %s")` and
+# `_problem(CODE_NOTHING, "nothing to save: no active session", slot)`.
+CODE_LINE = re.compile(r'"(?P<code>(?:V|S|M|SAVE)-\d{2})"')
+QUOTED = re.compile(r'"((?:[^"\\]|\\.)*)"')
+CONST_CODE = re.compile(r'^const (?P<name>CODE_[A-Z_0-9]+) := "(?P<code>SAVE-\d{2})"', re.MULTILINE)
+PROBLEM_CONST = re.compile(r"_problem\((?P<name>CODE_[A-Z_0-9]+)")
+
+# Reader files that raise codes without naming the code as a literal.
+SCAN = (
+    ROOT / "app" / "core" / "package_validator.gd",
+    ROOT / "app" / "core" / "session.gd",
+    ROOT / "app" / "core" / "mechanics.gd",
+    ROOT / "app" / "core" / "checks.gd",
+    ROOT / "app" / "core" / "save_store.gd",
+    ROOT / "app" / "core" / "hand.gd",
+    ROOT / "app" / "core" / "menu.gd",
+)
+
+# The eight bricks. Each row names the data file that turns it on and the file
+# that reads it; the generator refuses to run when a reader file disappears.
+BRICKS = (
+    ("1. State ledger", "data/state.json", "app/core/ledger.gd",
+     "the resources a run keeps, each with a start, a floor and a ceiling"),
+    ("2. Settlement rules", "data/rules.json", "app/core/mechanics.gd",
+     "when a state looks like this, change that state by this much"),
+    ("3. Action menu", "data/actions.json", "app/core/menu.gd",
+     "what a player can do, what it costs, what it changes, how often"),
+    ("4. Phase machine", "data/phases.json", "app/core/phases.gd",
+     "the turns a run has, the ranks it passes through, the ways it ends"),
+    ("5. Checks", "data/checks.json", "app/core/checks.gd",
+     "a named test on the state that a choice or a card can ask for"),
+    ("6. Pools", "data/pools.json", "app/core/pools.gd",
+     "a set of items drawn without repeats, or dealt as a hand"),
+    ("7. Relations", "data/factions.json", "app/core/relations.gd",
+     "who stands where with whom, and what a change of standing moves"),
+    ("8. Clock", "manifest.json `clock`", "app/core/session.gd",
+     "when a turn passes: every choice, every node, or every n of them"),
+)
+
+# One line per protocol, keyed by the id in the registry. A protocol added to
+# the registry without a line here stops the generator, so the page cannot miss
+# it.
+PROTOCOLS = {
+    "linear@1": (
+        "one node at a time, choices lead to other nodes; a node without choices ends the run",
+        "`data/nodes.json` with `entry`, every choice naming a `next` node",
+    ),
+    "turn_based@1": (
+        "the same walk, plus a round counter that advances when a node is left",
+        "`data/nodes.json`; `data/phases.json` if the run should have a limit",
+    ),
+}
 
 # Fields the format 2.0 checks in `format_issues()` know about and the const
 # arrays above never mention. Every name here has to appear somewhere in the
@@ -49,9 +108,12 @@ TYPE_BY_ARRAY = (
     ("OPTIONAL_MAP_FIELDS", "object"),
 )
 
-MARKERS = {
-    "fields": ("fields", "Field table"),
-    "vocabulary": ("vocabulary", "Kind, layer and asset-type vocabulary"),
+# page -> the blocks it carries
+PAGES = {
+    "manifest.md": ("fields", "vocabulary"),
+    "errors.md": ("errors",),
+    "bricks.md": ("bricks",),
+    "protocols.md": ("protocols",),
 }
 
 
@@ -139,6 +201,123 @@ def render_vocabulary(consts: dict[str, list[str]]) -> str:
     return "\n".join(lines)
 
 
+def message_of(line: str, code: str) -> str:
+    """The sentence next to a code, with the substitutions blanked out."""
+    quoted = QUOTED.findall(line)
+    if not quoted:
+        return "-"
+    sentence = quoted[-1]
+    sentence = re.sub(r"%[sd]", "…", sentence)
+    sentence = sentence.replace("|", "\\|").strip()
+    return sentence or "-"
+
+
+def error_rows() -> list[tuple[str, str, str]]:
+    """(code, file:line, sentence) for every refusal the source can raise."""
+    rows: dict[str, tuple[str, str, str]] = {}
+    for path in SCAN:
+        if not path.exists():
+            raise SystemExit(f"generator: {path.relative_to(ROOT)} is missing")
+        text = path.read_text(encoding="utf-8")
+        constants = {m.group("name"): m.group("code") for m in CONST_CODE.finditer(text)}
+        for number, line in enumerate(text.splitlines(), start=1):
+            found = CODE_LINE.search(line)
+            code = found.group("code") if found else None
+            if code is None:
+                alias = PROBLEM_CONST.search(line)
+                if alias:
+                    code = constants.get(alias.group("name"))
+            if code is None:
+                continue
+            where = f"`{path.relative_to(ROOT).as_posix()}:{number}`"
+            rows.setdefault(code, (code, where, message_of(line, code)))
+    if not rows:
+        raise SystemExit("generator: no refusal codes found in the source")
+    return [rows[code] for code in sorted(rows)]
+
+
+def render_errors(rows: list[tuple[str, str, str]]) -> str:
+    lines = [
+        "| Code | Raised at | What it says |",
+        "| --- | --- | --- |",
+    ]
+    for code, where, sentence in rows:
+        lines.append(f"| `{code}` | {where} | {sentence} |")
+    return "\n".join(lines)
+
+
+def brick_rows() -> list[tuple[str, str, str, str]]:
+    """(brick, declared in, read by, what it owns) for the eight bricks."""
+    rows: list[tuple[str, str, str, str]] = []
+    for brick, declared, reader, owns in BRICKS:
+        path = ROOT / reader
+        if not path.exists():
+            raise SystemExit(f"generator: brick {brick!r} names {reader}, which is missing")
+        rows.append((brick, declared, f"`{reader}`", owns))
+    return rows
+
+
+def render_bricks(rows: list[tuple[str, str, str, str]]) -> str:
+    lines = [
+        "| Brick | Turned on by | Read by | What it owns |",
+        "| --- | --- | --- | --- |",
+    ]
+    for brick, declared, reader, owns in rows:
+        lines.append(f"| {brick} | `{declared}` | {reader} | {owns} |")
+    return "\n".join(lines)
+
+
+def protocol_rows() -> list[tuple[str, str, str, str]]:
+    text = REGISTRY.read_text(encoding="utf-8")
+    pairs = re.findall(r'"(?P<id>[a-z_]+@\d)":\s*preload\("res://(?P<file>[a-z_/0-9]+\.gd)"\)', text)
+    if not pairs:
+        raise SystemExit("generator: the protocol registry lists no implementations")
+    rows: list[tuple[str, str, str, str]] = []
+    for protocol, file in pairs:
+        if protocol not in PROTOCOLS:
+            raise SystemExit(
+                f"generator: the registry implements {protocol}, which the guide does not describe"
+            )
+        expects, declares = PROTOCOLS[protocol]
+        rows.append((f"`{protocol}`", f"`app/{file}`", expects, declares))
+    known = {row[0].strip("`") for row in rows}
+    for protocol in PROTOCOLS:
+        if protocol not in known:
+            raise SystemExit(f"generator: the guide describes {protocol}, which the registry lost")
+    return rows
+
+
+def render_protocols(rows: list[tuple[str, str, str, str]]) -> str:
+    lines = [
+        "| Protocol | Implemented by | What the story has to look like | What to declare |",
+        "| --- | --- | --- | --- |",
+    ]
+    for protocol, where, expects, declares in rows:
+        lines.append(f"| {protocol} | {where} | {expects} | {declares} |")
+    return "\n".join(lines)
+
+
+def build() -> dict[tuple[str, str], str]:
+    """(page, block) -> rendered body, for every block the guide carries."""
+    schema_text = SCHEMA.read_text(encoding="utf-8")
+    consts = read_consts(schema_text)
+    for name in EXTRA:
+        if f'"{name}"' not in schema_text:
+            raise SystemExit(
+                f"generator: the schema never mentions {name!r}; the table would lie"
+            )
+    if not consts.get("REQUIRED_FIELDS"):
+        raise SystemExit("generator: no REQUIRED_FIELDS in the schema")
+    bodies = {
+        ("manifest.md", "fields"): render_fields(field_rows(consts)),
+        ("manifest.md", "vocabulary"): render_vocabulary(consts),
+        ("errors.md", "errors"): render_errors(error_rows()),
+        ("bricks.md", "bricks"): render_bricks(brick_rows()),
+        ("protocols.md", "protocols"): render_protocols(protocol_rows()),
+    }
+    return bodies
+
+
 def block(text: str, name: str) -> str:
     open_tag = f"<!-- generated:{name} -->"
     close_tag = f"<!-- /generated:{name} -->"
@@ -155,23 +334,6 @@ def replace(text: str, name: str, body: str) -> str:
     return text[:start] + "\n\n" + body + "\n\n" + text[end:]
 
 
-def build() -> tuple[str, dict[str, str]]:
-    schema_text = SCHEMA.read_text(encoding="utf-8")
-    consts = read_consts(schema_text)
-    for name in EXTRA:
-        if f'"{name}"' not in schema_text:
-            raise SystemExit(
-                f"generator: the schema never mentions {name!r}; the table would lie"
-            )
-    if not consts.get("REQUIRED_FIELDS"):
-        raise SystemExit("generator: no REQUIRED_FIELDS in the schema")
-    rows = field_rows(consts)
-    return schema_text, {
-        "fields": render_fields(rows),
-        "vocabulary": render_vocabulary(consts),
-    }
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="report drift, write nothing")
@@ -180,23 +342,36 @@ def main() -> int:
     if not args.check and not args.write:
         parser.error("say --check or --write")
 
-    page = PAGE.read_text(encoding="utf-8")
-    _, bodies = build()
-    drift = {name: body for name, body in bodies.items() if block(page, name) != body}
+    bodies = build()
+    pages: dict[str, str] = {}
+    drift: dict[tuple[str, str], str] = {}
+    for (page_name, block_name), body in bodies.items():
+        path = GUIDE / page_name
+        if not path.exists():
+            raise SystemExit(f"generator: {path.relative_to(ROOT)} is missing")
+        if page_name not in pages:
+            pages[page_name] = path.read_text(encoding="utf-8")
+        try:
+            current = block(pages[page_name], block_name)
+        except ValueError as error:
+            raise SystemExit(f"generator: {page_name} has no {block_name} block") from error
+        if current != body:
+            drift[(page_name, block_name)] = body
 
     if args.check:
         if not drift:
-            print(f"[guide] {PAGE.relative_to(ROOT)}: tables match the schema")
+            print(f"[guide] {len(bodies)} table(s) match the source")
             return 0
-        for name in drift:
-            print(f"[guide] {name}: the page does not match app/core/manifest_schema.gd")
+        for page_name, block_name in drift:
+            print(f"[guide] {page_name}: the {block_name} table does not match the source")
         print("[guide] run python infra/tool/docs/gen_guide.py --write")
         return 1
 
-    for name, body in bodies.items():
-        page = replace(page, name, body)
-    PAGE.write_bytes(page.encode("utf-8"))
-    print(f"[guide] wrote {len(bodies)} block(s) into {PAGE.relative_to(ROOT)}")
+    for page_name, text in pages.items():
+        for block_name in PAGES[page_name]:
+            text = replace(text, block_name, bodies[(page_name, block_name)])
+        (GUIDE / page_name).write_bytes(text.encode("utf-8"))
+    print(f"[guide] wrote {len(bodies)} block(s) into {len(pages)} page(s)")
     return 0
 
 
