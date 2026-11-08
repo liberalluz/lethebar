@@ -47,6 +47,14 @@
       "cwd": "."
     },
     {
+      "name": "conventions",
+      "command": [
+        "python",
+        "infra/checks/check_conventions.py"
+      ],
+      "cwd": "."
+    },
+    {
       "name": "commit-body",
       "command": [
         "python",

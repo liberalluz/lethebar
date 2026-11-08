@@ -7,9 +7,11 @@ Two lines are required in every commit body this branch adds:
     Batch: B<n>   (or: Batch: none)
 
 The check looks at `base..HEAD`, so merged history is never rewritten by it: a
-commit that is already on `main` is not examined. The subject line is not
-checked again here; `docs/specs/git-conventions.md` §2 covers its shape and the
-review covers its quality.
+commit that is already on `main` is not examined. The subject line is checked
+too: `type(scope): subject` with the type and the scope read from
+`docs/specs/git-conventions.md`, through `check_conventions.py`. That file is the
+only place those two lists live; a third copy is how the scope list drifted
+before.
 
 `Why:` must be followed by non-empty text, either on the same line or in the
 lines up to the next `Key:` line. `Batch:` accepts `B<n>`, `B<n><letter>`
@@ -27,7 +29,10 @@ import argparse
 import re
 import subprocess
 import sys
+from functools import lru_cache
 from pathlib import Path
+
+from check_conventions import load, subject_problems
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SEPARATOR = "\x1f"
@@ -103,10 +108,22 @@ def _markdown(body: str, kind: str) -> bool:
     return bool(UNDERSCORE.search(prose))
 
 
+@lru_cache(maxsize=1)
+def conventions() -> tuple[list[str], list[str]]:
+    """The types and scopes, read from the one file that owns them."""
+
+    root = Path(__file__).resolve().parents[2]
+    document_types, document_scopes, _, _ = load(root)
+    return document_types, document_scopes
+
+
 def inspect(sha: str, body: str) -> list[str]:
     """Every problem with one commit message, in the wording the gate uses."""
     details: list[str] = []
     subject = body.splitlines()[0] if body.splitlines() else ""
+    types, scopes = conventions()
+    for problem in subject_problems(subject, types, scopes):
+        details.append(f"{sha[:8]} {subject}: {problem}")
     if not field(body, "Why"):
         details.append(f"{sha[:8]} {subject}: missing 'Why:'")
     batch = field(body, "Batch")
