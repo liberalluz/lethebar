@@ -78,6 +78,7 @@ func _initialize() -> void:
 	_case_assembly()
 	_case_assembly_entry()
 	_case_assembly_reload()
+	_case_layer_tick()
 	_case_layers()
 	_case_content()
 	_case_meta()
@@ -3246,6 +3247,80 @@ func _rules_layer(name: String, target: String) -> PackedByteArray:
 			"data/disable.json": JSON.stringify({"actions": ["farm"]}, "\t").to_utf8_buffer(),
 		},
 	)
+
+func _case_layer_tick() -> void:
+	## TC-ASSEMBLY-004 — the tick on the pack page is the one the run gets. The
+	## page builds a button per story, and that button is what a player presses,
+	## so the test presses the button instead of calling `start_plugin` with the
+	## set it hopes the page remembered.
+	_section("TC-ASSEMBLY-004 a tick on the pack page reaches the run")
+	var shell := _shell()
+	shell.loader.import_bytes(_base_package("b82-base"), _context())
+	shell.builtin_ids.append("b82-base")
+	shell.loader.import_bytes(_rules_layer("b82-mod", "b82-base"), _context())
+
+	shell.open_plugins()
+	_press_story(shell, "b82-base")
+	var bare: Array = []
+	for action in shell.session.actions:
+		bare.append(String(action.get("id", "")))
+	_check(
+		"TC-ASSEMBLY-004: with nothing ticked the button opens the pack alone",
+		bare == ["farm"],
+		str(bare),
+	)
+
+	shell.toggle_layer("b82-base", "b82-mod")
+	_press_story(shell, "b82-base")
+	var layered: Array = []
+	for action in shell.session.actions:
+		layered.append(String(action.get("id", "")))
+	_check(
+		"TC-ASSEMBLY-004: a ticked layer reaches the run the button opens",
+		layered == ["drill"],
+		str(layered),
+	)
+	_check(
+		"TC-ASSEMBLY-004: the ticked run carries the layer's definition",
+		float(shell.session.ledger_defs.get("grain", {}).get("max", 0.0)) == 99.0,
+		str(shell.session.ledger_defs.get("grain", {})),
+	)
+
+	shell.toggle_layer("b82-base", "b82-mod")
+	_press_story(shell, "b82-base")
+	var again: Array = []
+	for action in shell.session.actions:
+		again.append(String(action.get("id", "")))
+	_check(
+		"TC-ASSEMBLY-004: unticking brings back the pack as it was written",
+		again == ["farm"],
+		str(again),
+	)
+
+	shell.session = null
+	shell.start_plugin("b82-mod")
+	_check(
+		"TC-ASSEMBLY-004: a layer cannot be opened as a story",
+		shell.session == null,
+		"a session was created for a layer",
+	)
+	_check(
+		"TC-ASSEMBLY-004: the refusal leaves the player on the pack page",
+		shell.screen == "notice" and String(shell.notice.get("code", "")) == "E-03",
+		"%s %s" % [shell.screen, shell.notice],
+	)
+
+
+func _press_story(shell: Shell, plugin_id: String) -> void:
+	## Presses the button a player would press. Finding it by the title it shows
+	## keeps the test honest: if the page stops offering the story, this fails.
+	var title := shell._pack_title(plugin_id)
+	for child in shell._options.get_children():
+		if child is Button and String((child as Button).text) == title:
+			(child as Button).pressed.emit()
+			return
+	_check("TC-ASSEMBLY-004: the pack page offers %s" % plugin_id, false, title)
+
 
 
 func _case_assembly_reload() -> void:
