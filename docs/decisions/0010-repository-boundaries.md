@@ -171,7 +171,7 @@ the day someone wants to merge it back.
    package is enough to prove the pipeline.
 
 **Order:** the world repository first — `lethebar-game-sanguo`, because it has the
-most content and therefore proves the multi-genre layout. `lethebar-game-xiuxian`
+most content and therefore proves the multi-genre layout. `lethebar-game-cultivation`
 follows. Genre material repositories open only when a second author appears; mod
 repositories only after the assembly layer lands; the marketplace only when a
 third author wants to publish without a maintainer copying files by hand.

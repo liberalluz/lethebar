@@ -50,7 +50,7 @@ both packages, because a world with two spellings is a packaging bug worth fixin
 New game
   -> worlds      (only when more than one world is installed)
      sanguo  · 3 stories
-     xiuxian · 2 stories
+     cultivation · 2 stories
   -> packs of one world
      tale / cards / war
   -> a session   (back returns to the pack list, then to the worlds)
