@@ -244,9 +244,28 @@ def pack_rows(packs: list[tuple[Path, dict]]) -> list[str]:
     return lines
 
 
-def badge_block(packs: list[tuple[Path, dict]]) -> str:
+def block_lines(packs: list[tuple[Path, dict]], fold: bool = False) -> list[str]:
+    """The badges, then the table, flat or behind a one-click summary."""
+    lines = [*repo_badges(packs), ""]
+    if fold:
+        lines.extend(
+            [
+                "<details>",
+                f"<summary>Packs ({len(packs)})</summary>",
+                "",
+                *pack_rows(packs),
+                "",
+                "</details>",
+            ]
+        )
+    else:
+        lines.extend(pack_rows(packs))
+    return lines
+
+
+def badge_block(packs: list[tuple[Path, dict]], fold: bool = False) -> str:
     """The marked block `--write` puts in a file and `--check` compares."""
-    return "\n".join([BADGE_BEGIN, *repo_badges(packs), "", *pack_rows(packs), BADGE_END])
+    return "\n".join([BADGE_BEGIN, *block_lines(packs, fold), BADGE_END])
 
 
 def marked_block(text: str) -> str:
@@ -296,7 +315,18 @@ def check_badges(path: Path, packs: list[tuple[Path, dict]]) -> list[str]:
     for pack_id in written:
         if pack_id not in ids:
             problems.append(f"the table has a row for {pack_id}, which no manifest names")
-    expected = "\n".join([*repo_badges(packs), "", *pack_rows(packs)])
+    folded = "<details>" in found
+    if folded:
+        summary = re.search(r"<summary>Packs \((\d+)\)</summary>", found)
+        if not summary:
+            problems.append(
+                "the block is folded but carries no <summary>Packs (N)</summary>"
+            )
+        elif int(summary.group(1)) != len(packs):
+            problems.append(
+                f"the summary says {summary.group(1)} packs; the manifests are {len(packs)}"
+            )
+    expected = "\n".join(block_lines(packs, folded))
     if not problems and found.strip() != expected.strip():
         problems.append(
             "the block around the table does not match the manifests (badges or spacing)"
@@ -304,13 +334,21 @@ def check_badges(path: Path, packs: list[tuple[Path, dict]]) -> list[str]:
     return problems
 
 
-def write_badges(path: Path, packs: list[tuple[Path, dict]]) -> None:
-    """Replace only the marked block; writing twice is a no-op."""
+def write_badges(
+    path: Path, packs: list[tuple[Path, dict]], fold: bool | None = None
+) -> None:
+    """Replace only the marked block; writing twice is a no-op.
+
+    With no explicit choice, the block keeps the shape it already has: a folded
+    table stays folded, so a version bump does not silently unfold it.
+    """
     text = path.read_text(encoding="utf-8")
-    marked_block(text)
+    found = marked_block(text)
+    if fold is None:
+        fold = "<details>" in found
     start = text.find(BADGE_BEGIN)
     end = text.find(BADGE_END)
-    updated = text[:start] + badge_block(packs) + text[end + len(BADGE_END) :]
+    updated = text[:start] + badge_block(packs, fold) + text[end + len(BADGE_END) :]
     if updated != text:
         path.write_text(updated, encoding="utf-8", newline="\n")
 
@@ -446,6 +484,27 @@ def self_test() -> int:
         stale = [(path, dict(body, version="9.9.9")) for path, body in packs]
         if not any("Version row for second" in problem for problem in check_badges(readme, stale)):
             problems.append("a version bump is not caught")
+        write_badges(readme, packs, fold=True)
+        folded = readme.read_text(encoding="utf-8")
+        if "<details>" not in folded or "<summary>Packs (2)</summary>" not in folded:
+            problems.append("a folded table is not folded")
+        if check_badges(readme, packs):
+            problems.append("a folded README does not check")
+        write_badges(readme, packs)
+        if "<details>" not in readme.read_text(encoding="utf-8"):
+            problems.append("a version bump unfolds the table")
+        write_badges(readme, packs, fold=False)
+        if "<details>" in readme.read_text(encoding="utf-8"):
+            problems.append("--flat leaves the table folded")
+        if check_badges(readme, packs):
+            problems.append("a flat README does not check")
+        write_badges(readme, packs, fold=True)
+        counted = readme.read_text(encoding="utf-8").replace(
+            "<summary>Packs (2)</summary>", "<summary>Packs (9)</summary>"
+        )
+        readme.write_text(counted, encoding="utf-8", newline="\n")
+        if not any("summary" in problem for problem in check_badges(readme, packs)):
+            problems.append("a stale pack count is accepted")
         one = repo / "packs" / "example"
         if "packs-1-6f42c1" not in badge_block([(one, read_manifest(one))]):
             problems.append("a single pack is not one row and one badge")
@@ -499,6 +558,22 @@ def main(argv: list[str]) -> int:
     badge_parser.add_argument(
         "--check", metavar="FILE", help="exit 1 when a row drifts"
     )
+    layout = badge_parser.add_mutually_exclusive_group()
+    layout.add_argument(
+        "--fold",
+        dest="fold",
+        action="store_const",
+        const=True,
+        help="put the table behind <details><summary>Packs (N)</summary>",
+    )
+    layout.add_argument(
+        "--flat",
+        dest="fold",
+        action="store_const",
+        const=False,
+        help="keep the table flat (the default shape)",
+    )
+    badge_parser.set_defaults(fold=None)
 
     commands.add_parser("self-test", help="assert reproducibility and the descriptor")
 
@@ -544,7 +619,7 @@ def main(argv: list[str]) -> int:
         if args.write and args.check:
             raise SystemExit("pass one of --write or --check, not both")
         if args.write:
-            write_badges(Path(args.write), packs)
+            write_badges(Path(args.write), packs, args.fold)
             print(f"wrote the pack table of {args.root} into {args.write}")
             return 0
         if args.check:

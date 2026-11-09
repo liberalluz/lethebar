@@ -152,27 +152,16 @@ def validate_date(value: str) -> None:
         raise PublishError(f"date must be YYYY-MM-DD, got {value!r}")
 
 
-def changelog_section(root: Path, version: str) -> str:
-    path = root / CHANGELOG
-    if not path.is_file():
-        raise PublishError(f"missing {path}")
-    text = read_text(path)
-    pattern = re.compile(
-        rf"^## {re.escape(version)}(?:\s*-\s*.*)?$",
-        re.MULTILINE,
-    )
-    match = pattern.search(text)
-    if not match:
-        raise PublishError(f"{CHANGELOG} has no section for {version}")
-    start = match.end()
-    following = H2_RE.search(text, start)
-    body = text[start : following.start() if following else len(text)].strip()
-    if not body:
-        raise PublishError(f"{version} section in {CHANGELOG} is empty")
-    return body
+def read_body(
+    root: Path, docs_root: Path, version: str, body_file: str | None
+) -> tuple[str, str]:
+    """The body a player reads.
 
-
-def read_body(root: Path, version: str, body_file: str | None) -> tuple[str, str]:
+    It is never a changelog section: a release note says what changed for a
+    person, and the changelog says what a batch did. With no `--body-file`, the
+    body is the player note in the docs repository; a missing note is an error,
+    not a reason to publish the changelog.
+    """
     if body_file:
         path = Path(body_file)
         if not path.is_absolute():
@@ -187,7 +176,16 @@ def read_body(root: Path, version: str, body_file: str | None) -> tuple[str, str
         except ValueError:
             source = str(path)
         return body, source
-    return changelog_section(root, version), CHANGELOG
+    note = docs_root / "product" / "release-notes" / f"{version}.en.md"
+    if not note.is_file():
+        raise PublishError(
+            f"no player notes for {version}: write {note} "
+            "(a changelog section is not a release body)"
+        )
+    body = read_text(note).strip()
+    if not body:
+        raise PublishError(f"player notes are empty: {note}")
+    return body, Path(os.path.relpath(note.resolve(), root.resolve())).as_posix()
 
 
 def evidence_path(docs_root: Path, version: str, day: str) -> Path:
@@ -346,7 +344,7 @@ def build_plan(
             "cannot derive repository from origin; pass --repo OWNER/NAME"
         )
 
-    body, body_source = read_body(root, version, body_file)
+    body, body_source = read_body(root, docs_root, version, body_file)
 
     return {
         "provider": provider,

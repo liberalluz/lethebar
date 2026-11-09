@@ -60,6 +60,19 @@ agrees; otherwise the badge says `mixed` and the rows carry the exact values.
 `engine` is the one that matters: a range the running engine does not satisfy is
 refused at install (`V-05`).
 
+When the table gets long, put it behind a one-click summary with `--fold`; a
+folded table keeps its count in the summary, and `--check` compares that count
+too. `--write` never changes the shape on its own: a folded table stays folded
+across a version bump, and `--flat` is how you unfold it on purpose.
+
+## The release body
+
+`publish.py` takes the body from `product/release-notes/<version>.en.md` in the
+docs repository; `--body-file` overrides it. It never falls back to
+`CHANGELOG.md`: a release note says what changed for a player, a changelog says
+what a batch did. A missing note is an error, not a reason to publish a batch
+list under a player-facing title.
+
 ## The author gate
 
 Copy `infra/ci/author-gate.yml` from the engine into `.github/workflows/gate.yml` and change one
