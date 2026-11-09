@@ -63,6 +63,15 @@
       "cwd": "."
     },
     {
+      "name": "merge-message",
+      "command": [
+        "python",
+        "infra/tool/merge/pr_merge.py",
+        "--self-test"
+      ],
+      "cwd": "."
+    },
+    {
       "name": "tree",
       "command": [
         "python",
@@ -94,6 +103,14 @@
       "command": [
         "python",
         "infra/stage_builtin.py"
+      ],
+      "cwd": "."
+    },
+    {
+      "name": "lifecycle",
+      "command": [
+        "python",
+        "infra/checks/check_lifecycle.py"
       ],
       "cwd": "."
     },

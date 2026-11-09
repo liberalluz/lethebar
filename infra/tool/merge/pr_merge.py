@@ -510,6 +510,8 @@ def _self_test() -> int:
     check("plain body keeps the words", "data/cards.json" in flat and "never" in flat, True)
     check("plain body keeps the rule lines",
           flat.startswith("Why: the engine reads data/cards.json"), True)
+    check("plain body keeps the Batch line after a backticked Why line",
+          "Batch: B42" in flat.splitlines(), True)
 
     wide = "Why: " + "word " * 40 + "\nBatch: none"
     wrapped = plain_body(wide)
