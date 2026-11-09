@@ -362,7 +362,44 @@ func assemble(ids: Array) -> Dictionary:
 				return {"ok": false, "code": "V-35", "message": clash, "entries": []}
 		entry["state"] = _state_of(manifest)
 		entries.append(entry)
+	var merged: Dictionary = _merge_layer_assets(entries)
+	if not merged.get("ok", false):
+		return merged
 	return {"ok": true, "code": "", "message": "", "entries": entries}
+
+
+func _merge_layer_assets(entries: Array) -> Dictionary:
+	## B92: every applied layer's asset bytes join the bundle's lookup, in
+	## assembly order. A path two applied layers both carry is ambiguous before
+	## the run starts, so it is refused; a path the bundle also declares is
+	## overridden by the layer, like every other layer dimension.
+	var base_index := -1
+	for i in entries.size():
+		var manifest: Dictionary = entries[i].get("manifest", {}) if entries[i].get("manifest", null) is Dictionary else {}
+		if String(manifest.get("kind", ManifestSchema.KIND_BUNDLE)) == ManifestSchema.KIND_BUNDLE:
+			base_index = i
+			break
+	if base_index < 0:
+		return {"ok": true}
+	var base_assets: Dictionary = entries[base_index]["data"]["assets"]
+	var owners := {}
+	for i in entries.size():
+		if i == base_index or String(entries[i].get("state", "")) != "applied":
+			continue
+		var layer_assets: Dictionary = entries[i]["data"]["assets"]
+		for path in layer_assets:
+			if owners.has(path):
+				return {
+					"ok": false,
+					"code": "V-45",
+					"message": "the layers %s and %s both carry %s" % [
+						owners[path], String(entries[i]["id"]), path,
+					],
+					"entries": [],
+				}
+			owners[path] = String(entries[i]["id"])
+			base_assets[path] = layer_assets[path]
+	return {"ok": true}
 
 
 func _state_of(manifest: Dictionary) -> String:
