@@ -25,7 +25,7 @@ about your pack. `hash` writes the descriptor that sits beside the zip; never ed
 
 `github.com/liberalluz/lethebar-pack-template` holds both tools, the three-step workflow and a
 working example pack; click **Use this template**, replace the example, and skip the assembly
-above. It is tested against engine `v0.6.0`, and its own gate ran green before it was offered.
+above. It is tested against engine `v0.7.1`, and its own gate ran green before it was offered.
 
 ## One tag, one release, two assets
 
@@ -39,6 +39,26 @@ The version in the tag, in `manifest.json`, and in the descriptor filename is th
 they disagree, nothing fails loudly — which is exactly why the contract is written down here.
 
 A second release of the same pack is a new tag: `v0.1.1`. Tags are never moved.
+
+## The README table
+
+A repository's README carries three things a reader checks before installing:
+how many packs there are, which spec and engine they share, and one row per
+pack. Write them from the manifests instead of by hand:
+
+```text
+python infra/tool/release/pack.py badge . --write README.md
+python infra/tool/release/pack.py badge . --check README.md
+```
+
+`--write` replaces only the block between `<!-- pack-badges:begin -->` and
+`<!-- pack-badges:end -->`; `--check` names the pack and the field when a row
+disagrees, and exits 1. The `packs` badge counts every pack, layers included,
+because a layer is installed and released on its own; the `Kind` column says
+which rows are playable. `spec` and `engine` are printed only when every pack
+agrees; otherwise the badge says `mixed` and the rows carry the exact values.
+`engine` is the one that matters: a range the running engine does not satisfy is
+refused at install (`V-05`).
 
 ## The author gate
 
