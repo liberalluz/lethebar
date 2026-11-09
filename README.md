@@ -9,7 +9,7 @@ English · [简体中文](README.zh-CN.md)
 
 ## Status
 
-**v0.7.1 is out, and one run can be built from more than one package.** Three Kingdoms and
+**v0.7.2 is out, and one run can be built from more than one package.** Three Kingdoms and
 Cultivation are published from their own repositories — `pack/sanguo/v1.0.0`,
 `pack/sanguo-content/v1.0.0`, `pack/sanguo-hard/v1.0.1` and `pack/cultivation/v1.0.0` — and
 this repository keeps one smoke pack (`duel`) so that the engine's own tests have something
@@ -17,8 +17,9 @@ to open. A world pack is a bundle: it supplies the story and the rules. A layer 
 a bundle with `target` and changes it — a `content` layer says how the story reads, a `mod`
 layer changes how it plays. The pack page lists the layers that name a pack; a layer starts
 unticked, because it changes rules nobody asked to change, and the save records the set that
-was played with, so a reload rebuilds the run it came from. v0.7.1 fixes the tick itself: until it, a ticked
-layer never reached the run, and a layer could be opened as a story.
+was played with, so a reload rebuilds the run it came from. v0.7.2 carries what followed that fix: a package is a layer because its
+manifest says `kind: layer`, not because it carries a `target`, and the pack page can
+remove a package or one of its layers.
 
 Every world repository builds its pack, checks the archive envelope before anything is
 published, and puts two files on a release: `<id>.zip` and `<id>-<version>.json`, the
@@ -30,8 +31,9 @@ in the interface. Installing straight from a release URL is not offered, because
 not send a CORS header with its release assets and the browser refuses the fetch.
 
 Upgrading: a browser that played the old built-in packs still holds them at version `0.1.0`,
-and `V-03` refuses any other version of the same id. Clear the site's data once; after that
-the world packs install normally.
+and `V-03` refuses a second install of the same id. Remove the old package on the pack page
+(press Remove twice), then install the world pack; clearing the site's data is no longer
+needed.
 
 Known limits: pictures and sound are drawn into one band and one portrait column, and
 only from PNG, JPEG and WAV; a run's clock is counted in turns or nodes, never in wall

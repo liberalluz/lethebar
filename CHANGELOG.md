@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.7.2 - 2026-11-09
+
+### Added
+- `check_commit_body.py` refuses a subject that is not `type(scope): subject`. It imports the parser from `check_conventions.py`, so the subject is judged against the same list rather than a third copy of it.
+- The gate runs `conventions` as its second check, before `commit-body`, so a drifted list is reported once instead of once per commit.
+- The pack page can remove an installed package, or one of its layers, after a confirming second press. Before this, `V-03` refused a version that was already installed and offered no way back, so a pack installed once could never be replaced. Removing a base that still owns a layer is refused, and the refusal names the layers.
+- `infra/checks/check_lifecycle.py` — the lifecycle report's `missing` list is the verdict, and a warning is not a reason. The open batch's own exit record is exempt: `exit` writes it after the merge (B87).
+- `pack.py badge <repo-root>` writes a repository's pack table from every `packs/*/manifest.json`: a `packs-N` badge, `spec` and `engine` badges only when every pack agrees (otherwise `mixed`), and one table row per pack with `Kind`, `Pack`, `Version`, `Spec` and `Engine`. `--write` replaces only the marked block and `--check` names the pack and the field when a row drifts (B88).
+- The gate runs `pack.py self-test` as the `badges` step, taking the check count from twelve to thirteen. A stale table now turns the gate red.
+
+### Changed
+- The batch runner is the installed skeleton again: `pause`, `resume`, `exit`, `budget_override`, `pr_title` and `release_checks` all exist, and the twelve gate commands still run in the order they ran before.
+- `release-tool`, `pack-envelope` and `guide` moved to `release_checks`, so an ordinary batch runs nine commands instead of twelve. A card marked `release: true` still runs all of them.
+- `config.json` gained the blocks the skeleton expects: `commit`, `release_checks`, `pr_create`, `merge` and `docs_root`.
+- The `commit` block carries the `team` convention this repository already follows by hand: seven types, seven scopes and the two body lines. A card now has to name its `git_scope`, and a commit whose scope is outside the list fails the gate.
+- The commit types and the scope list now live in one file. `check_conventions.py` reads `docs/specs/git-conventions.md` and `infra/tool/batch/config.json` and fails when the two disagree, naming the side that is wrong. Before this batch the same seven scopes were written twice, and `docs(srs)` still shipped a commit because nothing read the list at commit time.
+- The gate runs the lifecycle report and `pr_merge.py --self-test`, taking the check count from ten to twelve. A merged batch with no exit record, or a plain commit body that loses its `Batch:` line, now turns the gate red instead of relying on someone running the tools by hand.
+- `docs/guide/publishing.md` pins the current release instead of `v0.6.0`, and documents `badge` as the command that writes the README block, including that `packs-N` counts layers and `Kind` explains which rows are playable.
+
+### Fixed
+- A package is a layer because its manifest says `kind: layer`, not because it carries a `target`. `Session.create` reads `kind` from the installed record, so a bundle that happens to name a target is merged as a bundle instead of having its actions disabled by the layer path (B86).
+
 ## v0.7.1 - 2026-11-08
 
 ### Fixed
