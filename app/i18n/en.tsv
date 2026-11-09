@@ -48,6 +48,10 @@ ui.world_other	Other stories
 ui.arc_stage	arc: %s (from turn %d)
 ui.cast_line	Cast: %s
 ui.install_link	Install from a link…
+ui.remove	Remove
+ui.remove_confirm	Remove %s?
+ui.remove_hint	Press Remove again to remove %s.
+ui.remove_layers_first	Remove its layers first: %s.
 ui.link_ask	Paste the address of a .zip package.
 ui.link_digest	Paste its sha256 (64 hex characters).
 ui.link_refused	Nothing was installed. The address and the digest were not enough to accept this file.

@@ -71,3 +71,17 @@ the first and third runs produce identical views and identical saves.
 - **Make every change a capability instead of a mod.** Rejected: "the economy is
   harsher" is not a new way to play, and turning every tuning knob into an engine
   capability would bloat the engine with one-off switches.
+
+## Amendment (B86)
+
+- A player can remove an installed package from the pack page: the first press
+  asks, the second erases the registry record and the stored bytes, so `V-03`
+  no longer makes a wrong version permanent. A bundle that still owns a layer is
+  refused, and the refusal names the layers, because removing the base first
+  would leave records whose `target` names nothing.
+- Removal is the phase-1 form of the reversibility this ADR asks for, and it does
+  not wait for the marketplace. The acceptance is unchanged: run the base, run
+  the base plus the layer, remove the layer, run again — the first and third runs
+  show the same view and write the same save.
+- A save that needed the removed layer refuses to open with `E-02`; it is not
+  deleted.

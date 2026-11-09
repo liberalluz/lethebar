@@ -48,19 +48,20 @@ func ids() -> Array:
 
 
 func entry(plugin_id: String) -> Dictionary:
-	## The record has to describe itself. `layer` and `target` live in the
-	## manifest, and callers decide what a package is from the record alone:
-	## `Session.create` treats a record that names a `target` as a layer and
-	## everything else as an additive package. A save replays its assembly
-	## through this function, so a copy that dropped `target` would make a layer
-	## come back as a package that only adds — its `disable.json` and its
-	## overridden definitions would be lost (REQ-043, B80).
+	## The record has to describe itself. `kind` is the declaration (ADR-0013):
+	## `Session.create` applies a record as a layer only when `kind` says so, and
+	## merges everything else as an additive package. `layer` and `target` are
+	## copied beside it because the assembly chain reads them from the record, not
+	## from the manifest. A save replays its assembly through this function, so a
+	## copy that dropped any of them would make a layer come back as a package
+	## that only adds — its `disable.json` and its overridden definitions would be
+	## lost (REQ-043, B80, B86).
 	var record: Dictionary = _entries.get(plugin_id, {})
 	var manifest: Variant = record.get("manifest", {})
 	if not (manifest is Dictionary):
 		return record
 	var out := record.duplicate()
-	for key in ["layer", "target"]:
+	for key in ["kind", "layer", "target"]:
 		if (manifest as Dictionary).has(key):
 			out[key] = (manifest as Dictionary)[key]
 	return out

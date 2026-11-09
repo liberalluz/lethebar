@@ -80,6 +80,8 @@ func _initialize() -> void:
 	_case_assembly_reload()
 	_case_layer_tick()
 	_case_layers()
+	_case_layer_identity()
+	_case_removal()
 	_case_content()
 	_case_meta()
 	_case_wire3()
@@ -3366,9 +3368,132 @@ func _case_assembly_reload() -> void:
 	)
 
 
-func _layer_package(name: String, ignore: String = "") -> PackedByteArray:
-	## A layer names the package it sits on, not the other way round, so the only
-	## thing that makes it a layer is the target the assembly carries (REQ-042).
+func _case_layer_identity() -> void:
+	## B86: a record is a layer because `kind` says so. Two readers used to
+	## disagree — the replay looked for `target`, the assembly looked for `target`
+	## too — so a package that merely named one wrote over the run as well.
+	_section("B86 a layer is what its kind says")
+	var loader := PackageLoader.new()
+	var base: Dictionary = loader.import_bytes(_base_package("kind-base"), _context())
+	var layer: Dictionary = loader.import_bytes(_layer_package("kind-mod", "kind-base"), _context())
+	_check(
+		"B86: the base and the layer install",
+		base.get("status", "") == "installed" and layer.get("status", "") == "installed",
+		"%s %s" % [base.get("code", ""), layer.get("code", "")],
+	)
+	var record: Dictionary = loader.registry.entry("kind-mod")
+	_check("B86: the registry record carries kind", String(record.get("kind", "")) == "layer", str(record.get("kind", "")))
+	var resolved: Dictionary = loader.assemble(["kind-base", "kind-mod"])
+	var entries: Array = resolved.get("entries", [])
+	_check(
+		"B86: the assembly resolves both packages",
+		resolved.get("ok", false) and entries.size() == 2,
+		"%s %s" % [resolved.get("code", ""), resolved.get("message", "")],
+	)
+	if not resolved.get("ok", false):
+		return
+	var opened := Session.create(entries[0], {"assembly": entries.slice(1)})
+	var applied: Array = []
+	for action in opened.actions:
+		applied.append(String(action.get("id", "")))
+	_check("B86: a record whose kind is layer is applied", applied == ["drill"], str(applied))
+
+	# A bundle that the assembly hands a target is still a bundle. Before B86 it
+	# was applied as a layer, so its disable.json removed the base's action.
+	var impostor := _package(
+		"kind-bundle",
+		{"id": "kind-bundle", "kind": "bundle", "capabilities": ["ledger@1"], "mechanics": ["ledger"]},
+		[],
+		[],
+		{},
+		{},
+		{"data/disable.json": JSON.stringify({"actions": ["farm"]}, "\t").to_utf8_buffer()},
+	)
+	var bundle: Dictionary = loader.import_bytes(impostor, _context())
+	_check("B86: a bundle installs", bundle.get("status", "") == "installed", str(bundle.get("code", "")))
+	var mixed: Dictionary = loader.assemble(["kind-base", {"id": "kind-bundle", "target": "kind-base"}])
+	var mixed_entries: Array = mixed.get("entries", [])
+	if not mixed.get("ok", false):
+		_check("B86: the mixed assembly resolves", false, str(mixed.get("code", "")))
+		return
+	var merged := Session.create(mixed_entries[0], {"assembly": mixed_entries.slice(1)})
+	var merged_ids: Array = []
+	for action in merged.actions:
+		merged_ids.append(String(action.get("id", "")))
+	_check("B86: a bundle that names a target is merged, not applied", merged_ids == ["farm"], str(merged_ids))
+
+
+func _case_removal() -> void:
+	## B86: the pack page can take a package away. The record, the stored bytes
+	## and the row go together; saves stay and come back with the same id.
+	_section("B86 a package can be removed")
+	var shell := _shell()
+	shell.loader.import_bytes(_base_package("rm-base"), _context())
+	shell.loader.import_bytes(_layer_package("rm-mod", "rm-base"), _context())
+	shell.builtin_ids.append("rm-base")
+	shell.builtin_ids.append("rm-mod")
+	shell._ticked["rm-base"] = ["rm-mod"]
+	shell.open_plugins()
+
+	shell.start_plugin("rm-base", ["rm-mod"])
+	shell.save_to(1)
+	var listed := false
+	for row in shell._saves_index():
+		if String(row.get("plugin", "")) == "rm-base":
+			listed = true
+	_check("B86: a package with a save is listed before removal", listed, str(shell._saves_index()))
+
+	shell._remove_pressed("rm-mod")
+	_check("B86: the first press only asks", shell.loader.registry.has("rm-mod"), "removed on the first press")
+	shell._remove_pressed("rm-mod")
+	_check("B86: the second press removes the layer", not shell.loader.registry.has("rm-mod"), "still installed")
+	_check("B86: the removed layer leaves the list", not shell.builtin_ids.has("rm-mod"), str(shell.builtin_ids))
+	_check(
+		"B86: the removed layer leaves the ticks",
+		not (shell._ticked.get("rm-base", []) as Array).has("rm-mod"),
+		str(shell._ticked),
+	)
+	shell.resume_slot("rm-base", 1)
+	_check(
+		"B86: a save whose layer was removed is refused, not lost",
+		String(shell.notice.get("code", "")) == "E-02"
+			and String(shell.notice.get("message", "")).contains("rm-mod"),
+		"%s %s" % [shell.notice.get("code", ""), shell.notice.get("message", "")],
+	)
+
+	shell._remove_pressed("rm-base")
+	shell._remove_pressed("rm-base")
+	_check("B86: a package goes once its layers are gone", not shell.loader.registry.has("rm-base"), "still installed")
+	var after := false
+	for row in shell._saves_index():
+		if String(row.get("plugin", "")) == "rm-base":
+			after = true
+	_check("B86: a removed package leaves the save list", not after, str(shell._saves_index()))
+
+	var again: Dictionary = shell.loader.import_bytes(_base_package("rm-base"), _context())
+	_check(
+		"B86: reinstalling a removed package is not V-03",
+		again.get("status", "") == "installed",
+		str(again.get("code", "")),
+	)
+
+	shell.loader.import_bytes(_base_package("rm2-base"), _context())
+	shell.loader.import_bytes(_layer_package("rm2-mod", "rm2-base"), _context())
+	shell.builtin_ids.append("rm2-base")
+	shell.builtin_ids.append("rm2-mod")
+	shell.open_plugins()
+	shell._remove_pressed("rm2-base")
+	shell._remove_pressed("rm2-base")
+	_check(
+		"B86: a package with layers is not removed",
+		shell.loader.registry.has("rm2-base"),
+		"removed while a layer still pointed at it",
+	)
+
+
+func _layer_package(name: String, target: String = "lay-base") -> PackedByteArray:
+	## A layer declares `kind` and `layer` and names its target (ADR-0013); the
+	## assembly only chooses which one runs, it does not make the package a layer.
 	## It replaces one resource definition, adds one action and removes one.
 	var ledger := {
 		"resources": [{"id": "grain", "init": 10.0, "min": 0.0, "max": 99.0, "label": "粮"}],
@@ -3379,7 +3504,7 @@ func _layer_package(name: String, ignore: String = "") -> PackedByteArray:
 	var disable := {"actions": ["farm"]}
 	return _package(
 		name,
-		{"id": name, "capabilities": ["ledger@1"], "mechanics": ["ledger"]},
+		{"id": name, "kind": "layer", "layer": "mod", "target": target, "capabilities": ["ledger@1"], "mechanics": ["ledger"]},
 		[],
 		[],
 		{},
@@ -3465,7 +3590,7 @@ func _case_layers() -> void:
 		not itself.get("ok", true) and String(itself.get("code", "")) == "V-34",
 		"%s %s" % [itself.get("code", ""), itself.get("message", "")],
 	)
-	var ring: Dictionary = loader.import_bytes(_layer_package("lay-ring"), context)
+	var ring: Dictionary = loader.import_bytes(_layer_package("lay-ring", "lay-mod"), context)
 	_check("TC-WIRE-002: a second layer installs", ring["status"] == "installed", str(ring.get("code", "")))
 	var cycling: Dictionary = loader.assemble([
 		{"id": "lay-mod", "target": "lay-ring"},
