@@ -80,6 +80,7 @@ func _initialize() -> void:
 	_case_assembly_reload()
 	_case_layer_tick()
 	_case_layers()
+	_case_layer_dimensions()
 	_case_layer_identity()
 	_case_removal()
 	_case_content()
@@ -3491,7 +3492,7 @@ func _case_removal() -> void:
 	)
 
 
-func _layer_package(name: String, target: String = "lay-base") -> PackedByteArray:
+func _layer_package(name: String, target: String = "lay-base", dimension: String = "mod") -> PackedByteArray:
 	## A layer declares `kind` and `layer` and names its target (ADR-0013); the
 	## assembly only chooses which one runs, it does not make the package a layer.
 	## It replaces one resource definition, adds one action and removes one.
@@ -3504,7 +3505,7 @@ func _layer_package(name: String, target: String = "lay-base") -> PackedByteArra
 	var disable := {"actions": ["farm"]}
 	return _package(
 		name,
-		{"id": name, "kind": "layer", "layer": "mod", "target": target, "capabilities": ["ledger@1"], "mechanics": ["ledger"]},
+		{"id": name, "kind": "layer", "layer": dimension, "target": target, "capabilities": ["ledger@1"], "mechanics": ["ledger"]},
 		[],
 		[],
 		{},
@@ -3535,6 +3536,120 @@ func _base_package(name: String) -> PackedByteArray:
 			"data/state.json": JSON.stringify(ledger, "\t").to_utf8_buffer(),
 			"data/actions.json": JSON.stringify(actions, "\t").to_utf8_buffer(),
 		},
+	)
+
+
+func _case_layer_dimensions() -> void:
+	## B91: the engine says which layer dimensions it applies. The rest are
+	## declared, pending rather than ticked, and never make a world of their own.
+	_section("B91 a layer says whether it applies")
+	_check(
+		"B91: content and mod are applied, the other four are not",
+		ManifestSchema.layer_applied("content") and ManifestSchema.layer_applied("mod")
+			and not ManifestSchema.layer_applied("genre")
+			and not ManifestSchema.layer_applied("profession")
+			and not ManifestSchema.layer_applied("meta")
+			and not ManifestSchema.layer_applied("assets"),
+		str(ManifestSchema.APPLIED_LAYERS),
+	)
+	var loader := PackageLoader.new()
+	var base: Dictionary = loader.import_bytes(_base_package("dim-base"), _context())
+	var mod: Dictionary = loader.import_bytes(_layer_package("dim-mod", "dim-base"), _context())
+	var genre: Dictionary = loader.import_bytes(
+		_package("dim-genre", {"id": "dim-genre", "kind": "layer", "layer": "genre", "target": "dim-base"}),
+		_context(),
+	)
+	_check(
+		"B91: a bundle and layers of either kind install",
+		String(base.get("status", "")) == "installed" and String(mod.get("status", "")) == "installed"
+			and String(genre.get("status", "")) == "installed",
+		"%s %s %s" % [base.get("code", ""), mod.get("code", ""), genre.get("code", "")],
+	)
+	var assembly: Dictionary = loader.assemble(["dim-base", "dim-mod", "dim-genre"])
+	if not assembly.get("ok", false):
+		_check("B91: the assembly resolves", false, str(assembly.get("code", "")))
+		return
+	var entries: Array = assembly["entries"]
+	_check(
+		"B91: the bundle, the applied layer and the pending layer have three states",
+		String(entries[0].get("state", "")) == "bundle"
+			and String(entries[1].get("state", "")) == "applied"
+			and String(entries[2].get("state", "")) == "pending",
+		"%s %s %s" % [entries[0].get("state", ""), entries[1].get("state", ""), entries[2].get("state", "")],
+	)
+	loader.import_bytes(_layer_package("dim-on-layer", "dim-mod"), _context())
+	var nested: Dictionary = loader.assemble(["dim-base", "dim-mod", "dim-on-layer"])
+	_check(
+		"B91: a layer on a layer is refused with V-44",
+		not nested.get("ok", false) and String(nested.get("code", "")) == "V-44"
+			and String(nested.get("message", "")).contains("dim-on-layer")
+			and String(nested.get("message", "")).contains("dim-mod"),
+		str(nested.get("code", "")) + " " + str(nested.get("message", "")),
+	)
+	var meta_layer: Dictionary = loader.import_bytes(
+		_package("dim-meta-layer", {
+			"id": "dim-meta-layer", "kind": "layer", "layer": "meta", "target": "dim-base",
+			"meta": {"audience": "nobody", "minutes": 5},
+		}),
+		_context(),
+	)
+	_check(
+		"B91: a layer's meta is not validated because nothing reads it",
+		String(meta_layer.get("status", "")) == "installed", str(meta_layer.get("code", "")),
+	)
+	var meta_bundle: Dictionary = loader.import_bytes(
+		_package("dim-meta-bundle", {
+			"id": "dim-meta-bundle", "meta": {"audience": "nobody", "minutes": 5},
+		}),
+		_context(),
+	)
+	_check(
+		"B91: the same meta on a bundle is still V-42",
+		String(meta_bundle.get("status", "")) == "rejected" and String(meta_bundle.get("code", "")) == "V-42",
+		str(meta_bundle.get("code", "")),
+	)
+	var shell := _shell()
+	shell.loader.import_bytes(
+		_package("dim-world-base", {
+			"id": "dim-world-base", "collection": {"id": "dim-world", "names": {"en": "Dim"}},
+		}),
+		_context(),
+	)
+	shell.loader.import_bytes(
+		_package("dim-world-layer", {
+			"id": "dim-world-layer", "kind": "layer", "layer": "genre", "name": "Dim Genre",
+			"target": "dim-world-base",
+		}),
+		_context(),
+	)
+	shell.loader.import_bytes(
+		_package("dim-world-content", {
+			"id": "dim-world-content", "kind": "layer", "layer": "content", "name": "Dim Content",
+			"target": "dim-world-base",
+		}),
+		_context(),
+	)
+	shell.builtin_ids.append("dim-world-base")
+	shell.builtin_ids.append("dim-world-layer")
+	shell.builtin_ids.append("dim-world-content")
+	var worlds: Array = shell.worlds()
+	var blank := false
+	for world in worlds:
+		if String(world.get("id", "")) == "":
+			blank = true
+	_check("B91: a layer does not add a world", worlds.size() == 2 and not blank, str(worlds))
+	shell.open_plugins()
+	var ticks: Dictionary = {}
+	var explained := false
+	for child in shell._options.get_children():
+		if child is CheckBox:
+			ticks[String(child.text)] = true
+		if child is Label and String(child.text).contains("Dim Genre"):
+			explained = true
+	_check(
+		"B91: a pending layer has no tick and says why, an applied one has a tick",
+		not ticks.has("Dim Genre") and ticks.has("Dim Content") and explained,
+		str(ticks),
 	)
 
 

@@ -51,6 +51,7 @@ ui.install_link	Install from a link…
 ui.remove	Remove
 ui.remove_confirm	Remove %s?
 ui.remove_hint	Press Remove again to remove %s.
+ui.layer_pending	%s is declared but not applied by this engine version yet.
 ui.remove_layers_first	Remove its layers first: %s.
 ui.link_ask	Paste the address of a .zip package.
 ui.link_digest	Paste its sha256 (64 hex characters).

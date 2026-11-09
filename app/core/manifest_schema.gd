@@ -43,7 +43,15 @@ const KIND_BUNDLE := "bundle"
 const KIND_LAYER := "layer"
 const KINDS := [KIND_BUNDLE, KIND_LAYER]
 const LAYERS := ["profession", "genre", "mod", "content", "meta", "assets"]
+## The dimensions this build applies when a layer is assembled. The other four
+## are still declarations: the pack page marks them pending instead of offering
+## a tick that would change nothing (B91, ADR-0013).
+const APPLIED_LAYERS := ["content", "mod"]
 const SPEC_V2 := "2.0.0"
+
+
+static func layer_applied(dimension: String) -> bool:
+	return LAYERS.has(dimension) and APPLIED_LAYERS.has(dimension)
 
 const ID_PATTERN := "^[a-z0-9-]+$"
 const SEMVER_PATTERN := "^(\\d+)\\.(\\d+)\\.(\\d+)$"
