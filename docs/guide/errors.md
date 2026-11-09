@@ -30,15 +30,15 @@ last column names a `data/...` file, that is the file the author has to open.
 | `M-01` | `app/core/mechanics.gd:38` | rule without a set clause |
 | `M-02` | `app/core/mechanics.gd:77` | a when clause must be an object, not … |
 | `M-03` | `app/core/mechanics.gd:110` | a set clause must be an object |
-| `S-01` | `app/core/session.gd:140` | no implementation for protocol … |
-| `S-02` | `app/core/session.gd:159` | node … does not exist |
+| `S-01` | `app/core/session.gd:143` | no implementation for protocol … |
+| `S-02` | `app/core/session.gd:162` | node … does not exist |
 | `S-03` | `app/core/checks.gd:38` | no check named … |
-| `S-04` | `app/core/session.gd:253` | no action named … |
-| `S-05` | `app/core/session.gd:257` | reason |
-| `S-06` | `app/core/session.gd:465` | pool … does not exist |
-| `S-07` | `app/core/session.gd:279` | pool … does not exist |
-| `S-08` | `app/core/session.gd:322` | resource.….… |
-| `S-09` | `app/core/session.gd:306` | no card named … in the hand |
+| `S-04` | `app/core/session.gd:256` | no action named … |
+| `S-05` | `app/core/session.gd:260` | reason |
+| `S-06` | `app/core/session.gd:468` | pool … does not exist |
+| `S-07` | `app/core/session.gd:282` | pool … does not exist |
+| `S-08` | `app/core/session.gd:325` | resource.….… |
+| `S-09` | `app/core/session.gd:309` | no card named … in the hand |
 | `SAVE-01` | `app/core/save_store.gd:14` | SAVE-01 |
 | `SAVE-02` | `app/core/save_store.gd:15` | SAVE-02 |
 | `SAVE-03` | `app/core/save_store.gd:16` | SAVE-03 |
