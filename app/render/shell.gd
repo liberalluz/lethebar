@@ -309,11 +309,22 @@ func open_plugins() -> String:
 		for layer_id in layers_for(plugin_id):
 			# Off by default: a layer changes the rules of the run, so a player
 			# who never asked for one keeps the run the pack describes.
-			var tick := CheckBox.new()
-			tick.text = _pack_title(layer_id)
-			tick.button_pressed = (_ticked.get(plugin_id, []) as Array).has(layer_id)
-			tick.pressed.connect(toggle_layer.bind(plugin_id, layer_id))
-			_options.add_child(tick)
+			var record: Dictionary = loader.registry.entry(layer_id)
+			var manifest: Dictionary = record.get("manifest", {}) if record.get("manifest", null) is Dictionary else {}
+			if ManifestSchema.layer_applied(String(manifest.get("layer", ""))):
+				var tick := CheckBox.new()
+				tick.text = _pack_title(layer_id)
+				tick.button_pressed = (_ticked.get(plugin_id, []) as Array).has(layer_id)
+				tick.pressed.connect(toggle_layer.bind(plugin_id, layer_id))
+				_options.add_child(tick)
+			else:
+				# The declaration is real, the effect is not: say so instead of
+				# offering a tick that would change nothing (B91).
+				var pending := Label.new()
+				pending.text = Locale.text("ui.layer_pending") % _pack_title(layer_id)
+				pending.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				pending.add_theme_font_size_override("font_size", 13)
+				_options.add_child(pending)
 			_options.add_child(_remove_control(layer_id))
 	_options.add_child(_button(Locale.text("ui.install"), request_install))
 	_options.add_child(_button(Locale.text("ui.install_link"), request_link_install))
@@ -1188,6 +1199,10 @@ func worlds() -> Array:
 	## same on every visit, which is what makes a driver's click repeatable.
 	var buckets: Dictionary = {}
 	for plugin_id in builtin_ids:
+		if _is_layer(plugin_id):
+			# A layer is a patch, not a place: counting it here put an empty
+			# world in front of a one-world repository (B91).
+			continue
 		var world_id := world_of(plugin_id)
 		if not buckets.has(world_id):
 			buckets[world_id] = []

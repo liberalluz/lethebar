@@ -339,11 +339,41 @@ func assemble(ids: Array) -> Dictionary:
 			}
 		if target != "":
 			entry["target"] = target
+			var target_entry: Dictionary = registry.entry(target)
+			if target_entry.is_empty():
+				return {
+					"ok": false,
+					"code": "V-33",
+					"message": "the layer %s sits on %s, which is not installed" % [String(request["id"]), target],
+					"entries": [],
+				}
+			var target_manifest: Dictionary = target_entry.get("manifest", {}) if target_entry.get("manifest", null) is Dictionary else {}
+			if String(target_manifest.get("kind", ManifestSchema.KIND_BUNDLE)) != ManifestSchema.KIND_BUNDLE:
+				return {
+					"ok": false,
+					"code": "V-44",
+					"message": "the layer %s sits on %s, which is a %s, not a bundle" % [
+						String(request["id"]), target, String(target_manifest.get("kind", "")),
+					],
+					"entries": [],
+				}
 			var clash := _layer_conflict(entry, written)
 			if clash != "":
 				return {"ok": false, "code": "V-35", "message": clash, "entries": []}
+		entry["state"] = _state_of(manifest)
 		entries.append(entry)
 	return {"ok": true, "code": "", "message": "", "entries": entries}
+
+
+func _state_of(manifest: Dictionary) -> String:
+	## A layer the engine applies turns its tick into a change; one it does not
+	## apply is pending, and the pack page says so instead of offering the tick
+	## (B91).
+	if String(manifest.get("kind", ManifestSchema.KIND_BUNDLE)) != ManifestSchema.KIND_LAYER:
+		return "bundle"
+	if ManifestSchema.layer_applied(String(manifest.get("layer", ""))):
+		return "applied"
+	return "pending"
 
 
 func _layer_conflict(entry: Dictionary, written: Dictionary) -> String:

@@ -279,8 +279,9 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 	# The list has to render it, so an audience it cannot filter on, a length that
 	# is not a duration, a pitch that renders blank and an icon no texture provides
 	# are all refused where the package is installed.
+	var reads_meta := String(manifest.get("kind", "bundle")) == ManifestSchema.KIND_BUNDLE
 	var meta_raw: Variant = manifest.get("meta", {})
-	if meta_raw is Dictionary and not (meta_raw as Dictionary).is_empty():
+	if reads_meta and meta_raw is Dictionary and not (meta_raw as Dictionary).is_empty():
 		var meta_block := meta_raw as Dictionary
 		var audience := String(meta_block.get("audience", ""))
 		if audience == "" or not MetaLayer.AUDIENCES.has(audience):
