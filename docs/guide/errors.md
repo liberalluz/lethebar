@@ -94,6 +94,8 @@ The code tells you which file, the sentence tells you which part of it.
 - `V-33`: an assembly names a package that is not installed.
 - `V-34`, `V-35`: a layer targets something it should not, or two layers write
   the same field.
+- `V-45`: two applied layers carry the same asset path. The sentence names both
+  layers and the path; the run does not start.
 - `V-36` to `V-38`: `data/cards.json`. A hand without a deck, an unknown
   resource, a deck that cannot be dealt.
 - `S-01` to `S-09`: the run. A node or an action does not exist, cannot be paid

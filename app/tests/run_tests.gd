@@ -81,6 +81,7 @@ func _initialize() -> void:
 	_case_layer_tick()
 	_case_layers()
 	_case_layer_dimensions()
+	_case_asset_layers()
 	_case_layer_identity()
 	_case_removal()
 	_case_content()
@@ -3544,12 +3545,12 @@ func _case_layer_dimensions() -> void:
 	## declared, pending rather than ticked, and never make a world of their own.
 	_section("B91 a layer says whether it applies")
 	_check(
-		"B91: content and mod are applied, the other four are not",
+		"B91: content, mod and assets are applied, the other three are not",
 		ManifestSchema.layer_applied("content") and ManifestSchema.layer_applied("mod")
+			and ManifestSchema.layer_applied("assets")
 			and not ManifestSchema.layer_applied("genre")
 			and not ManifestSchema.layer_applied("profession")
-			and not ManifestSchema.layer_applied("meta")
-			and not ManifestSchema.layer_applied("assets"),
+			and not ManifestSchema.layer_applied("meta"),
 		str(ManifestSchema.APPLIED_LAYERS),
 	)
 	var loader := PackageLoader.new()
@@ -3650,6 +3651,78 @@ func _case_layer_dimensions() -> void:
 		"B91: a pending layer has no tick and says why, an applied one has a tick",
 		not ticks.has("Dim Genre") and ticks.has("Dim Content") and explained,
 		str(ticks),
+	)
+
+
+func _case_asset_layers() -> void:
+	## B92: an asset layer's bytes reach the bundle's lookup, the bundle's own
+	## bytes survive when the layer is absent, and two layers cannot claim the
+	## same path.
+	_section("B92 a layer's pictures reach the run")
+	_check(
+		"B92: assets is applied beside content and mod",
+		ManifestSchema.layer_applied("assets")
+			and ManifestSchema.layer_applied("content")
+			and ManifestSchema.layer_applied("mod")
+			and not ManifestSchema.layer_applied("genre"),
+		str(ManifestSchema.APPLIED_LAYERS),
+	)
+	var loader := PackageLoader.new()
+	var base: Dictionary = loader.import_bytes(
+		_package(
+			"pic-base",
+			{"id": "pic-base", "assets": [{"type": "text", "path": "assets/note.txt"}]},
+			[], [], {}, {},
+			{"assets/note.txt": "base".to_utf8_buffer()},
+		),
+		_context(),
+	)
+	var layer: Dictionary = loader.import_bytes(
+		_package(
+			"pic-layer",
+			{
+				"id": "pic-layer", "kind": "layer", "layer": "assets", "target": "pic-base",
+				"assets": [{"type": "text", "path": "assets/note.txt"}],
+			},
+			[], [], {}, {},
+			{"assets/note.txt": "layer".to_utf8_buffer()},
+		),
+		_context(),
+	)
+	_check(
+		"B92: the bundle and the asset layer install",
+		String(base.get("status", "")) == "installed" and String(layer.get("status", "")) == "installed",
+		"%s %s" % [base.get("code", ""), layer.get("code", "")],
+	)
+	var plain: Dictionary = loader.assemble(["pic-base"])
+	var merged: Dictionary = loader.assemble(["pic-base", "pic-layer"])
+	_check(
+		"B92: the layer's bytes replace the bundle's in the run's lookup",
+		plain.get("ok", false) and merged.get("ok", false)
+			and String(plain["entries"][0]["data"]["assets"].get("assets/note.txt", PackedByteArray()).get_string_from_utf8()) == "base"
+			and String(merged["entries"][0]["data"]["assets"].get("assets/note.txt", PackedByteArray()).get_string_from_utf8()) == "layer",
+		"%s / %s" % [str(plain.get("code", "")), str(merged.get("code", ""))],
+	)
+	loader.import_bytes(
+		_package(
+			"pic-layer-two",
+			{
+				"id": "pic-layer-two", "kind": "layer", "layer": "assets", "target": "pic-base",
+				"assets": [{"type": "text", "path": "assets/note.txt"}],
+			},
+			[], [], {}, {},
+			{"assets/note.txt": "second".to_utf8_buffer()},
+		),
+		_context(),
+	)
+	var clash: Dictionary = loader.assemble(["pic-base", "pic-layer", "pic-layer-two"])
+	_check(
+		"B92: two asset layers carrying the same path are refused with V-45",
+		not clash.get("ok", false) and String(clash.get("code", "")) == "V-45"
+			and String(clash.get("message", "")).contains("pic-layer")
+			and String(clash.get("message", "")).contains("pic-layer-two")
+			and String(clash.get("message", "")).contains("assets/note.txt"),
+		"%s %s" % [str(clash.get("code", "")), str(clash.get("message", ""))],
 	)
 
 

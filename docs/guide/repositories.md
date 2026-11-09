@@ -121,10 +121,10 @@ Read this before planning a family of packs:
 
 - a layer must still carry an `entry` node of its own (`V-07`), so it needs a
   placeholder node it never uses;
-- `target` pointing at a non-bundle is not refused; the failure only shows when
-  the run will not start;
-- `content` takes effect, `mod` mostly does; `genre`, `profession`, `meta` and
-  `assets` install without changing anything.
+- a layer whose `target` is not a bundle is refused with `V-44` when the
+  assembly is built;
+- `content`, `mod` and `assets` take effect; `genre`, `profession` and `meta`
+  install without changing anything.
 
 ## The repository is not part of the contract
 
