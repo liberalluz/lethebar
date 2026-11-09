@@ -46,8 +46,11 @@ the merge fills that map on the bundle entry.
 
 ## Consequences
 
-`profession`, `genre` and `meta` remain pending. Each needs a consumer before it
-joins the list, and each is a separate batch. `check_pack.py` still cannot warn
+`genre` and `meta` remain pending. `profession` is not pending for lack of a
+reader: the bundle's factions, ranks and labels are already read, and a layer
+cannot replace them without changing the world under a save (`ADR-0016`). Each
+remaining dimension still needs a consumer before it joins the list, and each is
+a separate batch. `check_pack.py` still cannot warn
 an author that a layer's dimension is pending: the list lives in GDScript, and a
 second copy in Python is its own decision.
 
