@@ -128,7 +128,10 @@ static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
 	session.assembly = [session.plugin_id]
 	for extra in options.get("assembly", []):
 		if extra is Dictionary and not (extra as Dictionary).is_empty():
-			if String((extra as Dictionary).get("target", "")) != "":
+			# Which of the two a record is comes from `kind`, never from the
+			# presence of a `target`: a package that merely names one must not
+			# start writing over another run (ADR-0013, B86).
+			if String((extra as Dictionary).get("kind", "")) == "layer":
 				session._apply_layer(extra)
 			else:
 				session._merge_package(extra)

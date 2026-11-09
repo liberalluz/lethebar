@@ -242,6 +242,8 @@ func show_loads() -> String:
 
 
 var _ticked: Dictionary = {}
+## The package whose remove control is waiting for its second press.
+var _pending_remove := ""
 
 
 func resume_slot(plugin_id: String, slot: int) -> Dictionary:
@@ -303,6 +305,7 @@ func open_plugins() -> String:
 			note.add_theme_font_size_override("font_size", 13)
 			_options.add_child(note)
 		_options.add_child(row)
+		_options.add_child(_remove_control(plugin_id))
 		for layer_id in layers_for(plugin_id):
 			# Off by default: a layer changes the rules of the run, so a player
 			# who never asked for one keeps the run the pack describes.
@@ -311,6 +314,7 @@ func open_plugins() -> String:
 			tick.button_pressed = (_ticked.get(plugin_id, []) as Array).has(layer_id)
 			tick.pressed.connect(toggle_layer.bind(plugin_id, layer_id))
 			_options.add_child(tick)
+			_options.add_child(_remove_control(layer_id))
 	_options.add_child(_button(Locale.text("ui.install"), request_install))
 	_options.add_child(_button(Locale.text("ui.install_link"), request_link_install))
 	_options.add_child(_button(Locale.text("ui.back"), show_landing))
@@ -350,6 +354,45 @@ func toggle_layer(plugin_id: String, layer_id: String) -> String:
 		chosen.append(layer_id)
 	_ticked[plugin_id] = chosen
 	return open_plugins()
+
+
+func _remove_control(plugin_id: String) -> Button:
+	## The second press is the one that erases; there is no undo, so the first
+	## press only names what would go.
+	var label := Locale.text("ui.remove")
+	if _pending_remove == plugin_id:
+		label = Locale.text("ui.remove_confirm") % _pack_title(plugin_id)
+	return _button(label, _remove_pressed.bind(plugin_id))
+
+
+func _remove_pressed(plugin_id: String) -> void:
+	if _pending_remove != plugin_id:
+		_pending_remove = plugin_id
+		open_plugins()
+		_status.text = Locale.text("ui.remove_hint") % _pack_title(plugin_id)
+		return
+	remove_package(plugin_id)
+
+
+func remove_package(plugin_id: String) -> void:
+	## Removal erases the in-memory registry, the stored bytes and the row that
+	## lists them in one step. Saves are not deleted: they are keyed by package,
+	## so installing the same id and version again brings them back (B86).
+	if not _is_layer(plugin_id) and not layers_for(plugin_id).is_empty():
+		open_plugins()
+		_status.text = Locale.text("ui.remove_layers_first") % _pack_title(plugin_id)
+		return
+	if session != null and String(session.plugin_id) == plugin_id:
+		session = null
+		entry = {}
+	loader.registry.uninstall(plugin_id)
+	packages.erase(plugin_id)
+	builtin_ids.erase(plugin_id)
+	_ticked.erase(plugin_id)
+	for pack_id in _ticked.keys():
+		(_ticked[pack_id] as Array).erase(plugin_id)
+	_pending_remove = ""
+	open_plugins()
 
 
 func _is_layer(plugin_id: String) -> bool:

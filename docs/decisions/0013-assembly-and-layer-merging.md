@@ -87,3 +87,15 @@ reload rebuilds the same assembly or refuses to load with a reason — never loa
 - **Load a bundle package that pre-merges its world and genre.** Rejected as the only
   mechanism: it moves the composition to build time and forbids a player from
   swapping one mod, which is the whole point of a mod.
+
+## Amendment (B86)
+
+- A record is a layer because it says `kind: "layer"`, not because it carries a
+  `target`. `InstallRegistry.entry()` copies `kind` from the manifest beside
+  `layer` and `target`, and `Session.create` dispatches on it. A bundle that
+  happens to name a `target` is merged as a bundle instead of being applied as a
+  layer; the guess and the declaration agreed in every package the project
+  shipped, which is why the mistake stayed invisible.
+- The suite keeps both directions: a `kind: layer` record with a target applies
+  its `disable`, and a bundle that names a target leaves the actions it names in
+  place.
