@@ -72,6 +72,15 @@
       "cwd": "."
     },
     {
+      "name": "badges",
+      "command": [
+        "python",
+        "infra/tool/release/pack.py",
+        "self-test"
+      ],
+      "cwd": "."
+    },
+    {
       "name": "tree",
       "command": [
         "python",
