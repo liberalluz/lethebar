@@ -112,7 +112,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":4309432,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"serviceWorker":"index.service.worker.js"};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":4314520,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"serviceWorker":"index.service.worker.js"};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
@@ -253,7 +253,7 @@ const engine = new Engine(GODOT_CONFIG);
 // The shell polls this object instead of waiting for the worker before the first
 // frame: the notice it feeds is text, so it can arrive one frame late (REQ-031).
 (function () {
-  var state = { controlled: false, stored: [], error: "", bytes: 43824186, ready: false };
+  var state = { controlled: false, stored: [], error: "", bytes: 43829274, ready: false };
   window.lethebarCache = state;
   function ask() {
     var worker = navigator.serviceWorker && navigator.serviceWorker.controller;
