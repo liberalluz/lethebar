@@ -140,10 +140,11 @@ they are likely to bite:
 
 - a layer still needs an `entry` node inside its own `data/nodes.json` (`V-07`),
   so it carries a placeholder node nothing ever reads;
-- a `target` that names another layer — or a pack that is not a bundle — is not
-  refused at assembly; the run simply will not start;
-- `layer: content` takes effect, `layer: mod` mostly does, and `genre`,
-  `profession`, `meta` and `assets` install without changing anything;
+- a `target` that names a layer rather than a bundle is refused at assembly
+  (`V-44`);
+- `layer: content`, `layer: mod` and `layer: assets` take effect; `genre` and
+  `meta` install without changing anything; `profession` is the bundle's own
+  data and has nothing to merge (`ADR-0016`);
 - a `layer` left on a bundle is ignored, as described above.
 
 None of these are promises about the format; they are the state of this build,

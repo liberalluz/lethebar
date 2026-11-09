@@ -45,7 +45,7 @@ by side, not a base and a patch.
 
 | `layer` | Fills | Example |
 | --- | --- | --- |
-| `profession` | the world itself: factions, territory, ranks, place names | a different map of the same era |
+| `profession` | the world itself: factions, territory, ranks, place names | a different map of the same era is a different `bundle` |
 | `genre` | how the player takes part: choices, a menu, a hand of cards | *(as a `bundle` in practice)* |
 | `mod` | numbers and costs someone else already declared | harder economy, a new action |
 | `content` | how the story is told: view, density, cast, arc | the same war, in first person |
@@ -123,8 +123,10 @@ Read this before planning a family of packs:
   placeholder node it never uses;
 - a layer whose `target` is not a bundle is refused with `V-44` when the
   assembly is built;
-- `content`, `mod` and `assets` take effect; `genre`, `profession` and `meta`
-  install without changing anything.
+- `content`, `mod` and `assets` take effect; `genre` and `meta` install without
+  changing anything; `profession` is the bundle's own data (`data/factions.json`,
+  `phases.ranks`, the resource labels), so a `profession` layer has nothing to
+  merge (`ADR-0016`).
 
 ## The repository is not part of the contract
 
