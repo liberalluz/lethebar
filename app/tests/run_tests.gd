@@ -410,7 +410,7 @@ func _case_save_002() -> void:
 
 
 func _case_resume_types() -> void:
-	_section("TC-SAVE-003 a resumed run has the numbers it was written with")
+	_section("TC-SAVE-005 a resumed run has the numbers it was written with")
 	MemoryBackend.reset()
 	var entry: Dictionary = PackageLoader.new().import_bytes(_turn_package("types"), _context())["entry"]
 	var store := SaveStore.new()
@@ -421,21 +421,21 @@ func _case_resume_types() -> void:
 	session.used = {"t1": {"per_run": 1, "turn": 1, "per_turn": 1}}
 	var before := session.snapshot()
 	_check(
-		"TC-SAVE-003: the run carries a whole-number counter",
+		"TC-SAVE-005: the run carries a whole-number counter",
 		before["used"] is Dictionary and not (before["used"] as Dictionary).is_empty(),
 		str(before["used"]),
 	)
-	_check("TC-SAVE-003: slot 1 accepts the save", store.write(entry, 1, before, "types")["ok"])
+	_check("TC-SAVE-005: slot 1 accepts the save", store.write(entry, 1, before, "types")["ok"])
 	var read := store.read(entry, 1)
-	_check("TC-SAVE-003: slot 1 reads back", read["ok"], str(read))
+	_check("TC-SAVE-005: slot 1 reads back", read["ok"], str(read))
 	var resumed := store.resume(entry, read["payload"])
-	_check("TC-SAVE-003: the resumed session exists", resumed != null, "null")
+	_check("TC-SAVE-005: the resumed session exists", resumed != null, "null")
 	if resumed == null:
 		return
 	var after := resumed.snapshot()
-	_check("TC-SAVE-003: a whole number comes back whole", after["used"] == before["used"], "%s != %s" % [str(after["used"]), str(before["used"])])
-	_check("TC-SAVE-003: a half stays a half", after["state"].get("half", 0) == 0.5, str(after["state"].get("half", null)))
-	_check("TC-SAVE-003: the two snapshots are equal", after == before, "%s != %s" % [str(after), str(before)])
+	_check("TC-SAVE-005: a whole number comes back whole", after["used"] == before["used"], "%s != %s" % [str(after["used"]), str(before["used"])])
+	_check("TC-SAVE-005: a half stays a half", after["state"].get("half", 0) == 0.5, str(after["state"].get("half", null)))
+	_check("TC-SAVE-005: the two snapshots are equal", after == before, "%s != %s" % [str(after), str(before)])
 
 
 func _case_package_survives() -> void:

@@ -74,6 +74,7 @@ claims: if they fail, the architecture claim fails, not just a feature.
 | `TC-PROTO-002` | `REQ-010` | A plugin declaring a power-supply and a progress mechanic shows both effects in the session readout; a plugin declaring none shows neither. |
 | `TC-SAVE-001` | `REQ-012` | Three slots are writable and independently readable; saving to slot 2 then loading slot 1 returns slot 1's node, and vice versa. |
 | `TC-SAVE-002` | `REQ-013` | A save payload with `schema: 2.0.0` is refused with a visible message; the slot is not overwritten and the game stays playable. |
+| `TC-SAVE-005` | `REQ-012` | A save written with whole-number counters loads back with whole numbers: the snapshot after a resume equals the snapshot before the save, and a fractional value stays fractional. |
 | `TC-DET-001` | `REQ-016` | The same choice sequence with the same seed produces a byte-identical session snapshot on two runs, and a different seed produces a different one. |
 | `TC-PERF-001` | `REQ-008` | From plugin selection to the first interactive scene is ≤ 5 s on E2 with a warm cache, measured as the median of three runs. |
 | `TC-UX-001` | `REQ-017` | Five first-time participants with no instructions each reach an interactive first session in ≤ 10 minutes without help from the author; at least four succeed. With the window narrowed to 640 px the save-slot rows keep both `Save` and `Load` on screen, and with a picture drawn the last button stays inside the window. |

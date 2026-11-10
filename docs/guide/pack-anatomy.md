@@ -29,7 +29,7 @@ The envelope is checked twice on purpose: once by you, on the bytes you are abou
 once by the engine, on the bytes a player's browser just downloaded. Only the second one protects
 a player, so it exists even if you skipped the first.
 
-Limits: 512 entries, 8 MiB per file, 32 MiB for the archive. They are generous for text and mean
+Limits: 500 entries, 4 MiB per file, 32 MiB for the archive. They are generous for text and mean
 for video; if a pack needs more, it needs a second pack.
 
 ## A worked tree
