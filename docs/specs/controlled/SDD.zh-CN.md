@@ -97,6 +97,8 @@ plugin.zip
 
 按 `1.0.0` 写的包不声明后三个字段，仍可安装（§4.2 `W-01`）。
 
+`kind` 是装配读的身份，不是提示：`Session.create` 在 `kind` 为 `layer` 时按层应用，否则按 bundle 合并。bundle 上的 `target` 是这一局忽略的数据，永远不会把包变成层；没写 `kind` 的 format `1.0.0` 包算 bundle。
+
 ### 3.3 数据文件
 
 - `nodes.json`：节点含 `id`、`text`、`assets`、`choices[]`；每个选择含
@@ -176,6 +178,8 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-33` | 装配里点名的包没有安装 |
 | `V-34` | 层的目标不在装配内、指向自身、链成环，或同一个包被命名两次。 | fatal |
 | `V-35` | 同一次装配里两个层写了同一个目标的同一个字段。 | fatal |
+| `V-44` | 层的 `target` 已安装，但它的 `kind` 不是 `bundle`。 | fatal，点名该层与目标 |
+| `V-45` | 同一次装配里两个层声明了同一条资产路径。 | fatal，点名两个层与路径 |
 | `V-36` | 声明 `cards.hand@1` 的包裹带有 `hand` 与 `deck` 的 `data/cards.json` | 拒绝 |
 | `V-37` | 每张牌的 `cost` 与 `effects` 都点名账本声明过的资源 | 拒绝 |
 | `V-38` | 牌库里的每个牌 id 都在包裹的 `cards` 表里声明过 | 拒绝 |
@@ -586,6 +590,22 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 
 四个归档全部移走时套件报 `OK — 394 checks, 12 skipped`；都在时报 `OK — 526 checks, 0 skipped`。把守卫改成恒真再移走归档会得到二十六条失败，这正是守卫的意义。
 
+## 11.20 层只应用六个维度里的三个
+
+层声明六个维度之一，引擎目前应用其中三个：`content` 整块替换基础包的块（§11.15），`mod` 改动基础包声明的数值或代价（§11.13），`assets` 把层里的图片并入 bundle 的查找表。另外三个——`genre`、`meta` 与 `profession`——仍是 pending：包能装、manifest 合法，但这一局不改变。
+
+`ManifestSchema.APPLIED_LAYERS` 是这份清单唯一的落点，`layer_applied()` 是所有读者要问的函数。`PackageLoader.assemble()` 把答案记在条目上（`state` 为 `applied` 或 `pending`），并在层的 `target` 已安装却不是 bundle 时以 `V-44` 拒绝，点名该层与目标。包页把 pending 层显示为一句说明、不给勾：一个勾了也不改变任何东西的层会被写进存档的装配，而下一个引擎版本会让同一份存档变成另一局。
+
+资产按装配顺序并入：`PackageLoader._merge_layer_assets()` 把每个层声明的字节复制进 bundle 的查找表，并记下每个路径归哪个层。两个层声明同一路径时以 `V-45` 拒绝，点名两个层与路径，所以胜出者从不取决于顺序。只有层声明过的图片，场景也能画出来；移除该层后恢复 bundle 自己的图。
+
+## 11.21 包或层可以被移除
+
+包页在每个包、每个层旁边给一个移除控件。第一次按下先问，第二次才移除，因为这个控件就在玩家用来开一局的勾旁边；仍有层的 bundle 会提示先移除层，而不是悄悄替玩家移除。
+
+移除会删掉注册表条目与已存字节（`InstallRegistry.uninstall()` 与 `PackageStore.erase()`），从内置清单与所有已勾选的装配里去掉它，并在被移除的包正是当前打开的那一局时关闭会话。`_saves_index()` 只列已安装的包，所以它的存档位从「继续」里消失；点名已移除层的存档以 `E-02` 被拒，点名该层，载荷保留而不是删除。
+
+移除也是让 `V-03` 不再致命的那一步：旧条目没了，同一个 id 同一个版本就能重新安装，这是除了清站点存储之外唯一的出路。
+
 ## 12. 需求映射
 
 | REQ | 设计 |
@@ -628,9 +648,13 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 | `REQ-038` | §11.9 换行的手牌，`Shell.hand_columns()`，无 `V-` 码 |
 | `REQ-039` | §11.10 按种子洗牌，`Session._shuffle_cards()`，无 `V-` 码 |
 | `REQ-040` | §11.11 包裹声明的世界，`ManifestSchema.collection_of()`，`V-32`、`W-04`、`Shell.worlds()` |
-| `REQ-041` | §11.12 装配，`PackageLoader.assemble()`、`Session._merge_package()`、`V-33` |
+| `REQ-041` | §11.12 装配，`PackageLoader.assemble()`、`Session._merge_package()`、`V-33`、`V-44` |
 | `REQ-042` | §11.13 层包，`PackageLoader.assemble()`，`Session._apply_layer()`，`V-34` |
 | `REQ-043` | §11.14 声明的目标，`ManifestSchema.format_issues()`，`PackageLoader._layer_conflict()`，`V-35` |
+| `REQ-048` | §3.2 分派读的身份，`Session.create`、`InstallRegistry.entry()` |
+| `REQ-049` | §11.20 已应用的维度，`ManifestSchema.APPLIED_LAYERS` 与 `layer_applied()`，`V-44` |
+| `REQ-050` | §11.20 资产合并，`PackageLoader._merge_layer_assets()`，`V-45` |
+| `REQ-051` | §11.21 移除，`Shell.remove_package()`，`V-03`、`E-02` |
 | `REQ-034` | §10.1 三国的一局、`content/builtin/sanguo/**` 的数据 |
 | `REQ-031` | §11.4 首访提示、`infra/export_web.py` 的缓存探针 |
 

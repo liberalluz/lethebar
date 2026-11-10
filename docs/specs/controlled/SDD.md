@@ -103,6 +103,11 @@ A package written for `1.0.0` declares none of the last three fields and still
 installs (§4.2, `W-01`). `clock` is independent of the format version: a `1.0.0`
 package may declare it as well.
 
+`kind` is the identity the assembly reads, not a hint: `Session.create` applies a
+record as a layer when its `kind` is `layer` and merges it as a bundle otherwise.
+A `target` on a bundle is data the run ignores; it never turns the package into a
+layer, and a format `1.0.0` package that declares no `kind` is a bundle.
+
 ### 3.3 Data files
 
 - `nodes.json`: nodes with `id`, `text`, `assets`, `choices[]`; each choice has
@@ -189,6 +194,8 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-33` | a package named in the assembly is not installed |
 | `V-34` | A layer names a target the assembly does not contain, sits on itself, closes a chain, or a package is named twice. | fatal |
 | `V-35` | Two layers in one assembly write the same field of the same target. | fatal |
+| `V-44` | A layer's `target` is installed but its `kind` is not `bundle`. | fatal, names the layer and the target |
+| `V-45` | Two layers in one assembly declare the same asset path. | fatal, names both layers and the path |
 | `V-40` | A `content` block names a view or a density the engine does not know. |
 | `V-41` | The cast repeats an id or carries an empty name, or the arc's turns do not ascend and stay unique. |
 | `V-42` | The `meta` block names an audience, a length, a pitch or an icon the engine cannot honour. |
@@ -727,6 +734,50 @@ matches, `already` when the id was already in the list, and `refused` when
 A refusal leaves the installed set untouched, and a link install without a
 digest is refused as `V-43` rather than installed unverified.
 
+## 11.20 A layer applies three of the six dimensions
+
+A layer names one of the six dimensions, and the engine applies three of them:
+`content` replaces the base package's block (§11.15), `mod` changes a number or a
+cost the base declares (§11.13), and `assets` adds the layer's pictures to the
+bundle's lookup. The other three — `genre`, `meta` and `profession` — are
+pending: the package installs, the manifest is valid, and the run does not
+change.
+
+`ManifestSchema.APPLIED_LAYERS` is the one place that list lives, and
+`layer_applied()` is what every reader asks. `PackageLoader.assemble()` records
+the answer on the entry (`state` is `applied` or `pending`) and refuses a layer
+whose `target` is installed but is not a bundle, with `V-44`, naming the layer
+and the target. The pack page shows a pending layer with a sentence and no
+tick: a tick that changes nothing would put a package into a save's assembly
+that the engine does not apply, and the next engine version would change that
+same save.
+
+Assets join in assembly order: `PackageLoader._merge_layer_assets()` copies each
+layer's declared bytes into the bundle's lookup and records which layer owns each
+path. Two layers that declare the same path are refused with `V-45`, naming both
+layers and the path, so the winner never depends on order. A scene that names a
+picture only the layer declares draws that picture; removing the layer brings
+back the bundle's own.
+
+## 11.21 A package or a layer can be removed
+
+The pack page offers a remove control beside every package and every layer. The
+first press asks and the second removes, because the control sits next to the
+tick a player presses to start a run; a bundle that still has layers says to
+remove them first instead of removing the layers silently.
+
+Removal erases the registry entry and the stored bytes
+(`InstallRegistry.uninstall()` and `PackageStore.erase()`), drops the package
+from the built-in list and from every ticked assembly, and closes the active
+session if the removed package was the one open. `_saves_index()` lists only
+installed packages, so the package's slots disappear from Continue; a save that
+names a removed layer is refused with `E-02`, naming the layer, and the payload
+is kept rather than deleted.
+
+Removal is also what makes `V-03` survivable: once the old entry is gone, the
+same id and version installs again, which is the only way out short of clearing
+the site's storage.
+
 ## 12. Requirement mapping
 
 | REQ | Design |
@@ -771,13 +822,17 @@ digest is refused as `V-43` rather than installed unverified.
 | `REQ-038` | §11.9 the wrapped hand, `Shell.hand_columns()`, no `V-` code |
 | `REQ-039` | §11.10 the seeded reshuffle, `Session._shuffle_cards()`, no `V-` code |
 | `REQ-040` | §11.11 the world a package declares, `ManifestSchema.collection_of()`, `V-32`, `W-04`, `Shell.worlds()` |
-| `REQ-041` | §11.12 the assembly, `PackageLoader.assemble()`, `Session._merge_package()`, `V-33` |
+| `REQ-041` | §11.12 the assembly, `PackageLoader.assemble()`, `Session._merge_package()`, `V-33`, `V-44` |
 | `REQ-042` | §11.13 the layer, `PackageLoader.assemble()`, `Session._apply_layer()`, `V-34` |
 | `REQ-043` | §11.14 the declared target, `ManifestSchema.format_issues()`, `PackageLoader._layer_conflict()`, `V-35` |
 | `REQ-044` | §11.15 the declared view, `ContentLayer`, `V-40`, `V-41` |
 | `REQ-045` | §11.16 the declared meta, `MetaLayer`, `V-42` |
 | `REQ-046` | §11.17 the artifact and the hash, `PackageLoader.import_url`, `V-43` |
 | `REQ-047` | §11.19 the link entry, `app/render/downloader.gd`, three outcomes |
+| `REQ-048` | §3.2 the identity the dispatch reads, `Session.create`, `InstallRegistry.entry()` |
+| `REQ-049` | §11.20 the applied dimensions, `ManifestSchema.APPLIED_LAYERS` and `layer_applied()`, `V-44` |
+| `REQ-050` | §11.20 asset merging, `PackageLoader._merge_layer_assets()`, `V-45` |
+| `REQ-051` | §11.21 removal, `Shell.remove_package()`, `V-03`, `E-02` |
 
 ## 13. Decisions and open questions
 
