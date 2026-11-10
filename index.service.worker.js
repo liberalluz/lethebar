@@ -4,7 +4,7 @@
 // Incrementing CACHE_VERSION will kick off the install event and force
 // previously cached resources to be updated from the network.
 /** @type {string} */
-const CACHE_VERSION = '1794286038|2181493';
+const CACHE_VERSION = '1794297814|2147774';
 /** @type {string} */
 const CACHE_PREFIX = 'Lethebar-sw-cache-';
 const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;
@@ -13,7 +13,7 @@ const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;
 const PAYLOAD_PREFIX = "Lethebar-payload-";
 const PAYLOAD = {
 	"index.wasm": "Lethebar-payload-wasm-fc74679e3b97",
-	"index.pck": "Lethebar-payload-pck-7ee4d48a97f9"
+	"index.pck": "Lethebar-payload-pck-33e8dac954b2"
 };
 /** @type {string} */
 const OFFLINE_URL = 'index.offline.html';
