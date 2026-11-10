@@ -81,6 +81,7 @@ func _initialize() -> void:
 	_case_assembly_reload()
 	_case_layer_tick()
 	_case_layers()
+	_case_upgrade_install()
 	_case_layer_dimensions()
 	_case_layer_entry()
 	_case_asset_layers()
@@ -149,9 +150,9 @@ func _case_pkg_002() -> void:
 	_check("TC-PKG-002: rejections added nothing", loader.registry.count() == 1)
 	_check("TC-PKG-002: installed plugin still present", loader.registry.has("test-linear"))
 
-	_section("TC-PKG-002 the same id at another version is refused (SDD §4.2 V-03)")
+	_section("TC-PKG-002 the same id at a lower version is refused (SDD §4.2 V-03)")
 	var conflicting := loader.import_bytes(
-		_package("conflict", {"version": "2.0.0"}), _context()
+		_package("conflict", {"version": "0.5.0"}), _context()
 	)
 	_check("V-03 version conflict", conflicting["status"] == "rejected" and conflicting["code"] == "V-03")
 
@@ -3522,6 +3523,75 @@ func _case_removal() -> void:
 		shell.loader.registry.has("rm2-base"),
 		"removed while a layer still pointed at it",
 	)
+
+
+func _case_upgrade_install() -> void:
+	## B103: a higher version of an installed id takes its place; the version it
+	## replaced is kept, and the pack page can put it back.
+	_section("B103 a newer version replaces the installed one")
+	var shell := _shell()
+	var first := _package(
+		"up-warm", {"id": "up-warm", "version": "0.1.0", "entry": "n1"},
+		[], [], _upgrade_nodes("old-only"),
+	)
+	var second := _package(
+		"up-warm-2", {"id": "up-warm", "version": "0.2.0", "entry": "n1"},
+		[], [], _upgrade_nodes("new-only"),
+	)
+	var first_result: Dictionary = shell.try_import(first)
+	_check("B103: the first version installs", first_result.get("install", "") == "installed", str(first_result.get("code", "")))
+	shell.start_plugin("up-warm", [])
+	shell.save_to(1)
+	_check("B103: the first version leaves a save", (shell.saves.slots(shell.loader.registry.entry("up-warm"))[0] as Dictionary).get("ok", false), str(shell._status.text))
+
+	var second_result: Dictionary = shell.try_import(second)
+	_check("B103: the higher version installs over it", second_result.get("install", "") == "installed", str(second_result))
+	_check("B103: the higher version is the one stored", String(shell.loader.registry.entry("up-warm").get("version", "")) == "0.2.0", "")
+	_check("B103: the replaced version is kept", shell.packages.previous_version("up-warm") == "0.1.0", shell.packages.previous_version("up-warm"))
+
+	shell.start_plugin("up-warm", [])
+	_check("B103: a run reads the new package", shell.session.nodes.has("new-only"), "")
+
+	shell.resume_slot("up-warm", 1)
+	_check("B103: a save made before the upgrade still opens", shell.session != null and shell.session.nodes.has("new-only"), "")
+
+	var older := _package(
+		"up-warm-old", {"id": "up-warm", "version": "0.1.0", "entry": "n1"},
+		[], [], _upgrade_nodes("old-only"),
+	)
+	var older_result: Dictionary = shell.try_import(older)
+	_check("B103: an older version is refused", older_result.get("install", "") == "refused" and String(older_result.get("code", "")) == "V-03", str(older_result.get("code", "")))
+	_check(
+		"B103: the refusal names both versions",
+		String(older_result.get("message", "")).contains("0.2.0") and String(older_result.get("message", "")).contains("0.1.0"),
+		String(older_result.get("message", "")),
+	)
+
+	var same := _package(
+		"up-warm-same", {"id": "up-warm", "version": "0.2.0", "entry": "n1"},
+		[], [], _upgrade_nodes("new-only"),
+	)
+	var same_result: Dictionary = shell.try_import(same)
+	_check("B103: re-importing the same version is allowed", same_result.get("install", "") == "already", str(same_result.get("code", "")))
+	_check("B103: re-importing does not overwrite the kept version", shell.packages.previous_version("up-warm") == "0.1.0", shell.packages.previous_version("up-warm"))
+
+	shell.restore_previous("up-warm")
+	_check("B103: restore puts the older version back", String(shell.loader.registry.entry("up-warm").get("version", "")) == "0.1.0", "")
+	_check("B103: restore keeps the version it replaced", shell.packages.previous_version("up-warm") == "0.2.0", shell.packages.previous_version("up-warm"))
+	shell.start_plugin("up-warm", [])
+	_check("B103: a run reads the restored package", shell.session.nodes.has("old-only"), "")
+
+	shell.remove_package("up-warm")
+	_check("B103: removal clears the kept version", shell.packages.previous_version("up-warm") == "", "")
+
+
+func _upgrade_nodes(extra: String) -> Dictionary:
+	return {
+		"nodes": [
+			{"id": "n1", "text": "A node.", "choices": []},
+			{"id": extra, "text": "Another node.", "choices": []},
+		],
+	}
 
 
 func _layer_package(name: String, target: String = "lay-base", dimension: String = "mod", entry: String = "n1") -> PackedByteArray:

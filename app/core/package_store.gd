@@ -8,6 +8,7 @@ extends RefCounted
 ## runtime payload, so an offline start sees what the online import saw.
 
 const PREFIX := "package:"
+const PREVIOUS := "previous:"
 
 var backend: SaveBackend
 
@@ -22,6 +23,8 @@ static func key_for(plugin_id: String) -> String:
 
 func persist(entry: Dictionary) -> bool:
 	## Call after a successful install; returns whether the bytes really landed.
+	## The version being replaced is kept once, under `previous:<id>`: one rollback
+	## is enough to rescue a player, and a second copy would double every save.
 	var plugin_id := String(entry.get("id", ""))
 	var bytes: PackedByteArray = entry.get("package_bytes", PackedByteArray())
 	if plugin_id == "" or bytes.is_empty():
@@ -31,7 +34,42 @@ func persist(entry: Dictionary) -> bool:
 		"version": String(entry.get("version", "")),
 		"bytes": Marshalls.raw_to_base64(bytes),
 	}
+	var old_text := String(backend.read(key_for(plugin_id)))
+	if old_text != "":
+		var old: Variant = JSON.parse_string(old_text)
+		if old is Dictionary and String(old.get("version", "")) != String(entry.get("version", "")):
+			backend.write(previous_key_for(plugin_id), old_text)
 	return backend.write(key_for(plugin_id), JSON.stringify(blob))
+
+
+func previous_key_for(plugin_id: String) -> String:
+	return PREVIOUS + plugin_id
+
+
+func stored_version(plugin_id: String) -> String:
+	## The version currently stored, read before a new import overwrites it.
+	var text := String(backend.read(key_for(plugin_id)))
+	if text == "":
+		return ""
+	var parsed: Variant = JSON.parse_string(text)
+	return String(parsed.get("version", "")) if parsed is Dictionary else ""
+
+
+func previous_of(plugin_id: String) -> Dictionary:
+	## The package that was installed before the current one, or {}.
+	var text := String(backend.read(previous_key_for(plugin_id)))
+	if text == "":
+		return {}
+	var parsed: Variant = JSON.parse_string(text)
+	return parsed if parsed is Dictionary else {}
+
+
+func previous_version(plugin_id: String) -> String:
+	return String(previous_of(plugin_id).get("version", ""))
+
+
+func erase_previous(plugin_id: String) -> bool:
+	return backend.erase(previous_key_for(plugin_id))
 
 
 func ids() -> Array:

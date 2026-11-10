@@ -60,6 +60,19 @@ static func known_capabilities() -> Array:
 static func _issue(code: String, field: String, message: String, fatal: bool) -> Dictionary:	return {"code": code, "field": field, "message": message, "fatal": fatal}
 
 
+static func _version_is_newer(candidate: String, installed: String) -> bool:
+	## Versions are `major.minor.patch` (V-04); compare the numbers, not the text,
+	## so 0.10.0 is newer than 0.9.0.
+	var a := candidate.split(".")
+	var b := installed.split(".")
+	for i in 3:
+		var x := int(a[i]) if i < a.size() else 0
+		var y := int(b[i]) if i < b.size() else 0
+		if x != y:
+			return x > y
+	return false
+
+
 static func first_fatal(issues: Array) -> Dictionary:
 	for issue in issues:
 		if issue.get("fatal", false):
@@ -85,11 +98,14 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 	var installed: Dictionary = context.get("installed", {})
 	var installed_version := String(installed.get(manifest["id"], ""))
 	if installed_version != "" and installed_version != String(manifest["version"]):
-		issues.append(_issue(
-			"V-03", "id",
-			"already installed at %s; re-import that version or uninstall first" % installed_version,
-			true,
-		))
+		var candidate := String(manifest["version"])
+		var newer := _version_is_newer(candidate, installed_version)
+		if not newer and not bool(context.get("allow_downgrade", false)):
+			issues.append(_issue(
+				"V-03", "id",
+				"%s is installed; %s is older. Remove it first, or import a newer version." % [installed_version, candidate],
+				true,
+			))
 
 	# V-32 / W-04 — the world a package belongs to is well formed, and two packs
 	# that describe the same world agree on how it is written (ADR-0012).
