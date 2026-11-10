@@ -778,6 +778,26 @@ Removal is also what makes `V-03` survivable: once the old entry is gone, the
 same id and version installs again, which is the only way out short of clearing
 the site's storage.
 
+## 11.22 A newer version replaces the one installed
+
+A package whose `version` is newer than the installed one installs over it,
+keeping exactly one copy of the version it replaced (`PackageStore.previous:<id>`).
+`V-03` now refuses only a lower version; its message names both versions and says
+to remove the package or import a newer one. Re-importing the same version is
+allowed and changes nothing.
+
+The pack page shows `Restore <version>` while a previous copy exists. One press
+re-imports those bytes with `allow_downgrade` set, so the explicit rollback is
+not a `V-03` refusal; the version it replaces becomes the new previous copy,
+which makes the control a toggle between two versions. Removing the package
+erases the previous copy with it.
+
+Saves are not touched by any of this: a slot is keyed by package and slot, and
+the payload names the version it ran under. A save made before an upgrade opens
+on the new version when the node ids it names still exist; an upgrade that
+renames or deletes those nodes makes the save unreadable, and `saveSchema` is
+still one-way, so rolling back does not make a newer save readable.
+
 ## 12. Requirement mapping
 
 | REQ | Design |

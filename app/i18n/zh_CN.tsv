@@ -53,6 +53,7 @@ ui.remove_confirm	移除 %s？
 ui.remove_hint	再按一次“移除”即可移除 %s。
 ui.layer_pending	「%s」已声明，但当前引擎版本还不会应用它。
 ui.remove_layers_first	先移除它的层：%s。
+ui.restore_previous	恢复 %s
 ui.link_ask	粘贴一个 .zip 包的地址。
 ui.link_digest	粘贴它的 sha256（64 个十六进制字符）。
 ui.link_refused	没有装任何东西。地址和摘要不足以接受这个文件。

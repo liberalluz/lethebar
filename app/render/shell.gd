@@ -306,6 +306,8 @@ func open_plugins() -> String:
 			_options.add_child(note)
 		_options.add_child(row)
 		_options.add_child(_remove_control(plugin_id))
+		if packages.previous_version(plugin_id) != "":
+			_options.add_child(_restore_control(plugin_id))
 		for layer_id in layers_for(plugin_id):
 			# Off by default: a layer changes the rules of the run, so a player
 			# who never asked for one keeps the run the pack describes.
@@ -398,12 +400,34 @@ func remove_package(plugin_id: String) -> void:
 		entry = {}
 	loader.registry.uninstall(plugin_id)
 	packages.erase(plugin_id)
+	packages.erase_previous(plugin_id)
 	builtin_ids.erase(plugin_id)
 	_ticked.erase(plugin_id)
 	for pack_id in _ticked.keys():
 		(_ticked[pack_id] as Array).erase(plugin_id)
 	_pending_remove = ""
 	open_plugins()
+
+
+func _restore_control(plugin_id: String) -> Button:
+	## One press: the previous version is the only rollback a player gets, so it
+	## does not need the two-press confirmation removal uses (B103).
+	return _button(
+		Locale.text("ui.restore_previous") % packages.previous_version(plugin_id),
+		restore_previous.bind(plugin_id),
+	)
+
+
+func restore_previous(plugin_id: String) -> void:
+	## Re-import the bytes kept under `previous:<id>`. The version it replaces is
+	## kept in turn, so pressing twice walks back and forth between two versions.
+	var prior := packages.previous_of(plugin_id)
+	var bytes := Marshalls.base64_to_raw(String(prior.get("bytes", "")))
+	if bytes.is_empty():
+		return
+	var context := _context()
+	context["allow_downgrade"] = true
+	_after_install(loader.import_bytes(bytes, context))
 
 
 func _is_layer(plugin_id: String) -> bool:
@@ -723,6 +747,7 @@ func _after_install(result: Dictionary) -> Dictionary:
 	var record: Dictionary = result["entry"]
 	var plugin_id := String(record.get("id", ""))
 	var already := builtin_ids.has(plugin_id)
+	var stored_version := packages.stored_version(plugin_id)
 	if not already:
 		builtin_ids.append(plugin_id)
 	packages.persist(record)
@@ -732,7 +757,7 @@ func _after_install(result: Dictionary) -> Dictionary:
 	session = Session.create(entry, {"start_counter": 1, "locale": Locale.current()})
 	session.start()
 	var view := enter_session()
-	view["install"] = "already" if already else "installed"
+	view["install"] = "already" if already and stored_version == String(record.get("version", "")) else "installed"
 	return view
 
 
