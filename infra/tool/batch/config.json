@@ -124,6 +124,26 @@
       "cwd": "."
     },
     {
+      "name": "delivery",
+      "command": [
+        "python",
+        "infra/checks/check_delivery.py",
+        "--docs-root",
+        "../lethebar-docs"
+      ],
+      "cwd": "."
+    },
+    {
+      "name": "traceability",
+      "command": [
+        "python",
+        "infra/checks/check_traceability.py",
+        "--root",
+        "."
+      ],
+      "cwd": "."
+    },
+    {
       "name": "import",
       "command": [
         "python",
