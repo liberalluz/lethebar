@@ -153,7 +153,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-04` | `specVersion` 在支持窗口内 | 拒绝 |
 | `V-05` | `engine` 范围包含当前引擎版本 | 拒绝 |
 | `V-06` | `protocol` 存在于注册表 | 拒绝 |
-| `V-07` | `entry` 节点存在于 `nodes.json` | 拒绝 |
+| `V-07` | bundle 的 `entry` 节点存在于其 `nodes.json`；层不检查 | 拒绝 |
 | `V-08` | 声明的每个资源路径都在包内 | 警告，跳过该资源 |
 | `V-09` | `saveSchema` 为正整数 | 拒绝 |
 | `V-14` | 规则读写的每个资源都在 `state.json` 里声明，且账本自身形状正确 | 拒绝 |

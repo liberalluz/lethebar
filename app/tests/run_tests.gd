@@ -81,6 +81,7 @@ func _initialize() -> void:
 	_case_layer_tick()
 	_case_layers()
 	_case_layer_dimensions()
+	_case_layer_entry()
 	_case_asset_layers()
 	_case_layer_identity()
 	_case_removal()
@@ -3493,7 +3494,7 @@ func _case_removal() -> void:
 	)
 
 
-func _layer_package(name: String, target: String = "lay-base", dimension: String = "mod") -> PackedByteArray:
+func _layer_package(name: String, target: String = "lay-base", dimension: String = "mod", entry: String = "n1") -> PackedByteArray:
 	## A layer declares `kind` and `layer` and names its target (ADR-0013); the
 	## assembly only chooses which one runs, it does not make the package a layer.
 	## It replaces one resource definition, adds one action and removes one.
@@ -3506,7 +3507,10 @@ func _layer_package(name: String, target: String = "lay-base", dimension: String
 	var disable := {"actions": ["farm"]}
 	return _package(
 		name,
-		{"id": name, "kind": "layer", "layer": dimension, "target": target, "capabilities": ["ledger@1"], "mechanics": ["ledger"]},
+		{
+			"id": name, "kind": "layer", "layer": dimension, "target": target,
+			"entry": entry, "capabilities": ["ledger@1"], "mechanics": ["ledger"],
+		},
 		[],
 		[],
 		{},
@@ -3652,6 +3656,29 @@ func _case_layer_dimensions() -> void:
 		not ticks.has("Dim Genre") and ticks.has("Dim Content") and explained,
 		str(ticks),
 	)
+
+
+func _case_layer_entry() -> void:
+	_section("B97 a layer is not a story: it needs no entry node of its own")
+	var loader := PackageLoader.new()
+	loader.import_bytes(_base_package("entry-base"), _context())
+	var layer := _layer_package("entry-layer", "entry-base", "mod", "ghost")
+	var result := loader.import_bytes(layer, _context())
+	_check(
+		"B97: the layer installs although no node answers its entry",
+		result["status"] == "installed",
+		"%s/%s" % [result["status"], result.get("code", "-")],
+	)
+	var assembled: Dictionary = loader.assemble(["entry-base", "entry-layer"])
+	_check(
+		"B97: it assembles on its target",
+		assembled.get("ok", false),
+		str(assembled.get("code", "")),
+	)
+	var entries: Array = assembled.get("entries", [])
+	if entries.size() == 2:
+		var session := Session.create(entries[0], {"assembly": entries.slice(1)})
+		_check("B97: a session opens from it", session != null, "no session")
 
 
 func _case_asset_layers() -> void:

@@ -169,7 +169,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-04` | `specVersion` is within the supported window | reject |
 | `V-05` | `engine` range includes the current engine version | reject |
 | `V-06` | `protocol` exists in the registry | reject |
-| `V-07` | `entry` node exists in `nodes.json` | reject |
+| `V-07` | a bundle's `entry` node exists in its own `nodes.json`; a layer is not asked | reject |
 | `V-08` | every declared asset path exists in the package | warn, skip asset |
 | `V-09` | `saveSchema` is a positive integer | reject |
 | `V-14` | every resource a rule reads or writes is declared in `state.json`, and the ledger itself is well formed | reject |
