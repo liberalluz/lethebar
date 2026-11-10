@@ -43,6 +43,9 @@ BOLD = re.compile(r"\*\*[^*]+\*\*")
 UNDERSCORE = re.compile(r"(?<![A-Za-z0-9_])__[^_]+__(?![A-Za-z0-9_])")
 
 
+WIDTH = 72
+
+
 def git(*args: str) -> str:
     result = subprocess.run(
         ["git", *args],
@@ -137,6 +140,18 @@ def inspect(sha: str, body: str) -> list[str]:
         if _markdown(body, mark):
             details.append(
                 f"{sha[:8]} {subject}: the body carries {mark} markup; a commit message is plain text"
+            )
+    in_fence = False
+    for number, line in enumerate(body.splitlines(), 1):
+        if line.strip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence or number == 1 or len(line) <= WIDTH:
+            continue
+        longest = max((len(token) for token in line.split()), default=0)
+        if longest <= WIDTH:
+            details.append(
+                f"{sha[:8]} {subject}: line {number} is {len(line)} columns; wrap it at {WIDTH}"
             )
     return details
 

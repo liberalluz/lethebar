@@ -1926,8 +1926,15 @@ def cmd_pr(args: argparse.Namespace) -> int:
     return 0
 
 
+def _sha256_file(path: Path) -> str:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return "missing"
+
+
 def exit_record_draft(
-    card: dict[str, Any], state: dict[str, Any], batch_id: str
+    card: dict[str, Any], state: dict[str, Any], batch_id: str, root: Path
 ) -> str:
     """Build an exit record skeleton from the card and the batch state."""
     scope = state.get("scope") or {}
@@ -1988,6 +1995,15 @@ def exit_record_draft(
     rows += ["", "## Changelog", ""]
     fragments = card.get("changelog") or []
     rows += [f"- `{item}` — fill" for item in fragments] or ["- fill"]
+    rows += ["", "## Checks", "", "| Check | Result |", "|---|---|"]
+    checks = state.get("checks") or {}
+    for name, item in checks.items():
+        rows.append(f"| {name} | {item.get('status', 'fill')} |")
+    if not checks:
+        rows.append("| fill | fill |")
+    for record in (state.get("skill_evidence") or {}).values():
+        relative = str(record.get("file") or "")
+        rows.append(f"- `{relative}` — sha256 `{_sha256_file(root / relative)}`")
     rows += [
         "",
         "## Scope",
@@ -2033,7 +2049,7 @@ def cmd_exit(args: argparse.Namespace) -> int:
         print(f"{target} exists; pass --force to overwrite", file=sys.stderr)
         return 1
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(exit_record_draft(card, state, batch_id) + "\n", encoding="utf-8")
+    target.write_text(exit_record_draft(card, state, batch_id, root) + "\n", encoding="utf-8")
     print(f"drafted {target}")
     print("fill the remaining fields, then run check_records.py")
     return 0
