@@ -178,6 +178,18 @@ path, so the case survives fixture renames.
   overwritten; slot 2 loads normally; the game remains interactive.
 
 ### `TC-DET-001`
+### `TC-SAVE-005`
+
+- Covers: `REQ-012`
+- Preconditions: a session with a counter whose per-run, per-turn and turn values
+  are whole numbers; one free slot.
+- Steps:
+  1. Set `used` to whole numbers (`{"per_run": 1, "turn": 1, "per_turn": 1}`) and save.
+  2. Resume from the slot.
+  3. Compare the resumed snapshot's `used` with the saved one.
+  4. Save and resume again with a fractional value (`0.5`).
+- Exit: the whole numbers come back as integers, the two snapshots are equal, and
+  the fraction comes back as `0.5` on the second resume.
 
 - Covers: `REQ-016`
 - Preconditions: a fixture with a fixed seed source; two distinct seeds available.

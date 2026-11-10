@@ -22,8 +22,8 @@ from fixtures import fixture_dir, leftovers
 
 ALLOWED_ROOTS = {"data", "assets", "i18n"}
 MANIFEST = "manifest.json"
-MAX_ENTRIES = 512
-MAX_FILE_BYTES = 8 * 1024 * 1024
+MAX_ENTRIES = 500
+MAX_FILE_BYTES = 4 * 1024 * 1024
 MAX_TOTAL_BYTES = 32 * 1024 * 1024
 EXECUTABLE_SUFFIXES = {
     ".gd", ".exe", ".sh", ".dll", ".bat", ".cmd", ".ps1", ".py", ".js",
@@ -282,6 +282,24 @@ def self_test() -> int:
                 "is not '>=x.y.z <x.y.z'",
                 False,
             ),
+            (
+                "an archive over the entry cap",
+                fixture(directory, "too-many", {
+                    **good,
+                    **{f"data/n{i:03d}.json": b"{}" for i in range(497)},
+                }),
+                "entry cap",
+                False,
+            ),
+            (
+                "a file over the file cap",
+                fixture(directory, "too-big", {
+                    **good,
+                    "data/big.json": b"\0" * (4 * 1024 * 1024 + 1),
+                }),
+                "file cap",
+                False,
+            ),
         ]
 
         failures = 0
@@ -295,6 +313,13 @@ def self_test() -> int:
                 detail = "; ".join(problems) or "no problem reported"
             print(f"[{'ok' if ok else 'fail'}] {title}: {detail}")
             failures += 0 if ok else 1
+
+        if MAX_ENTRIES != 500 or MAX_FILE_BYTES != 4 * 1024 * 1024:
+            print(
+                "[fail] the caps do not match app/core/package_limits.gd: "
+                f"{MAX_ENTRIES} entries and {MAX_FILE_BYTES} bytes per file"
+            )
+            failures += 1
 
         layer_cases = 0
         for title, name, layer, expects_warning in (
