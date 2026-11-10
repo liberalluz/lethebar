@@ -849,6 +849,25 @@ func _tightest() -> String:
 	return best
 
 
+static func canonical(value: Variant) -> Variant:
+	## JSON has one number type: `1` is written back as `1.0`. A run is compared
+	## and replayed by value, so both sides of a save pass through here and a
+	## whole number is an int again; a real fraction is left alone (ADR-0013).
+	if value is Dictionary:
+		var out: Dictionary = {}
+		for key in value:
+			out[key] = Session.canonical(value[key])
+		return out
+	if value is Array:
+		var items: Array = []
+		for item in value:
+			items.append(Session.canonical(item))
+		return items
+	if value is float and is_finite(value) and value == floor(value) and absf(value) < 1.0e15:
+		return int(value)
+	return value
+
+
 func snapshot() -> Dictionary:
 	## Serialisable payload for a save slot (SDD §7.2). No timestamp: the save
 	## layer stamps `savedAt`, which keeps gameplay output reproducible.
@@ -884,7 +903,7 @@ func snapshot() -> Dictionary:
 		# resumed save would quietly lose the addition it was playing with
 		# (REQ-041).
 		out["assembly"] = assembly.duplicate()
-	return out
+	return Session.canonical(out)
 
 
 func restore_factions(saved: Variant) -> void:

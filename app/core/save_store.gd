@@ -122,7 +122,7 @@ func read(entry: Dictionary, slot: int) -> Dictionary:
 	var parsed: Variant = JSON.parse_string(raw)
 	if not parsed is Dictionary:
 		return _problem(CODE_UNREADABLE, "slot %d holds no readable save" % slot, slot)
-	var payload: Dictionary = parsed
+	var payload: Dictionary = Session.canonical(parsed)
 
 	var declared := int(entry.get("manifest", {}).get("saveSchema", 0))
 	var found: Variant = payload.get("schema", null)
