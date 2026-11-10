@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.7.3 - 2026-11-10
+
+### Added
+- `pack.py badge --fold` and `--flat` choose the table's shape once; `--write` keeps the shape a file already has, so a version bump cannot unfold a table someone folded on purpose.
+- an `assets` layer now reaches the run: its declared pictures, sounds and text are merged into the bundle's lookup at assembly time (`B92`).
+- `check_pack.py` warns when a layer names a dimension this engine build does not apply, instead of staying silent until the author reads the guide.
+- `check_commit_body.py` enforces the 72-column rule the conventions already state; a line whose longest token is a path or a URL is allowed to run long.
+- `batch.py exit` writes a `Checks` section with the last gate result for every step and a `sha256` for each skill evidence file.
+
+### Changed
+- `author-gate.yml` pins `ENGINE_REF` at `v0.7.2` and says what that line means: the engine release whose tools run, not the Godot range in a manifest.
+
+### Fixed
+- `publish.py` no longer falls back to a changelog section. A release body is the player note at `product/release-notes/<version>.en.md`, and a missing note stops the release instead of publishing a batch list under a player-facing title.
+- A layer that names `genre`, `profession`, `meta` or `assets` no longer offers a tick it cannot honour: the pack page says the layer is declared but not applied, and the engine names the two dimensions it does apply.
+- `assemble()` refuses a layer whose target is not a bundle with `V-44`, naming the layer and the target, instead of applying it over another patch.
+- `worlds()` no longer counts a layer as a world, so one bundle plus one layer is one world rather than an empty "Other stories" shelf.
+- `V-42` checks a meta block only where the shell reads it: on the bundle. A layer's meta is still validated for shape but no longer refused for content nothing renders.
+- two applied layers carrying the same asset path are refused with `V-45` before the run starts, instead of one silently winning;
+- the guide no longer says a non-bundle target is accepted, and names the three dimensions that still do nothing.
+- The gate runs the three delivery checks and the chain from a requirement to its test case, so a broken external record, a missing freeze or an untested requirement is red before the merge.
+- `V-07` no longer asks a layer for its own `entry` node. Only a bundle, whose entry the session opens, has to name a node that exists in `data/nodes.json`.
+- A resumed run's snapshot now equals the one that was saved: a whole number stays whole instead of coming back as `1.0` from the JSON round trip.
+
 ## v0.7.2 - 2026-11-09
 
 ### Added
