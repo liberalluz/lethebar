@@ -1,5 +1,7 @@
 # What `manifest.json` means
 
+English · [简体中文](manifest.zh-CN.md)
+
 A pack is a zip. The engine opens `manifest.json` first and decides from it alone whether the
 pack can be installed. Everything else in the archive — nodes, actions, art — is only read after
 this file is accepted.

@@ -1,5 +1,7 @@
 # Protocols: the shape of a story
 
+English · [简体中文](protocols.zh-CN.md)
+
 A protocol is the answer to one question: how does a run move from one moment to
 the next? The engine implements protocols; a package picks one in its manifest
 and the engine plays the story with that shape.

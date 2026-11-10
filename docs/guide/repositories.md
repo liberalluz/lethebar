@@ -1,5 +1,7 @@
 # One repository, several packs
 
+English · [简体中文](repositories.zh-CN.md)
+
 A world usually grows more than one pack: the main story, a second playable
 variant, a content layer someone else wrote. They live side by side in the same
 repository, and each one is released on its own.

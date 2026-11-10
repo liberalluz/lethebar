@@ -176,6 +176,22 @@
         "infra/checks/check_translation.py"
       ],
       "cwd": "."
+    },
+    {
+      "name": "pairs",
+      "command": [
+        "python",
+        "infra/checks/check_guide_pairs.py"
+      ],
+      "cwd": "."
+    },
+    {
+      "name": "capabilities",
+      "command": [
+        "python",
+        "infra/checks/check_capabilities.py"
+      ],
+      "cwd": "."
     }
   ],
   "release_checks": [

@@ -19,26 +19,33 @@ package carries; a capability is what the engine knows how to do with them.
 
 ## Implemented
 
-| Capability | What the engine provides | Grown in | Proven by |
-| --- | --- | --- | --- |
-| `narrative@1` | scenes, choices, the linear traversal | `B2` | `TC-PROTO-001`, `TC-BUILTIN-001` |
-| `rounds@1` | turn counter over a scene run, round readout | `B3` | `TC-PROTO-002` |
-| `ledger@1` | named state values with bounds, clamped writes | `B16` | `TC-LEDGER-001` |
-| `rules@1` | `{when, set}` tables applied after every step | `B16` | `TC-LEDGER-001` |
-| `menu@1` | per-turn action list, availability reasons, end conditions | `B17` | `TC-TURN-001` |
-| `phases@1` | turn budget, ranked bands, failure conditions | `B17` | `TC-TURN-001` |
-| `pools@1` | declared item pools, one draw per item per run | `B18` | `TC-POOL-001` |
-| `relations@1` | entity pairs, thresholds, relation state | `B18` | `TC-REL-001` |
-| `conditions@1` | `when` clauses that read a relation or a drawn item | `B21` | `TC-WIRE-001` |
-| `draws@1` | an action that draws from a pool in the same step | `B21` | `TC-WIRE-001` |
-| `clock@1` | a tick per turn or per scene, readable by rules | `B19` | `TC-CLOCK-001` |
-| `actions@1` | action buttons rendered from package data, disabled with a reason | `B20` | `TC-SCENE-001` |
-| `assets@1` | declared textures, audio and text bound to a scene | `B9` | `TC-ASSET-001` |
-| `locale@1` | interface language, package translations, per-locale fallback | `B8`, `B10` | `TC-I18N-001` |
-| `save@2` | three slots, previews, resume, durable write | `B4`, `B23` | `TC-SAVE-001`…`TC-SAVE-003` |
-| `offline@1` | installable web build, package and save survival without a network | `B6`, `B12` | `TC-OFF-001`…`TC-OFF-004` |
-| `format@2` | package format `2.0.0`: `kind`, `layer`, `requires` | `B15` | `TC-FMT-001` |
-| `cards.hand@1` | a hand, a deck, a draw and a discard, a resolution order | `B41` | `TC-CARDS-001` |
+The Service column names the engine code that keeps the promise; the Blocks
+column names the package data it reads. A capability with no service is not
+implemented, and a service with no capability is invisible to packages.
+
+| Capability | What the engine provides | Service | Blocks | Grown in | Proven by |
+| --- | --- | --- | --- | --- | --- |
+| `text@1` | labels, prose and choices drawn as text | view, i18n | nodes, i18n | `B1` | `TC-PROTO-001` |
+| `render.2d@1` | a 2D canvas, textures, layout | view | assets | `B1` | `TC-ASSET-001` |
+| `audio@1` | declared sound and music played and stopped | audio | assets | `B9` | `TC-ASSET-002` |
+| `narrative@1` | scenes, choices, the linear traversal | session | nodes | `B2` | `TC-PROTO-001`, `TC-BUILTIN-001` |
+| `rounds@1` | turn counter over a scene run, round readout | phases | phases | `B3` | `TC-PROTO-002` |
+| `ledger@1` | named state values with bounds, clamped writes | ledger | ledger | `B16` | `TC-LEDGER-001` |
+| `rules@1` | `{when, set}` tables applied after every step | mechanics | rules | `B16` | `TC-LEDGER-001` |
+| `menu@1` | per-turn action list, availability reasons, end conditions | menu | actions | `B17` | `TC-TURN-001` |
+| `phases@1` | turn budget, ranked bands, failure conditions | phases | phases | `B17` | `TC-TURN-001` |
+| `pools@1` | declared item pools, one draw per item per run | pools | pools | `B18` | `TC-POOL-001` |
+| `relations@1` | entity pairs, thresholds, relation state | relations | factions | `B18` | `TC-REL-001` |
+| `conditions@1` | `when` clauses that read a relation or a drawn item | conditions | rules, factions | `B21` | `TC-WIRE-001` |
+| `draws@1` | an action that draws from a pool in the same step | draws | pools, hand | `B21` | `TC-WIRE-001` |
+| `clock@1` | a tick per turn or per scene, readable by rules | clock | clock | `B19` | `TC-CLOCK-001` |
+| `actions@1` | action buttons rendered from package data, disabled with a reason | menu | actions | `B20` | `TC-SCENE-001` |
+| `assets@1` | declared textures, audio and text bound to a scene | assets | assets | `B9` | `TC-ASSET-001` |
+| `locale@1` | interface language, package translations, per-locale fallback | i18n | i18n | `B8`, `B10` | `TC-I18N-001` |
+| `save@2` | three slots, previews, resume, durable write | save_store | save file | `B4`, `B23` | `TC-SAVE-001`…`TC-SAVE-003` |
+| `offline@1` | installable web build, package and save survival without a network | service worker | — | `B6`, `B12` | `TC-OFF-001`…`TC-OFF-004` |
+| `format@2` | package format `2.0.0`: `kind`, `layer`, `requires` | validator | manifest | `B15` | `TC-FMT-001` |
+| `cards.hand@1` | a hand, a deck, a draw and a discard, a resolution order | hand | hand, pools | `B41` | `TC-CARDS-001` |
 
 A package needs none of these by name today: an empty `requires.capabilities`
 means "narration only", which is what every existing package declares. The list

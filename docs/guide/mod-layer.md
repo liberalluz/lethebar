@@ -1,5 +1,7 @@
 # A mod layer, end to end
 
+English · [简体中文](mod-layer.zh-CN.md)
+
 A `mod` layer changes numbers and costs that a bundle already declared. It does
 not add a story: the nodes, the entry node and the phase machine stay the base
 pack's, because a run with two beginnings is not a run. What it can do is make
@@ -17,7 +19,7 @@ your-world-repository/
     └── sanguo-hard/
         ├── manifest.json
         └── data/
-            ├── ledger.json      the resources it rewrites
+            ├── state.json       the resources it rewrites
             ├── actions.json     the actions it adds
             └── disable.json     the actions it removes
 ```
@@ -61,7 +63,7 @@ nodes needs no `locales` at all.
 
 | Input file | Effect | Limits |
 |---|---|---|
-| `data/ledger.json` | the resource is **replaced wholesale**: bounds, start value, label | only a resource the base already declares; a new name is skipped |
+| `data/state.json` | the resource is **replaced wholesale**: bounds, start value, label | only a resource the base already declares; a new name is skipped |
 | `data/actions.json` | actions are **added** | an id the base already uses is refused with `W-05` and the base keeps it |
 | `data/pools.json` | pools are **added**, with their contents | same duplicate rule |
 | `data/hand.json` | cards join the hand, and `size`, `draw_per_turn`, `reshuffle` fill gaps | same duplicate rule |
