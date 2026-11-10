@@ -119,8 +119,6 @@ agreed to play.
 
 Read this before planning a family of packs:
 
-- a layer must still carry an `entry` node of its own (`V-07`), so it needs a
-  placeholder node it never uses;
 - a layer whose `target` is not a bundle is refused with `V-44` when the
   assembly is built;
 - `content`, `mod` and `assets` take effect; `genre` and `meta` install without

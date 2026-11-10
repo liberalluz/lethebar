@@ -48,16 +48,14 @@ The smallest layer that installs and takes effect:
 Three fields are what make it a layer: `kind`, `layer` and `target`. `target` is
 the id of the bundle it changes; `requires` says what has to be installed for it
 to be usable. `protocol` and `entry` are repeated only because the format still
-asks for them — see [what does not work yet](manifest.md#what-does-not-work-yet),
-and give `entry` a node in `data/nodes.json` that nothing ever reads.
+asks for them; nothing reads a layer's `entry`, and it needs no node in
+`data/nodes.json` (`V-07` asks only a bundle).
 
-That placeholder node has one consequence worth knowing before you publish: if
-the manifest declares `locales`, every node in `data/nodes.json` — the
-placeholder included — needs a non-empty entry in each `data/i18n/<locale>.json`,
-keyed by node id. A table shaped like `{"strings": {...}}` passes nothing; the
-install is refused with `V-22: data/i18n/en.json has no entry for node
-placeholder`. A layer that only carries rules needs no `locales` at all, and
-dropping the field is usually the shorter path.
+If the manifest declares `locales`, every node in `data/nodes.json` needs a
+non-empty entry in each `data/i18n/<locale>.json`, keyed by node id. A table
+shaped like `{"strings": {...}}` passes nothing; the install is refused with
+`V-22: data/i18n/en.json has no entry for node <id>`. A layer that carries no
+nodes needs no `locales` at all.
 
 ## What it may change
 

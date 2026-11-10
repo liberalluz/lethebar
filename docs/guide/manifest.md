@@ -135,11 +135,9 @@ does not have. Both are cheaper to see on your own machine than in someone's bro
 
 ## What does not work yet
 
-Four things a manifest can declare that the engine will not honour, in the order
+Three things a manifest can declare that the engine will not honour, in the order
 they are likely to bite:
 
-- a layer still needs an `entry` node inside its own `data/nodes.json` (`V-07`),
-  so it carries a placeholder node nothing ever reads;
 - a `target` that names a layer rather than a bundle is refused at assembly
   (`V-44`);
 - `layer: content`, `layer: mod` and `layer: assets` take effect; `genre` and

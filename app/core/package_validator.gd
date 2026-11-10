@@ -516,10 +516,12 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 	if not protocols.has(manifest["protocol"]):
 		issues.append(_issue("V-06", "protocol", "unknown protocol: %s" % manifest["protocol"], true))
 
-	# V-07 — the entry node has to exist in the package data.
+	# V-07 — a bundle's story needs the node it names. A layer is not a story:
+	# the session opens the bundle's entry, never the layer's (B97).
 	var node_ids: Array = context.get("node_ids", [])
-	if not node_ids.has(manifest["entry"]):
-		issues.append(_issue("V-07", "entry", "entry node not found in data/nodes.json: %s" % manifest["entry"], true))
+	if String(manifest.get("kind", ManifestSchema.KIND_BUNDLE)) == ManifestSchema.KIND_BUNDLE:
+		if not node_ids.has(manifest["entry"]):
+			issues.append(_issue("V-07", "entry", "entry node not found in data/nodes.json: %s" % manifest["entry"], true))
 
 	# V-09 — saves produced by this plugin need a payload version.
 	var save_schema: Variant = manifest["saveSchema"]

@@ -98,7 +98,7 @@ smallest one, in full, against the bundle above:
   "protocol": "linear@1",
   "capabilities": ["text@1"],
   "mechanics": [],
-  "entry": "placeholder",
+  "entry": "open",
   "saveSchema": 1,
   "assets": [],
   "content": { "view": "first", "density": "sparse", "cast": [], "arc": [] }
