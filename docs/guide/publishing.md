@@ -27,7 +27,7 @@ about your pack. `hash` writes the descriptor that sits beside the zip; never ed
 
 `github.com/liberalluz/lethebar-pack-template` holds both tools, the three-step workflow and a
 working example pack; click **Use this template**, replace the example, and skip the assembly
-above. It is tested against engine `v0.7.3`, and its own gate ran green before it was offered.
+above. It is tested against engine `v0.7.4`, and its own gate ran green before it was offered.
 
 ## One tag, one release, two assets
 

@@ -9,7 +9,7 @@ English · [简体中文](README.zh-CN.md)
 
 ## Status
 
-**v0.7.3 is out: a save comes back with the numbers it was written with.** Three Kingdoms and
+**v0.7.4 is out: a newer package replaces the one installed, and the pack page can put the old one back.** Three Kingdoms and
 Cultivation are published from their own repositories — `pack/sanguo/v1.0.0`,
 `pack/sanguo-content/v1.0.0`, `pack/sanguo-hard/v1.0.1` and `pack/cultivation/v1.0.0` — and
 this repository keeps one smoke pack (`duel`) so that the engine's own tests have something
