@@ -1,5 +1,7 @@
 # A mod layer, end to end
 
+English · [简体中文](mod-layer.zh-CN.md)
+
 A `mod` layer changes numbers and costs that a bundle already declared. It does
 not add a story: the nodes, the entry node and the phase machine stay the base
 pack's, because a run with two beginnings is not a run. What it can do is make

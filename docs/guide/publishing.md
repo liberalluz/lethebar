@@ -1,5 +1,7 @@
 # Publishing a pack
 
+English · [简体中文](publishing.zh-CN.md)
+
 A pack reaches players as a file, and a file reaches them as a GitHub release asset. This page
 covers the six commands that get you from a directory to a release, and the two things that fail
 when you skip one.

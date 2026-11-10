@@ -1,5 +1,7 @@
 # `manifest.json` 是什么意思
 
+[English](manifest.md) · 简体中文
+
 一个包是 zip。引擎先打开 `manifest.json`，只凭它决定这个包能不能装。压缩包里的
 其余东西——节点、动作、美术——要等这个文件被接受之后才读。
 

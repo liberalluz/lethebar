@@ -1,5 +1,7 @@
 # What is this?
 
+English · [简体中文](what-is-this.zh-CN.md)
+
 You write one zip. A player installs it and plays one run. There is no code in it.
 
 ## What you write

@@ -1,5 +1,7 @@
 # The eight bricks
 
+English · [简体中文](bricks.zh-CN.md)
+
 A package does not describe a game. It declares data files, and each file turns
 on one part of the engine. Eight parts exist. Nothing else does: a package that
 wants a ninth kind of rule is asking for a new engine capability, not a clever

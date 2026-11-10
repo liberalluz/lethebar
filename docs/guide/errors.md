@@ -1,5 +1,7 @@
 # When the engine says no
 
+English · [简体中文](errors.zh-CN.md)
+
 Every refusal the engine raises carries a code. The code is the part worth
 reading: it names the check, and the check names the file you have to open.
 

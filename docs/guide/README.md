@@ -1,5 +1,7 @@
 # The author's guide
 
+English · [简体中文](README.zh-CN.md)
+
 Guide v1.0.0. Ten pages about writing a pack: a zip of data that the engine
 reads, decides and draws. No engine source is needed, and nothing here assumes
 you read the rest.
@@ -8,6 +10,9 @@ you read the rest.
 
 [What is this?](what-is-this.md) — what the engine is, what you write, how a run
 works, and what a pack cannot do. Read this page first; the rest is detail.
+
+If your world will hold several packs, read [one repository, several packs](repositories.md)
+before you fix any id — the id is the save key.
 
 ## ② Write a pack
 
@@ -40,3 +45,6 @@ works, and what a pack cannot do. Read this page first; the rest is detail.
 When one disagrees with a controlled document in [`docs/specs/controlled/`](../specs/controlled/),
 the controlled document wins and the page has a bug — which is why the code table
 in [errors.md](errors.md) is generated from the source.
+
+Changing the engine is a different job: the contract is the controlled documents, not
+this guide.

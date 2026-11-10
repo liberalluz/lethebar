@@ -1,5 +1,7 @@
 # What a pack is
 
+English · [简体中文](pack-anatomy.zh-CN.md)
+
 A pack is a zip. Inside it is data: text, numbers, and the occasional picture or sound. It holds
 no program. The engine reads the data, decides what it means, and draws it.
 
