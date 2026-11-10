@@ -692,11 +692,14 @@ Steps:
 4. Save to slot 1 and resume with the same assembly.
 5. Resolve an assembly that names a package nothing installed.
 6. Open a session whose second package declares `grain` again.
+7. Resolve an assembly whose second entry is a layer naming a package that
+   installed as a layer.
 
 Exit: the view carries `grain` and `troops`; the menu lists `farm` then `drill`;
 the snapshot records both ids; the resumed run still carries `troops`; the
 missing package is refused with `V-33` naming it; the duplicate leaves exactly
-one `W-05` and keeps the first value.
+one `W-05` and keeps the first value; step 7 is refused with `V-44` naming the
+package and the layer.
 
 
 ## TC-WIRE-002 — a layer changes the package it names
@@ -805,4 +808,79 @@ leaves the installed set unchanged; step 4 installs, starts the pack and reports
   3. Trigger each declared failure and assert its reason.
   4. Assert five actions and one rule that moves a relation.
 - Exit: every number comes from package data, and `app/core` is unchanged.
+
+## TC-ASSEMBLY-005 — a layer says it is a layer
+
+- Covers: `REQ-048`
+- Fixture: `k-base` (a bundle with one node, a ledger resource and the action
+  `farm`), `k-mod` (a layer whose manifest says `kind: layer`, `layer: mod`,
+  `target: k-base`, raising the resource bound), `k-bundle` (a bundle that
+  carries `target: k-base` and `data/disable.json` removing `farm`), and
+  `k-lonely` (a layer whose `target` names nothing installed).
+- Steps:
+  1. Install all four and read what each install reported.
+  2. Open the pack page and read where `k-mod` appears.
+  3. Assemble `k-base` plus `k-mod` by id and read the bound.
+  4. Assemble `k-base` plus `k-bundle` by id and read the menu.
+  5. Open `k-mod` alone from the pack page.
+- Exit: `k-mod` is listed under `k-base` and the layered run carries the raised
+  bound; `k-bundle` is merged as a bundle, so `farm` is gone and the base's own
+  story still opens; `k-lonely` is refused with `V-33`; opening `k-mod` as a
+  story is refused with `E-03` and leaves the player on the pack page.
+
+## TC-ASSEMBLY-006 — a layer whose dimension does nothing says so
+
+- Covers: `REQ-049`
+- Fixture: `d-base` (a bundle with `grain` and one action), `d-content` (a layer
+  whose `content` block changes the view), `d-genre`, `d-meta`, `d-prof` (three
+  layers that declare `layer: genre`, `meta`, `profession` and also change
+  `grain`, so the run would show it if they applied), and `d-other` (a second
+  bundle in the same world).
+- Steps:
+  1. Install all six and open the pack page for `d-base`.
+  2. Read which layers offer a tick and what the page says about the others.
+  3. Start a run with `d-content` ticked and read the view and `grain`.
+  4. Assemble `d-base` plus `d-genre` by id and read `grain`.
+  5. Open the world screen.
+- Exit: `d-content` offers a tick and changes the view; `d-genre`, `d-meta` and
+  `d-prof` install, offer no tick, and each shows a one-line pending note;
+  step 4 keeps `grain` at the base value; the world screen lists one world, not
+  one per layer.
+
+## TC-ASSET-002 — a layer's pictures reach the run
+
+- Covers: `REQ-050`
+- Fixture: `a-base` (a bundle declaring `art/sky.png` and one sound), `a-layer`
+  (a layer declaring the same path with different bytes and a second sound),
+  `a-second` (a layer declaring the same path again), and `a-solo` (a bundle
+  with no assets).
+- Steps:
+  1. Install all four and open `a-base`.
+  2. Read the picture bytes and the sound count.
+  3. Assemble `a-base` plus `a-layer` and read the same two.
+  4. Assemble `a-base` plus both layers.
+  5. Remove `a-layer`, reopen, and read the picture again.
+  6. Open `a-solo`.
+- Exit: the base run shows its own picture and one sound; the layered run shows
+  the layer's bytes in the same slot and both sounds; two layers on one path are
+  refused with `V-45` naming both and the path; after removal the picture is the
+  base's again; `a-solo` opens without a picture band.
+
+## TC-WIRE-004 — a player can remove a package and a layer
+
+- Covers: `REQ-051`
+- Fixture: `rm-base` (a bundle), `rm-mod` (a layer over it), and a slot 1 save
+  of the layered run.
+- Steps:
+  1. Install both and open the pack page.
+  2. Press Remove on `rm-mod` once.
+  3. Press Remove on `rm-mod` again.
+  4. Press Remove on `rm-base` while `rm-mod` is installed, then after removing
+     `rm-mod`.
+  5. Read the save list and resume slot 1.
+  6. Reinstall `rm-base` at the same version.
+- Exit: one press names what it will remove and keeps both installed; the second
+  press removes `rm-mod`; `rm-base` refuses while its layer is installed and is
+  removed after; the save list no longer offers the slot and resuming it reports
+  `E-02` naming `rm-mod`; the reinstall reports `installed`, not `V-03`.
 
