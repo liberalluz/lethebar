@@ -134,14 +134,14 @@ deterministic, be data-agnostic, and declare its node contract.
 | File | Holds | Capability |
 |---|---|---|
 | `nodes.json` | scenes, choices, jumps | `narrative@1` |
-| `state.json` | named values, bounds | `ledger@1` |
+| `ledger.json` | named values, bounds | `ledger@1` |
 | `rules.json` | `{when, set}` tables | `rules@1` |
 | `actions.json` | actions, costs, effects | `actions@1`, `menu@1` |
 | `phases.json` | turn budget, ranks, failure | `phases@1` |
 | `pools.json` | pools, one draw per item per run | `pools@1` |
-| `factions.json` | entity pairs, thresholds | `relations@1` |
+| `relations.json` | entity pairs, thresholds | `relations@1` |
 | `hand.json` | deck, hand, draw, discard | `cards.hand@1` |
-| `clock.json` | a tick per turn or per scene | `clock@1` |
+| manifest `clock` | a tick per turn or per scene (`clock@1` has no file) | `clock@1` |
 
 `content`, `meta` and `assets` are manifest blocks, not files.
 

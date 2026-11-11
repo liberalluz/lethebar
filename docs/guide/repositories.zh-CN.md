@@ -71,7 +71,7 @@ manifest 里的 `id`，会被引擎用来把一局存在 `save:<id>:<slot>`。�
 ## 层指向什么
 
 ```json
-{ "kind": "layer", "layer": "mod", "target": "sanguo", "requires": ["sanguo"] }
+{ "kind": "layer", "layer": "mod", "target": "sanguo", "requires": [{ "id": "sanguo", "version": "1.0.0" }] }
 ```
 
 `target` 是层要改的那个包的 id——实践中是 `bundle`，因为一局只能从它开始。装配器

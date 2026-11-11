@@ -53,7 +53,7 @@ SCAN = (
 # The eight bricks. Each row names the data file that turns it on and the file
 # that reads it; the generator refuses to run when a reader file disappears.
 BRICKS = (
-    ("1. State ledger", "data/state.json", "app/core/ledger.gd",
+    ("1. State ledger", "data/ledger.json", "app/core/ledger.gd",
      "the resources a run keeps, each with a start, a floor and a ceiling"),
     ("2. Settlement rules", "data/rules.json", "app/core/mechanics.gd",
      "when a state looks like this, change that state by this much"),
@@ -65,7 +65,7 @@ BRICKS = (
      "a named test on the state that a choice or a card can ask for"),
     ("6. Pools", "data/pools.json", "app/core/pools.gd",
      "a set of items drawn without repeats, or dealt as a hand"),
-    ("7. Relations", "data/factions.json", "app/core/relations.gd",
+    ("7. Relations", "data/relations.json", "app/core/relations.gd",
      "who stands where with whom, and what a change of standing moves"),
     ("8. Clock", "manifest.json `clock`", "app/core/session.gd",
      "when a turn passes: every choice, every node, or every n of them"),
