@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.7.6 - 2026-11-11
+
+### Changed
+- The guide states the data-id grammar (`^[a-z][a-z0-9_]*$`, `V-16`) and what a re-run of `publish` does, in both languages.
+- `check_guide_pairs.py` compares version tokens, backticked `data/*.json` paths and REQ/TC codes between a page and its twin, not only the section count.
+
+### Fixed
+- `pack.py publish` reads the release before it writes: an asset that is already there with the same hash is left alone, a missing one is uploaded, and one that differs is refused unless `--force` is passed.
+- The `pack.py` docstring no longer promises byte-identical builds on every platform; it promises them under the same Python and zlib, and points at the descriptor as the thing a player verifies.
+- `package_loader.gd` no longer describes a fallback name that does not exist.
+- `errors.zh-CN.md` now carries the generated table's line numbers and the new file names, so it no longer points at `state.json` or `cards.json`.
+- `SDD.zh-CN.md` has §11.19 and the four mapping rows it was missing, so the Chinese spec no longer stops at REQ-043.
+
 ## v0.7.5 - 2026-11-11
 
 ### Changed
