@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.8.0 - 2026-11-11
+
+### Added
+- `persist@1`: a package may declare a small table that survives across runs (`manifest.persist`), write it with `persist.<key>` effects and read it from rules. It lives outside the save snapshot, so a replay does not change it.
+- `V-47` refuses a table that is over 32 keys or 4 KiB, mistyped, or declared without the `persist@1` capability.
+- `roll@1`: a bundle may declare named integer ranges in `manifest.rolls`; rules read `roll.<name>` and effects spend one with `{"key": {"add_roll": "name"}}`. The value is derived from the seed and the turn, so a reload cannot reroll it, and it does not advance the hand or pool stream.
+- `V-48` refuses a roll that is not an integer range, a range over one million, more than sixteen rolls, or `rolls` without the capability.
+- Saves now carry `seed`; a payload from before this batch falls back to `rng`.
+
+### Fixed
+- `publish.py` refuses a tag that is not the engine version. Its note and evidence paths are keyed by version alone, so a `pack/<id>/v<version>` tag would publish a pack under the engine's note and evidence; a pack keeps those in its own repository.
+
 ## v0.7.6 - 2026-11-11
 
 ### Changed
