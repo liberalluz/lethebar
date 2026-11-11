@@ -47,6 +47,7 @@ var loader := PackageLoader.new()
 ## IndexedDB: a slot survives a reload (TC-OFF-001/002/004). Tests swap both
 ## stores for the memory backend before `_ready()`.
 var saves := SaveStore.new(FileBackend.new())
+var memories := FileBackend.new()
 var packages := PackageStore.new(FileBackend.new())
 
 var screen := SCREEN_LANDING
@@ -266,7 +267,7 @@ func resume_slot(plugin_id: String, slot: int) -> Dictionary:
 			return current_view()
 		layers.append(layer_record)
 	var restored := saves.resume(
-		record, result["payload"], {"locale": Locale.current(), "assembly": layers}
+		record, result["payload"], {"locale": Locale.current(), "assembly": layers, "persist_backend": memories}
 	)
 	if restored == null:
 		open_notice(
@@ -464,6 +465,7 @@ func start_plugin(plugin_id: String, ticked: Array = []) -> Dictionary:
 		"start_counter": 1,
 		"locale": Locale.current(),
 		"assembly": entries.slice(1),
+		"persist_backend": memories,
 	})
 	if session == null:
 		open_notice("E-02", "pack %s has no usable protocol" % plugin_id)
@@ -697,7 +699,7 @@ func load_from(slot: int) -> Dictionary:
 	if not bool(result.get("ok", false)):
 		open_notice(String(result.get("code", "")), String(result.get("message", "")))
 		return current_view()
-	session = saves.resume(entry, result["payload"])
+	session = saves.resume(entry, result["payload"], {"persist_backend": memories})
 	return enter_session()
 
 
@@ -754,7 +756,7 @@ func _after_install(result: Dictionary) -> Dictionary:
 	saves.mark_writing()
 	_writing = true
 	entry = record
-	session = Session.create(entry, {"start_counter": 1, "locale": Locale.current()})
+	session = Session.create(entry, {"start_counter": 1, "locale": Locale.current(), "persist_backend": memories})
 	session.start()
 	var view := enter_session()
 	view["install"] = "already" if already and stored_version == String(record.get("version", "")) else "installed"

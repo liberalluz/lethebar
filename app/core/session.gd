@@ -48,6 +48,10 @@ var hand: Array
 var deck: Array
 var discard: Array
 var assembly: Array
+var persist_defs: Dictionary
+var persist: Dictionary
+var persist_store: PersistStore
+var persist_error: String
 
 
 static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
@@ -136,6 +140,19 @@ static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
 			else:
 				session._merge_package(extra)
 	session.locale = String(options.get("locale", ""))
+	# B112: the memory is declared by the bundle and by any layer, and it lives
+	# outside the save. It is loaded after the assembly so a layer's keys are
+	# known before the stored values are accepted.
+	session.persist_store = PersistStore.new(options.get("persist_backend", null), session.plugin_id)
+	session.persist = session.persist_store.values
+	session.persist_error = session.persist_store.declare(session.manifest.get("persist", {}))
+	for extra in options.get("assembly", []):
+		if extra is Dictionary and not (extra as Dictionary).is_empty():
+			var layer_manifest: Dictionary = (extra as Dictionary).get("manifest", {})
+			var declared := session.persist_store.declare(layer_manifest.get("persist", {}))
+			if session.persist_error == "":
+				session.persist_error = declared
+	session.persist_store.load()
 	var counter := int(options.get("start_counter", DEFAULT_START_COUNTER))
 	session.rng = ((session.plugin_id.hash() ^ (counter * 2654435761)) & 0x7FFFFFFF) | 1
 	session.protocol = ProtocolRegistry.implementation(session.protocol_id)
@@ -180,7 +197,10 @@ func goto(next_id: String) -> Dictionary:
 func apply_rules() -> void:
 	## Rules see the tick the way they see a resource, but only the engine can
 	## move it: a package that tries to write it is refused at install (V-14).
-	var result := Mechanics.apply(rules, state, {ManifestSchema.TICK_KEY: float(tick)})
+	var scope := {ManifestSchema.TICK_KEY: float(tick)}
+	for name in persist:
+		scope["persist." + String(name)] = persist[name]
+	var result := Mechanics.apply(rules, state, scope)
 	state = _clamped(result["state"])
 	_absorb(result["warnings"])
 	_apply_relations(result.get("relations", result.get("factions", [])))
@@ -214,9 +234,46 @@ func _apply_relations(changes: Array) -> void:
 
 
 func apply_effects(effects: Array) -> void:
-	var result := Mechanics.apply_effects(effects, state)
-	state = _clamped(result["state"])
-	_absorb(result["warnings"])
+	## B112: `persist.<key>` is written to the memory table, not to the state, so
+	## it never enters `snapshot()`. Everything else goes to Mechanics untouched.
+	var split := _split_persist(effects)
+	var plain: Array = split[0]
+	if not plain.is_empty():
+		var result := Mechanics.apply_effects(plain, state)
+		state = _clamped(result["state"])
+		_absorb(result["warnings"])
+	for write in split[1]:
+		_write_persist(write)
+
+
+func _split_persist(effects: Array) -> Array:
+	var plain: Array = []
+	var writes: Array = []
+	for effect in effects:
+		if not (effect is Dictionary):
+			plain.append(effect)
+			continue
+		var rest: Dictionary = {}
+		for name in effect:
+			var key := String(name)
+			if key.begins_with("persist."):
+				writes.append([key.substr(8), (effect as Dictionary)[name]])
+			else:
+				rest[key] = (effect as Dictionary)[name]
+		if not rest.is_empty():
+			plain.append(rest)
+	return [plain, writes]
+
+
+func _write_persist(write: Array) -> void:
+	if persist_store == null:
+		return
+	var outcome := persist_store.set_value(String(write[0]), write[1])
+	if not bool(outcome.get("ok", false)):
+		_absorb([{
+			"code": String(outcome.get("code", "")),
+			"message": String(outcome.get("message", "")),
+		}])
 
 
 func _clamped(values: Dictionary) -> Dictionary:
@@ -266,11 +323,15 @@ func act(action_id: String) -> Dictionary:
 		var paid := Mechanics.apply_effects([costs], scratch)
 		_absorb(paid["warnings"])
 		scratch = paid["state"]
+	var writes: Array = []
 	var effects: Variant = action.get("effects", [])
 	if effects is Array:
-		var done := Mechanics.apply_effects(effects, scratch)
-		_absorb(done["warnings"])
-		scratch = done["state"]
+		var split := _split_persist(effects)
+		writes = split[1]
+		if not (split[0] as Array).is_empty():
+			var done := Mechanics.apply_effects(split[0], scratch)
+			_absorb(done["warnings"])
+			scratch = done["state"]
 	scratch = _clamped(scratch)
 	var draws: Variant = action.get("draw", null)
 	if draws is Dictionary:
@@ -283,6 +344,8 @@ func act(action_id: String) -> Dictionary:
 			return view()
 		draw(pool_id)
 	state = scratch
+	for write in writes:
+		_write_persist(write)
 	Menu.record_use(action, self)
 	_step_rng()
 	turn += 1
@@ -328,12 +391,18 @@ func play_card(card_id: String) -> Dictionary:
 	if taken.is_empty():
 		reject("S-09", "no card named %s in the hand" % card_id)
 		return view()
+	var writes: Array = []
 	var effects: Variant = card.get("effects", [])
 	if effects is Array:
-		var done := Mechanics.apply_effects(effects, scratch)
-		_absorb(done["warnings"])
-		scratch = done["state"]
+		var split := _split_persist(effects)
+		writes = split[1]
+		if not (split[0] as Array).is_empty():
+			var done := Mechanics.apply_effects(split[0], scratch)
+			_absorb(done["warnings"])
+			scratch = done["state"]
 	state = _clamped(scratch)
+	for write in writes:
+		_write_persist(write)
 	hand = taken["hand"]
 	deck = taken["deck"]
 	discard = taken["discard"]

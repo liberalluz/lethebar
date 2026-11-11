@@ -84,3 +84,30 @@ Every id you write inside a data file — an action, a resource, a pool, a relat
 The package id is the one exception: it allows hyphens (`^[a-z0-9-]+$`) because it is a URL segment and a save key, not a data id.
 
 The rule is not cosmetic. An action id is reused as `action.<id>` in the translation file, stored in the save's `used` table, accepted by `disable.json`, and printed in the run. Changing it after a player has a save is a data migration, so pick the underscore form the first time. `V-16` refuses the archive at install when the grammar is broken.
+
+## Memory that outlives a run
+
+If your pack needs to remember something between runs — a shop's stock, a name
+the player chose, a first-run flag — declare it in the manifest and name
+`persist@1`:
+
+```json
+{
+  "capabilities": ["text@1", "persist@1"],
+  "persist": {"overseer": "", "rerolls": 0}
+}
+```
+
+An effect writes it with the `persist.` prefix, and a rule reads it the same way:
+
+```json
+{"effects": [{"persist.rerolls": {"add": 1}}]}
+{"when": {"key": "persist.rerolls", "op": "gte", "value": 3}, "set": {"flagged": 1}}
+```
+
+The table belongs to the bundle, not to a run. It is stored outside the save, so
+a replay of an old save sees the current memory, not the memory that run had —
+the memory is the player's, the save is the run's. Keys are lower-case ids,
+values are scalars or flat arrays; at most 32 keys and 4 KiB. A layer's table is
+declared against its target bundle. `V-47` refuses a table that is too large,
+mistyped, or declared without the capability.

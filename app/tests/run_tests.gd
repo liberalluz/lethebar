@@ -84,6 +84,7 @@ func _initialize() -> void:
 	_case_upgrade_install()
 	_case_layer_dimensions()
 	_case_layer_entry()
+	_case_persist()
 	_case_asset_layers()
 	_case_layer_identity()
 	_case_removal()
@@ -4205,6 +4206,58 @@ func _shipped_meta(plugin_id: String) -> Dictionary:
 	if String(result.get("status", "")) != "installed":
 		return {}
 	return MetaLayer.of(loader.registry.entry(plugin_id)["manifest"])
+
+
+func _case_persist() -> void:
+	## B112: the memory is a table outside the save. The same backend sees the
+	## new value on the next session; the snapshot never carries it.
+	_section("B112 a pack remembers across runs")
+	var actions := {
+		"actions": [
+			{
+				"id": "mark",
+				"label": "Mark",
+				"effects": [{"persist.seen": true}, {"persist.score": {"add": 2}}],
+			},
+		],
+	}
+	var shell := _shell()
+	var bytes := _package(
+		"pst",
+		{
+			"id": "pst",
+			"capabilities": ["persist@1"],
+			"mechanics": [],
+			"persist": {"seen": false, "score": 0},
+		},
+		[],
+		[],
+		{},
+		{"rules": [{"when": {"key": "persist.seen", "value": true}, "set": {"flagged": 1}}]},
+		{"data/actions.json": JSON.stringify(actions, "\t").to_utf8_buffer()},
+	)
+	var installed: Dictionary = shell.loader.import_bytes(bytes, _context())
+	_check("B112: the package installs", String(installed.get("status", "")) == "installed", str(installed.get("code", "")))
+	var entry: Dictionary = shell.loader.registry.entry("pst")
+	var backend := MemoryBackend.new()
+	var first := Session.create(entry, {"persist_backend": backend})
+	var defaults: Dictionary = first.persist if first != null else {}
+	_check("B112: the declared defaults are there", defaults == {"seen": false, "score": 0}, str(defaults))
+	first.act("mark")
+	var after: Dictionary = first.persist
+	_check("B112: an effect writes the table", after.get("seen") == true and int(after.get("score", 0)) == 2, str(after))
+	_check("B112: the snapshot does not carry the table", not (first.snapshot() as Dictionary).has("persist"))
+	var second := Session.create(entry, {"persist_backend": backend})
+	var kept: Dictionary = second.persist
+	_check("B112: the next session sees it", kept.get("seen") == true and int(kept.get("score", 0)) == 2, str(kept))
+	second.apply_rules()
+	_check("B112: a rule reads it", int(second.state.get("flagged", 0)) == 1, str(second.state))
+	var many := {}
+	for i in 40:
+		many["k%d" % i] = 0
+	var bulk := _package("pst-many", {"id": "pst-many", "capabilities": ["persist@1"], "mechanics": [], "persist": many})
+	var refused: Dictionary = shell.loader.import_bytes(bulk, _context())
+	_check("B112: too many keys are refused", String(refused.get("status", "")) == "rejected", String(refused.get("code", "")))
 
 
 func _case_meta() -> void:
