@@ -11,7 +11,7 @@ my-story.zip
 ├── manifest.json     what the pack is called, where a run starts
 ├── data/
 │   ├── nodes.json    scenes: who appears, what the choices are, where they lead
-│   ├── state.json    the numbers: money, stamina, trust
+│   ├── ledger.json    the numbers: money, stamina, trust
 │   ├── actions.json  buttons: farm, send a gift, leave
 │   ├── phases.json   turns, chapters, when a run ends
 │   └── rules.json    what changes after what

@@ -119,7 +119,7 @@ by `check_pack`, installed into the engine and played before a release goes out.
 | Template | Protocol | What it adds |
 | --- | --- | --- |
 | `templates/pack-min/` | `linear@1` | a manifest and `data/nodes.json`; three nodes, two choices |
-| `templates/pack-turn/` | `turn_based@1` | the same node, plus `data/state.json`, `data/actions.json` and `data/phases.json` |
+| `templates/pack-turn/` | `turn_based@1` | the same node, plus `data/ledger.json`, `data/actions.json` and `data/phases.json` |
 
 Start from `pack-min` if the story moves from one scene to the next and that is
 all it does. Start from `pack-turn` if a scene has a menu of actions under it, or

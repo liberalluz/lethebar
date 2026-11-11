@@ -109,7 +109,7 @@ manifest 说得清。别用 `-layer`、`-bundle`、`-v2`、`-final`：id 是存�
 
 - `target` 不是 bundle 的层，在构建装配时被 `V-44` 拒绝；
 - `content`、`mod`、`assets` 生效；`genre` 与 `meta` 装了什么也不改；`profession`
-  是 bundle 自己的数据（`data/factions.json`、`phases.ranks`、资源标签），所以
+  是 bundle 自己的数据（`data/relations.json`、`phases.ranks`、资源标签），所以
   `profession` 层没有东西可合并（`ADR-0016`）。
 
 ## 仓库不是契约的一部分

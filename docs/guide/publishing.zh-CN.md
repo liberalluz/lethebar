@@ -109,7 +109,7 @@ python infra/tool/release/pack.py badge . --check README.md
 | 模板 | 协议 | 它多了什么 |
 | --- | --- | --- |
 | `templates/pack-min/` | `linear@1` | 一个 manifest 和 `data/nodes.json`；三个节点、两个选择 |
-| `templates/pack-turn/` | `turn_based@1` | 同一个节点，加上 `data/state.json`、`data/actions.json`、`data/phases.json` |
+| `templates/pack-turn/` | `turn_based@1` | 同一个节点，加上 `data/ledger.json`、`data/actions.json`、`data/phases.json` |
 
 故事从一场戏走到下一场、只做这件事，就从 `pack-min` 开始。一场戏下面有动作菜单，
 或这一局需要回合上限，就从 `pack-turn` 开始。复制一个再改数据文件，比从空目录

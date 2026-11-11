@@ -22,25 +22,25 @@
 
 | 积木 | 由谁打开 | 由谁读 | 它管什么 |
 | --- | --- | --- | --- |
-| 1. 状态账本 | `data/state.json` | `app/core/ledger.gd` | 一局要保留的资源，每个都有初值、下限和上限 |
+| 1. 状态账本 | `data/ledger.json` | `app/core/ledger.gd` | 一局要保留的资源，每个都有初值、下限和上限 |
 | 2. 结算规则 | `data/rules.json` | `app/core/mechanics.gd` | 当状态是这样时，把那个状态改这么多 |
 | 3. 动作菜单 | `data/actions.json` | `app/core/menu.gd` | 玩家能做什么、花什么、改什么、多久一次 |
 | 4. 阶段机 | `data/phases.json` | `app/core/phases.gd` | 一局有多少回合、经过哪些段位、怎么结束 |
 | 5. 检查 | `data/checks.json` | `app/core/checks.gd` | 对状态的一个命名判断，选择或卡牌可以问它 |
 | 6. 池 | `data/pools.json` | `app/core/pools.gd` | 一组不重复抽取的物品，或作为手牌发出 |
-| 7. 关系 | `data/factions.json` | `app/core/relations.gd` | 谁和谁站在哪边，立场一变会带动什么 |
+| 7. 关系 | `data/relations.json` | `app/core/relations.gd` | 谁和谁站在哪边，立场一变会带动什么 |
 | 8. 时钟 | `manifest.json` 的 `clock` | `app/core/session.gd` | 什么时候过一回合：每个选择、每个节点，或每 n 个 |
 
 ## 一块积木怎么打开
 
-靠声明那个文件。一个有 `data/state.json` 和 `data/actions.json` 的包，就有账本和
+靠声明那个文件。一个有 `data/ledger.json` 和 `data/actions.json` 的包，就有账本和
 菜单；两个都没有的包，仍然能装、能玩一个线性故事，因为这两块是一局唯一坚持要的。
 
 省略一个文件不是错误。声明坏了才是：校验器会读 manifest 隐含的每个数据文件，
 当其中一个点名了不存在的东西时，拒绝安装。这种形状的三个例子：
 
-- 一个动作花 `gold`，而 `data/state.json` 从没声明 `gold` —— `V-16`
-- 一条规则把 `standing` 设成 `allied`，而 `data/factions.json` 从没声明
+- 一个动作花 `gold`，而 `data/ledger.json` 从没声明 `gold` —— `V-16`
+- 一条规则把 `standing` 设成 `allied`，而 `data/relations.json` 从没声明
   `allied` 这个状态 —— `V-25`
 - 一个动作从 `relics` 抽，而 `data/pools.json` 从没声明那个池 —— `V-26`
 
@@ -54,3 +54,7 @@
 
 两个后果：数字是浮点，所以成本 `0.5` 合法；规则按 `data/rules.json` 里出现的
 顺序执行，所以后面的规则看得到前面写下的东西。
+
+## 一个块一个名字
+
+块的文件按块命名：`data/ledger.json`、`data/relations.json`、`data/hand.json`。v0.7.5 之前的包用 `state.json`、`factions.json`、`cards.json`；引擎仍能读，但新包应该用块名（ADR-0018）。

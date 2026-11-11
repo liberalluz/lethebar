@@ -11,7 +11,7 @@ my-story.zip
 ├── manifest.json     这包叫什么、一局从哪开始
 ├── data/
 │   ├── nodes.json    场景：谁出现、有什么选择、通向哪里
-│   ├── state.json    数字：钱、体力、信任
+│   ├── ledger.json    数字：钱、体力、信任
 │   ├── actions.json  按钮：种田、送礼、离开
 │   ├── phases.json   回合、章节、一局什么时候结束
 │   └── rules.json    什么之后变什么

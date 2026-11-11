@@ -36,7 +36,7 @@ var pools: Array
 var pools_left: Dictionary
 var pools_shuffled: Dictionary
 var drawn: Array
-var factions: Dictionary
+var relations: Dictionary
 var turn: int
 var tick: int
 var clock_per: String
@@ -95,7 +95,7 @@ static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
 	session.pools_left = Pools.remaining(session.pools)
 	session.pools_shuffled = {}
 	session.drawn = []
-	session.factions = Relations.defines(data.get("factions", {}) if data.get("factions", null) is Dictionary else {})
+	session.relations = Relations.defines(data.get("relations", {}) if data.get("relations", null) is Dictionary else {})
 	session.turn = 1
 	# The clock is the engine's own count of advances, never the wall clock; a
 	# package may say which advance it counts (engine-bricks §8). Empty means it
@@ -183,14 +183,14 @@ func apply_rules() -> void:
 	var result := Mechanics.apply(rules, state, {ManifestSchema.TICK_KEY: float(tick)})
 	state = _clamped(result["state"])
 	_absorb(result["warnings"])
-	_apply_relations(result.get("relations", []))
+	_apply_relations(result.get("relations", result.get("factions", [])))
 
 
 func _apply_relations(changes: Array) -> void:
 	## A rule names a pair and a change; the session owns the map, so it is the
 	## only writer (REQ-032). An undeclared pair cannot reach here: V-31 refuses
 	## it at install time.
-	var entities: Dictionary = factions.get("entities", {})
+	var entities: Dictionary = relations.get("entities", {})
 	for change in changes:
 		if not (change is Dictionary):
 			continue
@@ -491,19 +491,19 @@ func drawn_ids() -> Array:
 func relation(from_id: String, to_id: String) -> float:
 	## What `from_id` feels about `to_id`. Only that direction: the package owns
 	## the numbers and the engine never assumes symmetry (engine-bricks §7).
-	return Relations.value(factions, from_id, to_id)
+	return Relations.value(relations, from_id, to_id)
 
 
 func relation_state(from_id: String, to_id: String) -> String:
 	## The first declared threshold crossed, or "" when none is. The state names
 	## are the package's; the engine carries none of its own.
-	return Relations.state(factions, from_id, to_id)
+	return Relations.state(relations, from_id, to_id)
 
 
 func faction_map() -> Array:
 	var out: Array = []
-	for id in factions.get("order", []):
-		out.append({"id": String(id), "label": Relations.label(factions, String(id))})
+	for id in relations.get("order", []):
+		out.append({"id": String(id), "label": Relations.label(relations, String(id))})
 	return out
 
 
@@ -749,9 +749,9 @@ func view() -> Dictionary:
 		# A hand is how a card package offers its options; a package without one
 		# never grows the key, so a menu-only package looks exactly as before.
 		out["hand"] = hand_view()
-	if Relations.declares(factions):
+	if Relations.declares(relations):
 		out["factions"] = faction_map()
-		out["thresholds"] = (factions.get("thresholds", {}) as Dictionary).duplicate(true)
+		out["thresholds"] = (relations.get("thresholds", {}) as Dictionary).duplicate(true)
 	if Phases.declares(phase):
 		out["turn"] = turn
 		out["rank"] = rank()
@@ -787,15 +787,15 @@ func content_layer_view() -> Dictionary:
 func situation() -> Dictionary:
 	## How the run stands, read once for the scene (REQ-033). Every number comes
 	## from what the package declared: the turn budget from phases, the pair
-	## values from factions, the floors and ceilings from the ledger. A story that
+	## values from relations, the floors and ceilings from the ledger. A story that
 	## declares none of them gets no reading rather than a made-up one.
 	var out := {}
-	if not (Phases.declares(phase) or Relations.declares(factions)):
+	if not (Phases.declares(phase) or Relations.declares(relations)):
 		return out
 	if Phases.declares(phase):
 		var turns := int(phase.get("turns", Phases.DEFAULT_TURNS))
 		out["turnsLeft"] = maxi(turns - turn + 1, 0)
-	if Relations.declares(factions):
+	if Relations.declares(relations):
 		var leaning := _standing(true)
 		var friction := _standing(false)
 		if leaning != "":
@@ -813,7 +813,7 @@ func _standing(high: bool) -> String:
 	## Sums the relations each entity receives, so "everyone leans toward Wu" is
 	## the total of what the other entities feel, not one direction picked by the
 	## engine. Ties keep the declaration order, so the answer is stable.
-	var order: Array = factions.get("order", [])
+	var order: Array = relations.get("order", [])
 	var best := ""
 	var best_score := 0.0
 	var found := false
@@ -886,7 +886,7 @@ func snapshot() -> Dictionary:
 		"used": used.duplicate(true),
 		"pools": _pool_snapshot(),
 		"drawn": drawn.duplicate(true),
-		"factions": factions.duplicate(true),
+		"relations": relations.duplicate(true),
 	}
 	if not content_spec.is_empty():
 		# The declaration is part of the run, so a save that came from a layered
@@ -906,7 +906,7 @@ func snapshot() -> Dictionary:
 	return Session.canonical(out)
 
 
-func restore_factions(saved: Variant) -> void:
+func restore_relations(saved: Variant) -> void:
 	## The faction map is part of the run once a rule can move it (REQ-032). A
 	## payload without one keeps the map the package declared.
 	if not (saved is Dictionary):
@@ -914,7 +914,7 @@ func restore_factions(saved: Variant) -> void:
 	var parsed: Dictionary = saved
 	if not (parsed.get("entities", null) is Dictionary):
 		return
-	factions = parsed.duplicate(true)
+	relations = parsed.duplicate(true)
 
 
 func declares(mechanic_id: String) -> bool:

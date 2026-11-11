@@ -103,13 +103,13 @@ plugin.zip
 
 - `nodes.json`：节点含 `id`、`text`、`assets`、`choices[]`；每个选择含
   `label`、`next`、`effects[]`。
-- `state.json`：账本。每个资源有 `id`、`init`、`min`、`max`，可带显示用 `label`，
+- `ledger.json`：账本。每个资源有 `id`、`init`、`min`、`max`，可带显示用 `label`，
   也可用 `labels` 把数值映射成显示文字（例如 `{"2": "名动诸侯"}`）。值始终是数字，
   标签只是代替数字显示，不改变数字。
 - `rules.json`：结算规则，每条 `{when, set}`，按文件顺序在所选项自身的效果之后求值。
   规则读到的是效果刚留下的值，所以同一步里标签能跟上数字。`mechanics.json` 保持同一
   形状，在没有 `rules.json` 时被读取，账本之前写的包因此仍能玩。
-- 规则点名资源，而不是自由变量：规则读写的每个键都必须在 `state.json` 里声明（`V-14`）。
+- 规则点名资源，而不是自由变量：规则读写的每个键都必须在 `ledger.json` 里声明（`V-14`）。
   没有控制流，除比较与算术外没有表达式语言。
 
 - `actions.json`：菜单。每个动作有 `id`、`label`，可带 `costs`、`requires`、
@@ -126,7 +126,7 @@ plugin.zip
 - `pools.json`：`{id, items, draw: {n, replace}}`。一次抽取取走 `n` 条，除非 `replace`
   为真；剩下的部分进存档，重载不能重掷；顺序在第一次抽取时由会话随机数固定，
   而不是在加载时打乱。
-- `factions.json`：`thresholds` 与 `entities`，每个势力带一组有方向的 `relations`。
+- `relations.json`：`thresholds` 与 `entities`，每个势力带一组有方向的 `relations`。
   非负阈值是下限、负阈值是上限；引擎不发明状态名，也不假设关系对称。
 ### 3.4 资源类型
 
@@ -156,7 +156,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-07` | bundle 的 `entry` 节点存在于其 `nodes.json`；层不检查 | 拒绝 |
 | `V-08` | 声明的每个资源路径都在包内 | 警告，跳过该资源 |
 | `V-09` | `saveSchema` 为正整数 | 拒绝 |
-| `V-14` | 规则读写的每个资源都在 `state.json` 里声明，且账本自身形状正确 | 拒绝 |
+| `V-14` | 规则读写的每个资源都在 `ledger.json` 里声明，且账本自身形状正确 | 拒绝 |
 | `V-16` | 动作 id 唯一、至少一条效果、上限是引擎会统计的那种；它们触碰的每个资源都已声明 | 拒绝 |
 | `V-17` | `turns` 至少为 1，段位在 `1..turns` 内递增，每条失败都带原因与条件 | 拒绝 |
 | `V-18` | 骰子至少两面、目标落在骰子范围内；加成要点名资源 | 拒绝 |
@@ -168,7 +168,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-24` | 每条 `requires` 都由已安装或内置的包满足，且版本落在声明范围内 | 拒绝 |
 | `W-01` | `specVersion` 低于 `2.0.0`：现在可读，`v0.2.0` 起拒绝 | 警告 |
 | `V-21` | `clock.per` 是 `turn` 或 `node`，且声明了时钟的包至少有一条规则的 `when` 读 `tick` | 拒绝 |
-| `V-25` | 条件里的关系状态在 `factions.json` 里声明过，或点名的条目存在于某个池子里 | 拒绝 |
+| `V-25` | 条件里的关系状态在 `relations.json` 里声明过，或点名的条目存在于某个池子里 | 拒绝 |
 | `V-26` | 动作的 `draw.pool` 在 `pools.json` 里声明过 | 拒绝 |
 | `V-27` | `capabilities` 的每一条都是引擎已提供的 `name@major` 能力标识（ADR-0008） | 拒绝 |
 | `V-28` | 压缩包本身、条目数、每个条目解压后的字节与解压总量都在上限内；由加载器在读取清单之前判定 | 拒绝 |
@@ -180,10 +180,10 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-35` | 同一次装配里两个层写了同一个目标的同一个字段。 | fatal |
 | `V-44` | 层的 `target` 已安装，但它的 `kind` 不是 `bundle`。 | fatal，点名该层与目标 |
 | `V-45` | 同一次装配里两个层声明了同一条资产路径。 | fatal，点名两个层与路径 |
-| `V-36` | 声明 `cards.hand@1` 的包裹带有 `hand` 与 `deck` 的 `data/cards.json` | 拒绝 |
+| `V-36` | 声明 `cards.hand@1` 的包裹带有 `hand` 与 `deck` 的 `data/hand.json` | 拒绝 |
 | `V-37` | 每张牌的 `cost` 与 `effects` 都点名账本声明过的资源 | 拒绝 |
 | `V-38` | 牌库里的每个牌 id 都在包裹的 `cards` 表里声明过 | 拒绝 |
-| `V-39` | 牌指名了没有任何 texture 资源声明的图标 | 致命，`data/cards.json` |
+| `V-39` | 牌指名了没有任何 texture 资源声明的图标 | 致命，`data/hand.json` |
 
 每次拒绝都给出代码与出错字段；拒绝不会扰动已安装插件及其存档。
 
@@ -639,9 +639,9 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 | `REQ-019` | §8.3 摆放、§8.4 可接受的格式 |
 | `REQ-020` | §11.2 包内语言、§4.2 校验（`V-22`） |
 | `REQ-021` | §3.2 清单字段、§4.2 校验（`V-23`、`V-24`、`W-01`） |
-| `REQ-022` | §3.3 数据文件（`state.json`、`rules.json`、`labels`）、§4.2 校验（`V-14`）、§6.1 夹取 |
+| `REQ-022` | §3.3 数据文件（`ledger.json`、`rules.json`、`labels`）、§4.2 校验（`V-14`）、§6.1 夹取 |
 | `REQ-023` | §3.3 数据文件（`actions.json`、`phases.json`、`checks.json`）、§4.2 校验（`V-16`、`V-17`、`V-18`）、§6.2 结算与回合 |
-| `REQ-024` | §3.3 数据文件（`pools.json`、`factions.json`）、§4.2 校验（`V-19`、`V-20`、`W-02`） |
+| `REQ-024` | §3.3 数据文件（`pools.json`、`relations.json`）、§4.2 校验（`V-19`、`V-20`、`W-02`） |
 | `REQ-025` | §3.2 清单字段（`clock`）、§4.2 校验（`V-21`、`V-14`）、§6.5 时钟 |
 | `REQ-026` | §6.1 一局何时结束、§11.3 场景画出动作菜单 |
 | `REQ-027` | §3.3 数据文件（`actions.json` 的 `requires` 与 `draw`）、§4.2 校验（`V-25`、`V-26`）、`engine-bricks` §7 条件 |

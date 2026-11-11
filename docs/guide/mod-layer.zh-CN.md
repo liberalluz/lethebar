@@ -17,7 +17,7 @@ your-world-repository/
     └── sanguo-hard/
         ├── manifest.json
         └── data/
-            ├── state.json      它重写的资源
+            ├── ledger.json      它重写的资源
             ├── actions.json    它添加的动作
             └── disable.json    它移除的动作
 ```
@@ -58,7 +58,7 @@ your-world-repository/
 
 | 输入文件 | 效果 | 限制 |
 |---|---|---|
-| `data/state.json` | 整个资源被**替换**：上下限、初值、标签 | 只能是底包已声明的资源；新名字被跳过 |
+| `data/ledger.json` | 整个资源被**替换**：上下限、初值、标签 | 只能是底包已声明的资源；新名字被跳过 |
 | `data/actions.json` | 动作被**添加** | 底包已用的 id 会被 `W-05` 拒绝，底包保留 |
 | `data/pools.json` | 池被**添加**，连同内容 | 同样的重名规则 |
 | `data/hand.json` | 牌加入手牌，`size`、`draw_per_turn`、`reshuffle` 填空缺 | 同样的重名规则 |
@@ -97,7 +97,7 @@ tag 里带包名，所以一个仓可以发布一个底包和三个层，彼此�
 
 装上不是证明；一局才是。三个检查，按顺序：
 
-1. **一个只有这个层能产生的数字。** 把底包的初始粮食写进层的 `state.json`，改成
+1. **一个只有这个层能产生的数字。** 把底包的初始粮食写进层的 `ledger.json`，改成
    别的——`40` 改成 `25`——然后勾上层开一局，读故事下面那一行。不勾是 `40`，
    勾了是 `25`。
 2. **一个只有这个层声明的动作。** 把 `levy` 放进 `data/actions.json`，勾上层，
