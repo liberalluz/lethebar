@@ -86,7 +86,7 @@ func write(entry: Dictionary, slot: int, snapshot: Dictionary, preview: String =
 		"used": snapshot.get("used", {}).duplicate(true),
 		"pools": snapshot.get("pools", {}).duplicate(true),
 		"drawn": snapshot.get("drawn", []).duplicate(true),
-		"factions": snapshot.get("factions", {}).duplicate(true),
+		"relations": snapshot.get("relations", {}).duplicate(true),
 		# A run of several packages writes the list it was opened from, so the
 		# slot says what it needs rather than the screen guessing (REQ-041).
 		"assembly": snapshot.get("assembly", []).duplicate(),
@@ -163,7 +163,7 @@ func read(entry: Dictionary, slot: int) -> Dictionary:
 			"used": payload.get("used", {}),
 			"pools": payload.get("pools", {}),
 			"drawn": payload.get("drawn", []),
-			"factions": payload.get("factions", {}),
+			"relations": payload.get("relations", payload.get("factions", {})),
 			"assembly": payload.get("assembly", []),
 		"content": payload.get("content", {}),
 			"hand": payload.get("hand", []),
@@ -216,7 +216,7 @@ func resume(entry: Dictionary, payload: Dictionary, options: Dictionary = {}) ->
 	session.used = payload.get("used", {}) if payload.get("used", null) is Dictionary else {}
 	session.drawn = payload.get("drawn", []) if payload.get("drawn", null) is Array else []
 	session.restore_pools(payload.get("pools", {}))
-	session.restore_factions(payload.get("factions", {}))
+	session.restore_relations(payload.get("relations", payload.get("factions", {})))
 	var saved_content: Variant = payload.get("content", {})
 	if ContentLayer.declares(saved_content):
 		# A save made by a session that declared how it reads resumes with the same

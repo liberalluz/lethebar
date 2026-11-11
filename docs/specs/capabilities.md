@@ -35,8 +35,8 @@ implemented, and a service with no capability is invisible to packages.
 | `menu@1` | per-turn action list, availability reasons, end conditions | menu | actions | `B17` | `TC-TURN-001` |
 | `phases@1` | turn budget, ranked bands, failure conditions | phases | phases | `B17` | `TC-TURN-001` |
 | `pools@1` | declared item pools, one draw per item per run | pools | pools | `B18` | `TC-POOL-001` |
-| `relations@1` | entity pairs, thresholds, relation state | relations | factions | `B18` | `TC-REL-001` |
-| `conditions@1` | `when` clauses that read a relation or a drawn item | conditions | rules, factions | `B21` | `TC-WIRE-001` |
+| `relations@1` | entity pairs, thresholds, relation state | relations | relations | `B18` | `TC-REL-001` |
+| `conditions@1` | `when` clauses that read a relation or a drawn item | conditions | rules, relations | `B21` | `TC-WIRE-001` |
 | `draws@1` | an action that draws from a pool in the same step | draws | pools, hand | `B21` | `TC-WIRE-001` |
 | `clock@1` | a tick per turn or per scene, readable by rules | clock | clock | `B19` | `TC-CLOCK-001` |
 | `actions@1` | action buttons rendered from package data, disabled with a reason | menu | actions | `B20` | `TC-SCENE-001` |

@@ -124,7 +124,7 @@ Read this before planning a family of packs:
 - a layer whose `target` is not a bundle is refused with `V-44` when the
   assembly is built;
 - `content`, `mod` and `assets` take effect; `genre` and `meta` install without
-  changing anything; `profession` is the bundle's own data (`data/factions.json`,
+  changing anything; `profession` is the bundle's own data (`data/relations.json`,
   `phases.ranks`, the resource labels), so a `profession` layer has nothing to
   merge (`ADR-0016`).
 

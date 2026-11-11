@@ -57,7 +57,7 @@ last column names a `data/...` file, that is the file the author has to open.
 | `V-07` | `app/core/package_validator.gd:540` | entry |
 | `V-08` | `app/core/package_validator.gd:660` | declared asset missing from package: … |
 | `V-09` | `app/core/package_validator.gd:545` | must be a positive integer |
-| `V-14` | `app/core/package_validator.gd:554` | state.json |
+| `V-14` | `app/core/package_validator.gd:554` | ledger.json |
 | `V-16` | `app/core/package_validator.gd:358` | actions.json |
 | `V-17` | `app/core/package_validator.gd:365` | phases.json |
 | `V-18` | `app/core/package_validator.gd:369` | checks.json |
@@ -72,10 +72,10 @@ last column names a `data/...` file, that is the file the author has to open.
 | `V-27` | `app/core/package_validator.gd:194` | capabilities |
 | `V-31` | `app/core/package_validator.gd:617` | a rule's relations must be an array |
 | `V-32` | `app/core/package_validator.gd:117` | id must match [a-z0-9-]+ |
-| `V-36` | `app/core/package_validator.gd:463` | cards.json |
-| `V-37` | `app/core/package_validator.gd:513` | cards.json |
-| `V-38` | `app/core/package_validator.gd:473` | cards.json |
-| `V-39` | `app/core/package_validator.gd:493` | cards.json |
+| `V-36` | `app/core/package_validator.gd:463` | hand.json |
+| `V-37` | `app/core/package_validator.gd:513` | hand.json |
+| `V-38` | `app/core/package_validator.gd:473` | hand.json |
+| `V-39` | `app/core/package_validator.gd:493` | hand.json |
 | `V-40` | `app/core/package_validator.gd:243` | manifest.json |
 | `V-41` | `app/core/package_validator.gd:265` | manifest.json |
 | `V-42` | `app/core/package_validator.gd:305` | manifest.json |
@@ -98,7 +98,7 @@ The code tells you which file, the sentence tells you which part of it.
   the same field.
 - `V-45`: two applied layers carry the same asset path. The sentence names both
   layers and the path; the run does not start.
-- `V-36` to `V-38`: `data/cards.json`. A hand without a deck, an unknown
+- `V-36` to `V-38`: `data/hand.json`. A hand without a deck, an unknown
   resource, a deck that cannot be dealt.
 - `S-01` to `S-09`: the run. A node or an action does not exist, cannot be paid
   for, or is not offered here.

@@ -358,7 +358,7 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 			issues.append(_issue("V-16", "actions.json", String(problem), true))
 		for key in Menu.referenced_keys(actions):
 			if not declared_resources.is_empty() and not declared_resources.has(key):
-				issues.append(_issue("V-16", "actions.json", "action names resource %s, which data/state.json never declares" % key, true))
+				issues.append(_issue("V-16", "actions.json", "action names resource %s, which data/ledger.json never declares" % key, true))
 	var phases: Variant = context.get("phases", {})
 	if phases is Dictionary and Phases.declares(phases):
 		for problem in Phases.problems(phases):
@@ -377,12 +377,12 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 	if pools is Array and not (pools as Array).is_empty():
 		for problem in Pools.problems(pools):
 			issues.append(_issue("V-19", "pools.json", String(problem), true))
-	var factions: Variant = context.get("factions", {})
-	if factions is Dictionary and not (factions as Dictionary).is_empty():
-		for problem in Relations.problems(factions):
+	var relations: Variant = context.get("relations", {})
+	if relations is Dictionary and not (relations as Dictionary).is_empty():
+		for problem in Relations.problems(relations):
 			var item: Dictionary = problem
 			var code := "V-20" if bool(item.get("fatal", true)) else "W-02"
-			issues.append(_issue(code, "factions.json", String(item.get("message", "")), bool(item.get("fatal", true))))
+			issues.append(_issue(code, "relations.json", String(item.get("message", "")), bool(item.get("fatal", true))))
 
 	# V-25, V-26 — a condition that names a relation state or a drawn item, and a
 	# draw that names a pool. Both are install-time questions: at the table a typo
@@ -390,11 +390,11 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 	if not actions.is_empty():
 		var thresholds: Dictionary = {}
 		var entity_ids: Array = []
-		if factions is Dictionary:
-			var declared: Variant = factions.get("thresholds", {})
+		if relations is Dictionary:
+			var declared: Variant = relations.get("thresholds", {})
 			if declared is Dictionary:
 				thresholds = declared
-			for entity in factions.get("entities", []):
+			for entity in relations.get("entities", []):
 				if entity is Dictionary:
 					entity_ids.append(String(entity.get("id", "")))
 		var pool_ids: Array = []
@@ -417,7 +417,7 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 						if not thresholds.has(state_name):
 							issues.append(_issue(
 								"V-25", "actions.json",
-								"relation state %s is never declared in data/factions.json" % state_name,
+								"relation state %s is never declared in data/relations.json" % state_name,
 								true,
 							))
 						var named: Variant = condition.get("relation")
@@ -427,7 +427,7 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 								if entity_id != "" and not entity_ids.has(entity_id):
 									issues.append(_issue(
 										"V-25", "actions.json",
-										"relation names entity %s, which data/factions.json never declares" % entity_id,
+										"relation names entity %s, which data/relations.json never declares" % entity_id,
 										true,
 									))
 					if condition.has("drawn"):
@@ -460,7 +460,7 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 	var has_hand_params := hand_raw is Dictionary and (hand_raw as Dictionary).get("hand", null) is Dictionary
 	if claims_hand and (not has_hand_params or not Hand.declared(hand_spec)):
 		issues.append(_issue(
-			"V-36", "cards.json",
+			"V-36", "hand.json",
 			"claims %s but data/cards.json declares no hand and no deck" % Hand.CAPABILITY,
 			true,
 		))
@@ -470,7 +470,7 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 		for card_id in listed_deck:
 			if not cards.has(card_id):
 				issues.append(_issue(
-					"V-38", "cards.json",
+					"V-38", "hand.json",
 					"deck names card %s, which the package never declares" % card_id,
 					true,
 				))
@@ -490,7 +490,7 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 			var icon := String(pictured.get("icon", ""))
 			if not textures.has(icon):
 				issues.append(_issue(
-					"V-39", "cards.json",
+					"V-39", "hand.json",
 					"card %s names an icon no texture in the manifest provides: %s" % [card_id, icon],
 					true,
 				))
@@ -510,8 +510,8 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 					if declared_resources.is_empty() or declared_resources.has(String(key)):
 						continue
 					issues.append(_issue(
-						"V-37", "cards.json",
-						"card %s names resource %s, which data/state.json never declares" % [card_id, String(key)],
+						"V-37", "hand.json",
+						"card %s names resource %s, which data/ledger.json never declares" % [card_id, String(key)],
 						true,
 					))
 
@@ -551,7 +551,7 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 	var declared: Dictionary = {}
 	if ledger is Dictionary and not ledger.is_empty():
 		for problem in Ledger.problems(ledger):
-			issues.append(_issue("V-14", "state.json", String(problem), true))
+			issues.append(_issue("V-14", "ledger.json", String(problem), true))
 		declared = Ledger.definitions(ledger)
 	# The tick is readable by every rule and writable by none, whether or not the
 	# package keeps a ledger: time is the engine's, not the author's.
@@ -571,7 +571,7 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 			if ledger is Dictionary and not ledger.is_empty() and not declared.has(key):
 				issues.append(_issue(
 					"V-14", "rules",
-					"rule names resource %s, which data/state.json never declares" % key,
+					"rule names resource %s, which data/ledger.json never declares" % key,
 					true,
 				))
 
@@ -602,7 +602,7 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 	# V-31 — a rule that moves a relation has to name a pair the package declared
 	# and a change that is a number. A silent zero would read to the player as a
 	# real value, which is the same mistake V-14 refuses for resources.
-	var faction_map: Variant = context.get("factions", {})
+	var faction_map: Variant = context.get("relations", {})
 	var entities: Dictionary = {}
 	if faction_map is Dictionary:
 		var parsed := Relations.defines(faction_map)
@@ -625,13 +625,13 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 			if not entities.has(from_id):
 				issues.append(_issue(
 					"V-31", "rules",
-					"a relation change names %s, which data/factions.json never declares" % from_id,
+					"a relation change names %s, which data/relations.json never declares" % from_id,
 					true,
 				))
 			if not entities.has(to_id):
 				issues.append(_issue(
 					"V-31", "rules",
-					"a relation change points at %s, which data/factions.json never declares" % to_id,
+					"a relation change points at %s, which data/relations.json never declares" % to_id,
 					true,
 				))
 			var amount: Variant = null

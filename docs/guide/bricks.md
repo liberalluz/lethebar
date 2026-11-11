@@ -39,7 +39,7 @@ disappears breaks the generator before it can mislead a reader.
 
 ## How a brick is turned on
 
-By declaring the file. A package with `data/state.json` and `data/actions.json`
+By declaring the file. A package with `data/ledger.json` and `data/actions.json`
 has a ledger and a menu; a package with neither still installs and plays a
 linear story, because those two bricks are the only ones a run insists on.
 
@@ -47,8 +47,8 @@ Leaving a file out is not an error. Declaring it badly is: the validator reads
 every data file the manifest implies, and refuses the install when one of them
 names something that does not exist. Three examples of that shape:
 
-- an action costs `gold`, and `data/state.json` never declares `gold` — `V-16`
-- a rule sets `standing` to `allied`, and `data/factions.json` never declares
+- an action costs `gold`, and `data/ledger.json` never declares `gold` — `V-16`
+- a rule sets `standing` to `allied`, and `data/relations.json` never declares
   `allied` as a state — `V-25`
 - an action draws from `relics`, and `data/pools.json` never declares that pool —
   `V-26`
@@ -67,3 +67,7 @@ does not ship, and the answer today is no.
 Two consequences: numbers are floats, so a cost of `0.5` is legal; and rules
 run in the order they appear in `data/rules.json`, so a later rule sees what an
 earlier one wrote.
+
+## One name per block
+
+A block's file is named after the block: `data/ledger.json`, `data/relations.json`, `data/hand.json`. Packages published before v0.7.5 used `state.json`, `factions.json` and `cards.json`; the engine still reads those, but new packages should use the block name (ADR-0018).

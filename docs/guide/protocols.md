@@ -36,7 +36,7 @@ be expressed as resources, rules and choices inside one of the two shapes.
 The engine also ships a capability called `cards.hand@1`. It is not a protocol:
 it rides on either one and adds a hand of cards to the session, with a deck, a
 cost per card and an optional picture. A package that declares it needs a
-`data/cards.json`; `V-36` refuses a hand without a deck, `V-37` a card naming a
+`data/hand.json`; `V-36` refuses a hand without a deck, `V-37` a card naming a
 resource that does not exist, and `V-39` a card pointing at a picture the
 package never declares.
 

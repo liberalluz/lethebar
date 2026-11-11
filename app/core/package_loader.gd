@@ -13,14 +13,14 @@ extends RefCounted
 const MANIFEST_PATH := "manifest.json"
 const NODES_PATH := "data/nodes.json"
 const MECHANICS_PATH := "data/mechanics.json"
-const STATE_PATH := "data/state.json"
+const LEDGER_PATH := "data/ledger.json"
 const RULES_PATH := "data/rules.json"
 const ACTIONS_PATH := "data/actions.json"
 const PHASES_PATH := "data/phases.json"
 const CHECKS_PATH := "data/checks.json"
 const POOLS_PATH := "data/pools.json"
-const FACTIONS_PATH := "data/factions.json"
-const CARDS_PATH := "data/cards.json"
+const RELATIONS_PATH := "data/relations.json"
+const HAND_PATH := "data/hand.json"
 const DISABLE_PATH := "data/disable.json"
 const DEFAULT_WORK_DIR := "user://pkg"
 
@@ -31,6 +31,15 @@ var _import_counter := 0
 
 func _init(registry_instance: InstallRegistry = null) -> void:
 	registry = registry_instance if registry_instance != null else InstallRegistry.new()
+
+
+## The first of `paths` that the archive carries, parsed, or null. New names come
+## first, the pre-B105 names after them (ADR-0018).
+func _first_json(reader: ZIPReader, files: Array, paths: Array) -> Variant:
+	for path in paths:
+		if files.has(path):
+			return JSON.parse_string(reader.read_file(path).get_string_from_utf8())
+	return null
 
 
 func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionary:
@@ -69,7 +78,7 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 
 	var manifest: Dictionary = manifest_variant
 	var node_ids: Array = []
-	var data := {"nodes": [], "mechanics": {}, "assets": {}, "i18n": {}, "ledger": {}, "rules": [], "actions": [], "phases": {}, "checks": [], "pools": [], "factions": {}, "hand": {}, "content": {}}
+	var data := {"nodes": [], "mechanics": {}, "assets": {}, "i18n": {}, "ledger": {}, "rules": [], "actions": [], "phases": {}, "checks": [], "pools": [], "relations": {}, "hand": {}, "content": {}}
 
 	if files.has(NODES_PATH):
 		var nodes_variant: Variant = JSON.parse_string(reader.read_file(NODES_PATH).get_string_from_utf8())
@@ -85,10 +94,9 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 	# The ledger and its settlement rules (engine-bricks §1, §2). A package that
 	# carries neither keeps the pre-brick behaviour: rules over whatever keys a
 	# story happens to write, no bounds.
-	if files.has(STATE_PATH):
-		var state_variant: Variant = JSON.parse_string(reader.read_file(STATE_PATH).get_string_from_utf8())
-		if state_variant is Dictionary:
-			data["ledger"] = state_variant
+	var ledger_variant: Variant = _first_json(reader, files, [LEDGER_PATH])
+	if ledger_variant is Dictionary:
+		data["ledger"] = ledger_variant
 	if files.has(RULES_PATH):
 		var rules_variant: Variant = JSON.parse_string(reader.read_file(RULES_PATH).get_string_from_utf8())
 		if rules_variant is Dictionary and rules_variant.get("rules", null) is Array:
@@ -116,17 +124,15 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 		var pools_variant: Variant = JSON.parse_string(reader.read_file(POOLS_PATH).get_string_from_utf8())
 		if pools_variant is Dictionary and pools_variant.get("pools", null) is Array:
 			data["pools"] = pools_variant["pools"]
-	if files.has(FACTIONS_PATH):
-		var factions_variant: Variant = JSON.parse_string(reader.read_file(FACTIONS_PATH).get_string_from_utf8())
-		if factions_variant is Dictionary:
-			data["factions"] = factions_variant
+	var relations_variant: Variant = _first_json(reader, files, [RELATIONS_PATH])
+	if relations_variant is Dictionary:
+		data["relations"] = relations_variant
 	# A hand is a deck, a set of cards and the size of the hand (REQ-036). It is
 	# kept whole so the session can deal from it; the validator resolves every
 	# card id and every cost key before a run may start.
-	if files.has(CARDS_PATH):
-		var cards_variant: Variant = JSON.parse_string(reader.read_file(CARDS_PATH).get_string_from_utf8())
-		if cards_variant is Dictionary:
-			data["hand"] = cards_variant
+	var hand_variant: Variant = _first_json(reader, files, [HAND_PATH])
+	if hand_variant is Dictionary:
+		data["hand"] = hand_variant
 	var content_variant: Variant = manifest.get("content", {})
 	data["content"] = content_variant if content_variant is Dictionary else {}
 	# A layer removes entries by name instead of replacing the list that holds
@@ -186,7 +192,7 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 	check_context["phases"] = data["phases"]
 	check_context["checks"] = data["checks"]
 	check_context["pools"] = data["pools"]
-	check_context["factions"] = data["factions"]
+	check_context["relations"] = data["relations"]
 	check_context["hand"] = data["hand"]
 	check_context["content"] = data["content"]
 	check_context["installed"] = registry.versions()

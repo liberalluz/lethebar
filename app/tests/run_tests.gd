@@ -324,7 +324,7 @@ func _case_det_001() -> void:
 	)
 	var keys: Array = JSON.parse_string(first).keys()
 	keys.sort()
-	var expected := ["drawn", "factions", "finished", "node", "plugin", "pools", "protocol", "rng", "schema", "state", "tick", "turn", "used", "version", "visited"]
+	var expected := ["drawn", "finished", "node", "plugin", "pools", "protocol", "relations", "rng", "schema", "state", "tick", "turn", "used", "version", "visited"]
 	_check("TC-DET-001: the payload keeps its declared shape", str(keys) == str(expected), str(keys))
 
 
@@ -1481,7 +1481,7 @@ func _case_ledger() -> void:
 			nodes,
 			{},
 			{
-				"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+				"data/ledger.json": JSON.stringify(ledger).to_utf8_buffer(),
 				"data/rules.json": JSON.stringify(rules).to_utf8_buffer(),
 			},
 		),
@@ -1512,7 +1512,7 @@ func _case_ledger() -> void:
 			nodes,
 			{},
 			{
-				"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+				"data/ledger.json": JSON.stringify(ledger).to_utf8_buffer(),
 				"data/rules.json": JSON.stringify(undeclared_rules).to_utf8_buffer(),
 			},
 		),
@@ -1548,7 +1548,7 @@ func _case_ledger() -> void:
 			ordered_nodes,
 			{},
 			{
-				"data/state.json": JSON.stringify(ordered_state).to_utf8_buffer(),
+				"data/ledger.json": JSON.stringify(ordered_state).to_utf8_buffer(),
 				"data/rules.json": JSON.stringify(ordered_rules).to_utf8_buffer(),
 			},
 		),
@@ -1595,7 +1595,7 @@ func _labels_package(name: String, strings: Dictionary) -> PackedByteArray:
 	}
 	var files := {
 		"data/actions.json": JSON.stringify(actions).to_utf8_buffer(),
-		"data/state.json": JSON.stringify({
+		"data/ledger.json": JSON.stringify({
 			"resources": [
 				{"id": "grain", "init": 10, "min": 0, "max": 20},
 				{"id": "standing", "init": 2, "min": 0, "max": 2, "labels": {"0": "兵微将寡", "2": "名动诸侯"}},
@@ -1935,7 +1935,7 @@ func _case_pools() -> void:
 func _case_relations() -> void:
 	_section("TC-REL-001 directed relations")
 	var nodes := {"nodes": [{"id": "n1", "text": "One.", "choices": []}]}
-	var factions := {
+	var relations := {
 		"thresholds": {"ally": 60, "hostile": -60},
 		"entities": [
 			{"id": "wei", "label": "魏", "relations": {"shu": -40, "wu": 70}},
@@ -1951,7 +1951,7 @@ func _case_relations() -> void:
 			[],
 			nodes,
 			{},
-			{"data/factions.json": JSON.stringify(factions).to_utf8_buffer()},
+			{"data/relations.json": JSON.stringify(relations).to_utf8_buffer()},
 		),
 		_context()
 	)
@@ -1993,7 +1993,7 @@ func _case_relations() -> void:
 			[],
 			nodes,
 			{},
-			{"data/factions.json": JSON.stringify(lopsided).to_utf8_buffer()},
+			{"data/relations.json": JSON.stringify(lopsided).to_utf8_buffer()},
 		),
 		_context()
 	)
@@ -2018,7 +2018,7 @@ func _case_relations() -> void:
 			[],
 			nodes,
 			{},
-			{"data/factions.json": JSON.stringify(ghost).to_utf8_buffer()},
+			{"data/relations.json": JSON.stringify(ghost).to_utf8_buffer()},
 		),
 		_context()
 	)
@@ -2048,7 +2048,7 @@ func _case_turn() -> void:
 	var phases := {"turns": 3, "ranks": [{"at": 1, "title": "校尉"}, {"at": 2, "title": "将军"}], "fail": [{"when": {"key": "pop", "op": "gte", "value": 3}, "reason": "人满为患"}]}
 	var checks := {"checks": [{"id": "battle", "roll": {"dice": 1, "sides": 100}, "target": 60, "bonus": {"key": "prestige", "scale": 0.5}}]}
 	var files := {
-		"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+		"data/ledger.json": JSON.stringify(ledger).to_utf8_buffer(),
 		"data/actions.json": JSON.stringify(actions).to_utf8_buffer(),
 		"data/phases.json": JSON.stringify(phases).to_utf8_buffer(),
 		"data/checks.json": JSON.stringify(checks).to_utf8_buffer(),
@@ -2094,7 +2094,7 @@ func _case_turn() -> void:
 	var spend := {"actions": [{"id": "spend", "label": "spend", "costs": {"grain": {"add": -20}}, "effects": [{"pop": {"add": 1}}], "limit": {"per_run": 1}}]}
 	var run_phases := {"turns": 3, "ranks": [{"at": 1, "title": "校尉"}, {"at": 2, "title": "将军"}], "fail": []}
 	var run_files := {
-		"data/state.json": JSON.stringify(ledger_two).to_utf8_buffer(),
+		"data/ledger.json": JSON.stringify(ledger_two).to_utf8_buffer(),
 		"data/actions.json": JSON.stringify(spend).to_utf8_buffer(),
 		"data/phases.json": JSON.stringify(run_phases).to_utf8_buffer(),
 	}
@@ -2174,7 +2174,7 @@ func _case_clock() -> void:
 			nodes,
 			{},
 			{
-				"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+				"data/ledger.json": JSON.stringify(ledger).to_utf8_buffer(),
 				"data/actions.json": JSON.stringify(actions).to_utf8_buffer(),
 				"data/rules.json": JSON.stringify(per_turn).to_utf8_buffer(),
 			},
@@ -2224,7 +2224,7 @@ func _case_clock() -> void:
 			nodes,
 			{},
 			{
-				"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+				"data/ledger.json": JSON.stringify(ledger).to_utf8_buffer(),
 				"data/actions.json": JSON.stringify(actions).to_utf8_buffer(),
 				"data/rules.json": JSON.stringify(per_turn).to_utf8_buffer(),
 			},
@@ -2256,7 +2256,7 @@ func _case_clock() -> void:
 			nodes,
 			{},
 			{
-				"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+				"data/ledger.json": JSON.stringify(ledger).to_utf8_buffer(),
 				"data/actions.json": JSON.stringify(actions).to_utf8_buffer(),
 				"data/rules.json": JSON.stringify(no_reader).to_utf8_buffer(),
 			},
@@ -2279,7 +2279,7 @@ func _case_clock() -> void:
 			nodes,
 			{},
 			{
-				"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+				"data/ledger.json": JSON.stringify(ledger).to_utf8_buffer(),
 				"data/actions.json": JSON.stringify(actions).to_utf8_buffer(),
 				"data/rules.json": JSON.stringify(writes_tick).to_utf8_buffer(),
 			},
@@ -2335,7 +2335,7 @@ func _case_scene() -> void:
 		nodes,
 		{},
 		{
-			"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+			"data/ledger.json": JSON.stringify(ledger).to_utf8_buffer(),
 			"data/actions.json": JSON.stringify(actions).to_utf8_buffer(),
 			"data/phases.json": JSON.stringify(phases).to_utf8_buffer(),
 		}
@@ -2399,14 +2399,14 @@ func _art_package(name: String, variant: String = "") -> PackedByteArray:
 		pictures = {"assets/card-raid.png": "this is not a picture".to_utf8_buffer()}
 	var assets := [{"type": "texture", "path": "assets/card-raid.png", "slot": "card"}]
 	var files := {
-		"data/state.json": JSON.stringify({
+		"data/ledger.json": JSON.stringify({
 			"resources": [
 				{"id": "grain", "init": 10, "min": 0, "max": 20},
 				{"id": "coin", "init": 5, "min": 0, "max": 10},
 			],
 		}).to_utf8_buffer(),
 		"data/phases.json": JSON.stringify({"turns": 8, "ranks": [{"at": 1, "title": "Captain"}], "fail": []}).to_utf8_buffer(),
-		"data/cards.json": JSON.stringify({"hand": {"size": 2, "draw_per_turn": 0}, "cards": cards, "deck": ["raid", "feast"]}).to_utf8_buffer(),
+		"data/hand.json": JSON.stringify({"hand": {"size": 2, "draw_per_turn": 0}, "cards": cards, "deck": ["raid", "feast"]}).to_utf8_buffer(),
 	}
 	for picture_path in pictures:
 		files[picture_path] = pictures[picture_path]
@@ -2501,7 +2501,7 @@ func _long_hand_package(name: String) -> PackedByteArray:
 		})
 		deck.append("card-%d" % index)
 	var files := {
-		"data/state.json": JSON.stringify({
+		"data/ledger.json": JSON.stringify({
 			"resources": [
 				{"id": "grain", "init": 10, "min": 0, "max": 20},
 				{"id": "coin", "init": 9, "min": 0, "max": 9},
@@ -2512,7 +2512,7 @@ func _long_hand_package(name: String) -> PackedByteArray:
 			"ranks": [{"at": 1, "title": "Captain"}],
 			"fail": [],
 		}).to_utf8_buffer(),
-		"data/cards.json": JSON.stringify({
+		"data/hand.json": JSON.stringify({
 			"hand": {"size": 8, "draw_per_turn": 1, "reshuffle": true},
 			"cards": cards,
 			"deck": deck,
@@ -2606,7 +2606,7 @@ func _shuffle_package(name: String) -> PackedByteArray:
 		})
 		deck.append("c%d" % index)
 	var files := {
-		"data/state.json": JSON.stringify({
+		"data/ledger.json": JSON.stringify({
 			"resources": [{"id": "grain", "init": 5, "min": 0, "max": 20}],
 		}).to_utf8_buffer(),
 		"data/phases.json": JSON.stringify({
@@ -2614,7 +2614,7 @@ func _shuffle_package(name: String) -> PackedByteArray:
 			"ranks": [{"at": 1, "title": "Captain"}],
 			"fail": [],
 		}).to_utf8_buffer(),
-		"data/cards.json": JSON.stringify({
+		"data/hand.json": JSON.stringify({
 			"hand": {"size": 2, "draw_per_turn": 1, "reshuffle": true},
 			"cards": cards,
 			"deck": deck,
@@ -2839,7 +2839,7 @@ func _case_wire() -> void:
 			{"id": "pop", "init": 0, "min": 0, "max": 100},
 		],
 	}
-	var factions := {
+	var relations := {
 		"thresholds": {"ally": 60, "hostile": -60},
 		"entities": [
 			{"id": "wei", "label": "Wei", "relations": {"shu": 70, "wu": -70}},
@@ -2868,8 +2868,8 @@ func _case_wire() -> void:
 	}
 	var phases := {"turns": 10, "ranks": [], "fail": []}
 	var files := {
-		"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
-		"data/factions.json": JSON.stringify(factions).to_utf8_buffer(),
+		"data/ledger.json": JSON.stringify(ledger).to_utf8_buffer(),
+		"data/relations.json": JSON.stringify(relations).to_utf8_buffer(),
 		"data/pools.json": JSON.stringify(pools).to_utf8_buffer(),
 		"data/actions.json": JSON.stringify(actions).to_utf8_buffer(),
 		"data/phases.json": JSON.stringify(phases).to_utf8_buffer(),
@@ -2937,8 +2937,8 @@ func _case_wire() -> void:
 		nodes,
 		{},
 		{
-			"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
-			"data/factions.json": JSON.stringify(factions).to_utf8_buffer(),
+			"data/ledger.json": JSON.stringify(ledger).to_utf8_buffer(),
+			"data/relations.json": JSON.stringify(relations).to_utf8_buffer(),
 			"data/actions.json": JSON.stringify(bad_state).to_utf8_buffer(),
 			"data/phases.json": JSON.stringify(phases).to_utf8_buffer(),
 		}
@@ -2958,7 +2958,7 @@ func _case_wire() -> void:
 		nodes,
 		{},
 		{
-			"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
+			"data/ledger.json": JSON.stringify(ledger).to_utf8_buffer(),
 			"data/pools.json": JSON.stringify(pools).to_utf8_buffer(),
 			"data/actions.json": JSON.stringify(bad_pool).to_utf8_buffer(),
 			"data/phases.json": JSON.stringify(phases).to_utf8_buffer(),
@@ -3160,7 +3160,7 @@ func _assembly_package(name: String, variant: String = "") -> PackedByteArray:
 		resources = [{"id": "grain", "init": 1, "min": 0, "max": 99}]
 		actions = []
 	var files := {
-		"data/state.json": JSON.stringify({"resources": resources}).to_utf8_buffer(),
+		"data/ledger.json": JSON.stringify({"resources": resources}).to_utf8_buffer(),
 		"data/actions.json": JSON.stringify({"actions": actions}).to_utf8_buffer(),
 	}
 	return _package(
@@ -3274,7 +3274,7 @@ func _rules_layer(name: String, target: String) -> PackedByteArray:
 		{},
 		{},
 		{
-			"data/state.json": JSON.stringify({"resources": [
+			"data/ledger.json": JSON.stringify({"resources": [
 				{"id": "grain", "init": 10.0, "min": 0.0, "max": 99.0, "label": "粮"},
 			]}, "\t").to_utf8_buffer(),
 			"data/actions.json": JSON.stringify({"actions": [
@@ -3616,7 +3616,7 @@ func _layer_package(name: String, target: String = "lay-base", dimension: String
 		{},
 		{},
 		{
-			"data/state.json": JSON.stringify(ledger, "\t").to_utf8_buffer(),
+			"data/ledger.json": JSON.stringify(ledger, "\t").to_utf8_buffer(),
 			"data/actions.json": JSON.stringify(actions, "\t").to_utf8_buffer(),
 			"data/disable.json": JSON.stringify(disable, "\t").to_utf8_buffer(),
 		},
@@ -3638,7 +3638,7 @@ func _base_package(name: String) -> PackedByteArray:
 		{},
 		{},
 		{
-			"data/state.json": JSON.stringify(ledger, "\t").to_utf8_buffer(),
+			"data/ledger.json": JSON.stringify(ledger, "\t").to_utf8_buffer(),
 			"data/actions.json": JSON.stringify(actions, "\t").to_utf8_buffer(),
 		},
 	)
@@ -3960,7 +3960,7 @@ func _assembly_base_with_content(name: String) -> PackedByteArray:
 		[],
 		{"nodes": [{"id": "camp", "text": "A camp.", "choices": []}]},
 		{},
-		{"data/state.json": JSON.stringify({"resources": [
+		{"data/ledger.json": JSON.stringify({"resources": [
 			{"id": "grain", "init": 10, "min": 0, "max": 20},
 		]}).to_utf8_buffer()},
 	)
@@ -4145,7 +4145,7 @@ func _layer_with_target(name: String, target: String, ledger: bool = true, actio
 		overrides["target"] = target
 	var files := {}
 	if ledger:
-		files["data/state.json"] = JSON.stringify({
+		files["data/ledger.json"] = JSON.stringify({
 			"resources": [{"id": "grain", "init": 10.0, "min": 0.0, "max": 99.0, "label": "粮"}],
 		}, "\t").to_utf8_buffer()
 	if action:
@@ -4165,7 +4165,7 @@ func _content_package(name: String, content: Dictionary) -> PackedByteArray:
 		"content": content,
 	}
 	var files := {
-		"data/state.json": JSON.stringify({
+		"data/ledger.json": JSON.stringify({
 			"resources": [{"id": "grain", "init": 10.0, "min": 0.0, "max": 20.0, "label": "粮"}],
 		}, "\t").to_utf8_buffer(),
 		"data/actions.json": JSON.stringify({
@@ -4552,7 +4552,7 @@ func _cards_package(name: String, variant: String = "") -> PackedByteArray:
 	if variant == "bad-cost":
 		cards[0]["cost"] = {"silver": {"add": -3}}
 	var files := {
-		"data/state.json": JSON.stringify({
+		"data/ledger.json": JSON.stringify({
 			"resources": [
 				{"id": "grain", "init": 10, "min": 0, "max": 20},
 				{"id": "coin", "init": 5, "min": 0, "max": 10},
@@ -4563,10 +4563,10 @@ func _cards_package(name: String, variant: String = "") -> PackedByteArray:
 			"ranks": [{"at": 1, "title": "Captain"}],
 			"fail": [],
 		}).to_utf8_buffer(),
-		"data/cards.json": JSON.stringify({"hand": hand, "cards": cards, "deck": deck}).to_utf8_buffer(),
+		"data/hand.json": JSON.stringify({"hand": hand, "cards": cards, "deck": deck}).to_utf8_buffer(),
 	}
 	if variant == "no-hand":
-		files["data/cards.json"] = JSON.stringify({"cards": cards, "deck": deck}).to_utf8_buffer()
+		files["data/hand.json"] = JSON.stringify({"cards": cards, "deck": deck}).to_utf8_buffer()
 	return _package(
 		name,
 		{"id": name, "entry": "c1", "capabilities": ["cards.hand@1", "ledger@1", "phases@1"], "mechanics": ["cards", "ledger", "phases"]},
@@ -4787,7 +4787,7 @@ func _case_writable_relations() -> void:
 			{"id": "pop", "init": 0, "min": 0, "max": 100},
 		],
 	}
-	var factions := {
+	var relations := {
 		"thresholds": {"ally": 60, "hostile": -60},
 		"entities": [
 			{"id": "wei", "label": "Wei", "relations": {"shu": 70}},
@@ -4805,8 +4805,8 @@ func _case_writable_relations() -> void:
 	}
 	var phases := {"turns": 10, "ranks": [], "fail": []}
 	var files := {
-		"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
-		"data/factions.json": JSON.stringify(factions).to_utf8_buffer(),
+		"data/ledger.json": JSON.stringify(ledger).to_utf8_buffer(),
+		"data/relations.json": JSON.stringify(relations).to_utf8_buffer(),
 		"data/rules.json": JSON.stringify(rules).to_utf8_buffer(),
 		"data/phases.json": JSON.stringify(phases).to_utf8_buffer(),
 	}
@@ -4857,8 +4857,8 @@ func _case_writable_relations() -> void:
 			nodes,
 			{},
 			{
-				"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
-				"data/factions.json": JSON.stringify(factions).to_utf8_buffer(),
+				"data/ledger.json": JSON.stringify(ledger).to_utf8_buffer(),
+				"data/relations.json": JSON.stringify(relations).to_utf8_buffer(),
 				"data/phases.json": JSON.stringify(phases).to_utf8_buffer(),
 			},
 		),
@@ -4930,7 +4930,7 @@ func _case_situation() -> void:
 			{"id": "coin", "init": 60, "min": 0, "max": 100},
 		],
 	}
-	var factions := {
+	var relations := {
 		"thresholds": {"ally": 60, "hostile": -60},
 		"entities": [
 			{"id": "wei", "label": "Wei", "relations": {"shu": -10}},
@@ -4947,8 +4947,8 @@ func _case_situation() -> void:
 		nodes,
 		{},
 		{
-			"data/state.json": JSON.stringify(ledger).to_utf8_buffer(),
-			"data/factions.json": JSON.stringify(factions).to_utf8_buffer(),
+			"data/ledger.json": JSON.stringify(ledger).to_utf8_buffer(),
+			"data/relations.json": JSON.stringify(relations).to_utf8_buffer(),
 			"data/phases.json": JSON.stringify(phases).to_utf8_buffer(),
 		}
 	)
@@ -5010,7 +5010,7 @@ func _case_situation() -> void:
 		[],
 		nodes,
 		{},
-		{"data/state.json": JSON.stringify(ledger).to_utf8_buffer()}
+		{"data/ledger.json": JSON.stringify(ledger).to_utf8_buffer()}
 	)
 	var bare_shell := _shell()
 	bare_shell.try_import(bare)

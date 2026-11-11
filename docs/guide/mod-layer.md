@@ -19,7 +19,7 @@ your-world-repository/
     └── sanguo-hard/
         ├── manifest.json
         └── data/
-            ├── state.json       the resources it rewrites
+            ├── ledger.json       the resources it rewrites
             ├── actions.json     the actions it adds
             └── disable.json     the actions it removes
 ```
@@ -63,7 +63,7 @@ nodes needs no `locales` at all.
 
 | Input file | Effect | Limits |
 |---|---|---|
-| `data/state.json` | the resource is **replaced wholesale**: bounds, start value, label | only a resource the base already declares; a new name is skipped |
+| `data/ledger.json` | the resource is **replaced wholesale**: bounds, start value, label | only a resource the base already declares; a new name is skipped |
 | `data/actions.json` | actions are **added** | an id the base already uses is refused with `W-05` and the base keeps it |
 | `data/pools.json` | pools are **added**, with their contents | same duplicate rule |
 | `data/hand.json` | cards join the hand, and `size`, `draw_per_turn`, `reshuffle` fill gaps | same duplicate rule |

@@ -112,7 +112,7 @@ layer, and a format `1.0.0` package that declares no `kind` is a bundle.
 
 - `nodes.json`: nodes with `id`, `text`, `assets`, `choices[]`; each choice has
   `label`, `next`, and `effects[]`.
-- `state.json`: the ledger. Every resource has `id`, `init`, `min` and `max`,
+- `ledger.json`: the ledger. Every resource has `id`, `init`, `min` and `max`,
   may carry a display `label`, and may map numeric values to display text with
   `labels` (for example `{"2": "名动诸侯"}`). A value is a number; a label is
   text drawn instead of the number and never changes it.
@@ -122,7 +122,7 @@ layer, and a format `1.0.0` package that declares no `kind` is a bundle.
   step. `mechanics.json` keeps the same shape and is read when `rules.json` is
   absent, so packages written before the ledger still play.
 - A rule names resources rather than free variables: every key a rule reads or
-  writes must be declared in `state.json` (`V-14`). There is no control flow and
+  writes must be declared in `ledger.json` (`V-14`). There is no control flow and
   no expression language beyond comparisons and arithmetic.
 
 - `actions.json`: the menu. Each action has `id`, `label`, optional `costs`,
@@ -143,7 +143,7 @@ layer, and a format `1.0.0` package that declares no `kind` is a bundle.
   removes them unless `replace` is true; the remainder is saved, so a reload
   cannot re-roll it, and the order is fixed by the session RNG on the first
   draw rather than at load.
-- `factions.json`: `thresholds` and `entities`, each entity carrying directed
+- `relations.json`: `thresholds` and `entities`, each entity carrying directed
   `relations`. A non-negative threshold is a floor, a negative one is a
   ceiling; the engine invents no state names and assumes no symmetry.
 Registered types in v0.0.0: `texture`, `audio`, `text`. A type outside the
@@ -172,7 +172,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-07` | a bundle's `entry` node exists in its own `nodes.json`; a layer is not asked | reject |
 | `V-08` | every declared asset path exists in the package | warn, skip asset |
 | `V-09` | `saveSchema` is a positive integer | reject |
-| `V-14` | every resource a rule reads or writes is declared in `state.json`, and the ledger itself is well formed | reject |
+| `V-14` | every resource a rule reads or writes is declared in `ledger.json`, and the ledger itself is well formed | reject |
 | `V-16` | actions have unique ids, at least one effect, and limits the engine counts; every resource they touch is declared | reject |
 | `V-17` | `turns` is at least 1, ranks ascend inside `1..turns`, every failure carries a reason and a condition | reject |
 | `V-18` | a die has at least two sides and the target lies inside the dice range; a bonus names a resource | reject |
@@ -184,7 +184,7 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-24` | every `requires` entry is satisfied by an installed or built-in package whose version falls inside the declared range | reject |
 | `W-01` | `specVersion` is below `2.0.0`: readable now, refused from v0.2.0 | warn |
 | `V-21` | `clock.per` is `turn` or `node`, and a package that declares a clock also carries at least one rule whose `when` reads `tick` | reject |
-| `V-25` | a condition names a relation state declared in `factions.json`, or an item some pool contains | reject |
+| `V-25` | a condition names a relation state declared in `relations.json`, or an item some pool contains | reject |
 | `V-26` | an action's `draw.pool` names a pool `pools.json` declares | reject |
 | `V-27` | every entry in `capabilities` is a capability id `name@major` the engine provides (ADR-0008) | reject |
 | `V-28` | the archive, its entry count, each entry's unpacked bytes and the unpacked total are inside the envelope; raised by the loader before the manifest is read | reject |
@@ -200,10 +200,10 @@ idle → chosen(file) → unpacked → validated → installed
 | `V-41` | The cast repeats an id or carries an empty name, or the arc's turns do not ascend and stay unique. |
 | `V-42` | The `meta` block names an audience, a length, a pitch or an icon the engine cannot honour. |
 | `V-43` | The bytes of a downloaded package do not hash to the value the caller expects. |
-| `V-36` | a package that names `cards.hand@1` ships a `data/cards.json` with a `hand` and a `deck` | reject |
+| `V-36` | a package that names `cards.hand@1` ships a `data/hand.json` with a `hand` and a `deck` | reject |
 | `V-37` | every card's `cost` and `effects` name resources the ledger declares | reject |
 | `V-38` | every card id in the deck is declared in the package's `cards` table | reject |
-| `V-39` | A card names an icon that no texture asset declares | fatal, `data/cards.json` |
+| `V-39` | A card names an icon that no texture asset declares | fatal, `data/hand.json` |
 
 Every rejection names its code and the offending field; a rejection never
 disturbs already-installed plugins or their saves. `V-24` is checked at install
@@ -823,9 +823,9 @@ still one-way, so rolling back does not make a newer save readable.
 | `REQ-019` | §8.3 placement, §8.4 accepted formats |
 | `REQ-020` | §11.2 package language, §4.2 validation (`V-22`) |
 | `REQ-021` | §3.2 manifest fields, §4.2 validation (`V-23`, `V-24`, `W-01`) |
-| `REQ-022` | §3.3 data files (`state.json`, `rules.json`, `labels`), §4.2 validation (`V-14`), §6.1 clamping |
+| `REQ-022` | §3.3 data files (`ledger.json`, `rules.json`, `labels`), §4.2 validation (`V-14`), §6.1 clamping |
 | `REQ-023` | §3.3 data files (`actions.json`, `phases.json`, `checks.json`), §4.2 validation (`V-16`, `V-17`, `V-18`), §6.2 settlement and turns |
-| `REQ-024` | §3.3 data files (`pools.json`, `factions.json`), §4.2 validation (`V-19`, `V-20`, `W-02`) |
+| `REQ-024` | §3.3 data files (`pools.json`, `relations.json`), §4.2 validation (`V-19`, `V-20`, `W-02`) |
 | `REQ-025` | §3.2 manifest field (`clock`), §4.2 validation (`V-21`, `V-14`), §6.5 the clock |
 | `REQ-026` | §6.1 when a run ends, §11 the scene draws the menu |
 | `REQ-027` | §3.3 data file (`actions.json`, `requires` and `draw`), §4.2 validation (`V-25`, `V-26`), `engine-bricks` §7 conditions |

@@ -158,7 +158,7 @@ static func _relation_holds(condition: Dictionary, session: Session) -> bool:
 		var to_id := String(named.get("to", ""))
 		return session.relation_state(from_id, to_id) == state_name
 	var target := String(named)
-	for entity_id in session.factions.get("order", []):
+	for entity_id in session.relations.get("order", []):
 		var from_id := String(entity_id)
 		if from_id == "" or from_id == target:
 			continue
