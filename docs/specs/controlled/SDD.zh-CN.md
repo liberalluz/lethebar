@@ -590,6 +590,14 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 
 四个归档全部移走时套件报 `OK — 394 checks, 12 skipped`；都在时报 `OK — 526 checks, 0 skipped`。把守卫改成恒真再移走归档会得到二十六条失败，这正是守卫的意义。
 
+## 11.19 链接是第二种入口
+
+`REQ-047`。包列表提供两个入口：一个文件，由导出器注入 `<input type="file">`；一个链接，要求给出地址与预期的 sha256。
+
+套接字在 `app/render/downloader.gd`，不在 `core`，因为 `TC-OFF-003` 要求 `res://core` 或 `res://protocols` 下的任何运行时源码都不得打开网络路径。所以 `PackageLoader.import_url` 收一个 `Callable`，而不是一个它能自己拨的 URL。
+
+只报告三种结果：摘要匹配时 `installed`；id 已在列表里时 `already`；`V-01`（什么都没到）或 `V-43`（摘要不符）中止安装时 `refused`。拒绝不会动已装集合；带链接但不带摘要的安装按 `V-43` 拒绝，而不是未经验证地装进去。
+
 ## 11.20 层只应用六个维度里的三个
 
 层声明六个维度之一，引擎目前应用其中三个：`content` 整块替换基础包的块（§11.15），`mod` 改动基础包声明的数值或代价（§11.13），`assets` 把层里的图片并入 bundle 的查找表。另外三个——`genre`、`meta` 与 `profession`——仍是 pending：包能装、manifest 合法，但这一局不改变。
@@ -659,6 +667,10 @@ v0.0.0 包含两个机制：力量供给（随选择变化的资源）与进度�
 | `REQ-041` | §11.12 装配，`PackageLoader.assemble()`、`Session._merge_package()`、`V-33`、`V-44` |
 | `REQ-042` | §11.13 层包，`PackageLoader.assemble()`，`Session._apply_layer()`，`V-34` |
 | `REQ-043` | §11.14 声明的目标，`ManifestSchema.format_issues()`，`PackageLoader._layer_conflict()`，`V-35` |
+| `REQ-044` | §11.15 故事怎么读由包声明，`ContentLayer`，`V-40`、`V-41` |
+| `REQ-045` | §11.16 包说明它是给谁玩的，`MetaLayer`，`V-42` |
+| `REQ-046` | §11.17 包以带哈希的发布物旅行，`PackageLoader.import_url`，`V-43` |
+| `REQ-047` | §11.19 链接入口，`app/render/downloader.gd`，三种结果 |
 | `REQ-048` | §3.2 分派读的身份，`Session.create`、`InstallRegistry.entry()` |
 | `REQ-049` | §11.20 已应用的维度，`ManifestSchema.APPLIED_LAYERS` 与 `layer_applied()`，`V-44` |
 | `REQ-050` | §11.20 资产合并，`PackageLoader._merge_layer_assets()`，`V-45` |
