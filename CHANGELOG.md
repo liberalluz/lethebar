@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.7.5 - 2026-11-11
+
+### Changed
+- The data files are named after the blocks they carry: `data/ledger.json`, `data/relations.json`, `data/hand.json`. The old names (`state.json`, `factions.json`, `cards.json`) are no longer read: nothing is published yet, so there is no package to keep working.
+
 ## v0.7.4 - 2026-11-10
 
 ### Added
