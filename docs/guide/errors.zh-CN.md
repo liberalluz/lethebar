@@ -45,36 +45,36 @@
 | `SAVE-06` | `app/core/save_store.gd:19` | SAVE-06 |
 | `SAVE-07` | `app/core/save_store.gd:20` | SAVE-07 |
 | `SAVE-08` | `app/core/save_store.gd:21` | SAVE-08 |
-| `V-02` | `app/core/package_validator.gd:77` | message |
-| `V-03` | `app/core/package_validator.gd:84` | 必须匹配 [a-z0-9-]+ |
-| `V-04` | `app/core/package_validator.gd:133` | specVersion |
-| `V-05` | `app/core/package_validator.gd:506` | 期望形如 >=4.3.0 <5.0.0 的范围 |
-| `V-06` | `app/core/package_validator.gd:517` | protocol |
-| `V-07` | `app/core/package_validator.gd:524` | entry |
-| `V-08` | `app/core/package_validator.gd:644` | 声明的资产在包里缺失：… |
-| `V-09` | `app/core/package_validator.gd:529` | 必须是正整数 |
-| `V-14` | `app/core/package_validator.gd:538` | state.json |
-| `V-16` | `app/core/package_validator.gd:342` | actions.json |
-| `V-17` | `app/core/package_validator.gd:349` | phases.json |
-| `V-18` | `app/core/package_validator.gd:353` | checks.json |
-| `V-19` | `app/core/package_validator.gd:363` | pools.json |
-| `V-20` | `app/core/package_validator.gd:368` | W-02 |
-| `V-21` | `app/core/package_validator.gd:570` | clock |
-| `V-22` | `app/core/package_validator.gd:657` | defaultLocale |
-| `V-23` | `app/core/package_validator.gd:154` | message |
-| `V-24` | `app/core/package_validator.gd:205` | requires |
-| `V-25` | `app/core/package_validator.gd:403` | actions.json |
-| `V-26` | `app/core/package_validator.gd:430` | actions.json |
-| `V-27` | `app/core/package_validator.gd:178` | capabilities |
-| `V-31` | `app/core/package_validator.gd:601` | 规则里的 relations 必须是数组 |
-| `V-32` | `app/core/package_validator.gd:101` | id 必须匹配 [a-z0-9-]+ |
-| `V-36` | `app/core/package_validator.gd:447` | cards.json |
-| `V-37` | `app/core/package_validator.gd:497` | cards.json |
-| `V-38` | `app/core/package_validator.gd:457` | cards.json |
-| `V-39` | `app/core/package_validator.gd:477` | cards.json |
-| `V-40` | `app/core/package_validator.gd:227` | manifest.json |
-| `V-41` | `app/core/package_validator.gd:249` | manifest.json |
-| `V-42` | `app/core/package_validator.gd:289` | manifest.json |
+| `V-02` | `app/core/package_validator.gd:90` | message |
+| `V-03` | `app/core/package_validator.gd:97` | 必须匹配 [a-z0-9-]+ |
+| `V-04` | `app/core/package_validator.gd:149` | specVersion |
+| `V-05` | `app/core/package_validator.gd:522` | 期望形如 >=4.3.0 <5.0.0 的范围 |
+| `V-06` | `app/core/package_validator.gd:533` | protocol |
+| `V-07` | `app/core/package_validator.gd:540` | entry |
+| `V-08` | `app/core/package_validator.gd:660` | 声明的资产在包里缺失：… |
+| `V-09` | `app/core/package_validator.gd:545` | 必须是正整数 |
+| `V-14` | `app/core/package_validator.gd:554` | ledger.json |
+| `V-16` | `app/core/package_validator.gd:358` | actions.json |
+| `V-17` | `app/core/package_validator.gd:365` | phases.json |
+| `V-18` | `app/core/package_validator.gd:369` | checks.json |
+| `V-19` | `app/core/package_validator.gd:379` | pools.json |
+| `V-20` | `app/core/package_validator.gd:384` | W-02 |
+| `V-21` | `app/core/package_validator.gd:586` | clock |
+| `V-22` | `app/core/package_validator.gd:673` | defaultLocale |
+| `V-23` | `app/core/package_validator.gd:170` | message |
+| `V-24` | `app/core/package_validator.gd:221` | requires |
+| `V-25` | `app/core/package_validator.gd:419` | actions.json |
+| `V-26` | `app/core/package_validator.gd:446` | actions.json |
+| `V-27` | `app/core/package_validator.gd:194` | capabilities |
+| `V-31` | `app/core/package_validator.gd:617` | 规则里的 relations 必须是数组 |
+| `V-32` | `app/core/package_validator.gd:117` | id 必须匹配 [a-z0-9-]+ |
+| `V-36` | `app/core/package_validator.gd:463` | hand.json |
+| `V-37` | `app/core/package_validator.gd:513` | hand.json |
+| `V-38` | `app/core/package_validator.gd:473` | hand.json |
+| `V-39` | `app/core/package_validator.gd:493` | hand.json |
+| `V-40` | `app/core/package_validator.gd:243` | manifest.json |
+| `V-41` | `app/core/package_validator.gd:265` | manifest.json |
+| `V-42` | `app/core/package_validator.gd:305` | manifest.json |
 
 ## 按码该打开什么
 
