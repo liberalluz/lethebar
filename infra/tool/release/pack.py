@@ -6,8 +6,14 @@ artifact with a hash an engine can check. This tool is that step.
 
 Reproducibility is the point. Zip records a timestamp per entry and walks the
 directory in whatever order the filesystem hands back, so a build fixes both: one
-timestamp for every entry and a sorted name list. Two builds of one directory are
-then byte-identical, which is what makes a hash worth writing down.
+timestamp for every entry and a sorted name list. Two builds of one directory with
+the same Python and zlib are then byte-identical, which is what makes a hash worth
+writing down. Another platform may compress differently, so the descriptor, not the
+promise of identical bytes, is what a player verifies.
+
+`publish` reads the release before it writes: an artifact that is already there with
+the same hash is left alone, a missing one is uploaded, and one that differs is
+refused unless `--force` is given.
 
     python infra/tool/release/pack.py build content/builtin/<id> --out dist
     python infra/tool/release/pack.py hash dist/<id>.zip
@@ -148,6 +154,70 @@ def upload_command(target: Path, sidecar: Path, repo: str, tag: str) -> list[str
         repo,
         "--clobber",
     ]
+
+
+def upload_one(path: Path, repo: str, tag: str) -> list[str]:
+    return [gh(), "release", "upload", tag, str(path), "--repo", repo, "--clobber"]
+
+
+def release_assets(repo: str, tag: str) -> dict[str, str]:
+    """The assets a release already carries, by name and sha256.
+
+    `gh` reports a `digest` of the form `sha256:<hex>` for an uploaded asset.
+    An asset without one is kept with an empty hash, which never equals a local
+    hash, so it can only be replaced with `--force`.
+    """
+    result = subprocess.run(
+        [gh(), "release", "view", tag, "--repo", repo, "--json", "assets"],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    if result.returncode != 0:
+        return {}
+    try:
+        payload = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        return {}
+    assets: dict[str, str] = {}
+    for asset in payload.get("assets", []):
+        name = str(asset.get("name", ""))
+        digest = str(asset.get("digest", ""))
+        if name:
+            assets[name] = digest.removeprefix("sha256:")
+    return assets
+
+
+def plan_publish(
+    local: dict[str, str], remote: dict[str, str], exists: bool, force: bool
+) -> tuple[list[str], bool, str, int]:
+    """What a publication still has to do, after reading the release.
+
+    A published artifact may already be in a player's hands, so a name that
+    exists with a different hash is refused unless `force` is given. A name that
+    is missing is uploaded; a release that carries every name is left alone.
+    """
+    differing = sorted(
+        name for name in local if name in remote and remote[name] != local[name]
+    )
+    if differing and not force:
+        return (
+            [],
+            False,
+            "the release already carries different bytes: "
+            + ", ".join(differing)
+            + "; pass --force to replace them",
+            1,
+        )
+    upload = [
+        name
+        for name in local
+        if name not in remote or (force and name in differing)
+    ]
+    if exists and not upload:
+        return [], False, "nothing to do: the release already carries these bytes", 0
+    return upload, not exists, "", 0
 
 
 def validate(target: Path) -> dict:
@@ -440,6 +510,26 @@ def self_test() -> int:
             "upload",
         ]:
             problems.append("an existing release is created again")
+        local = {"a.zip": "11", "a.json": "22"}
+        upload, create, message, code = plan_publish(local, {}, False, False)
+        if not create or sorted(upload) != ["a.json", "a.zip"] or code != 0:
+            problems.append("a missing release does not create and upload")
+        upload, create, message, code = plan_publish(
+            local, {"a.zip": "11", "a.json": "22"}, True, False
+        )
+        if upload or create or code != 0 or "nothing" not in message:
+            problems.append("an identical release is written again")
+        upload, create, message, code = plan_publish(local, {"a.zip": "11"}, True, False)
+        if upload != ["a.json"] or create or code != 0:
+            problems.append("a half-uploaded release is not completed")
+        upload, create, message, code = plan_publish(local, {"a.zip": "99"}, True, False)
+        if upload or create or code == 0:
+            problems.append("a differing artifact is replaced without --force")
+        upload, create, message, code = plan_publish(
+            local, {"a.zip": "99", "a.json": "22"}, True, True
+        )
+        if upload != ["a.zip"] or code != 0:
+            problems.append("--force does not replace a differing artifact")
         repo = Path(source) / "repo"
         for pack_id, version, kind, layer, engine in [
             ("example", "0.1.0", "bundle", "", ">=4.7.0 <5.0.0"),
@@ -547,6 +637,9 @@ def main(argv: list[str]) -> int:
     publish_parser.add_argument("--repo", required=True)
     publish_parser.add_argument("--tag", required=True)
     publish_parser.add_argument("--apply", action="store_true")
+    publish_parser.add_argument(
+        "--force", action="store_true", help="replace an artifact whose bytes differ"
+    )
 
     badge_parser = commands.add_parser(
         "badge", help="write a repository's pack table from packs/*/manifest.json"
@@ -604,9 +697,24 @@ def main(argv: list[str]) -> int:
             print("dry run; pass --apply to create the release and upload")
             return 0
         validate(target)
+        sidecar = write_descriptor(target)
         exists = release_exists(args.repo, args.tag)
         print(f"release {args.tag} {'exists' if exists else 'is missing'}")
-        for command in publish_commands(target, args.repo, args.tag, exists):
+        remote = release_assets(args.repo, args.tag) if exists else {}
+        local = {target.name: digest(target), sidecar.name: digest(sidecar)}
+        upload, create, message, code = plan_publish(local, remote, exists, args.force)
+        if code != 0:
+            print(message, file=sys.stderr)
+            return code
+        if message:
+            print(message)
+        commands: list[list[str]] = []
+        if create:
+            commands.append(create_command(args.repo, args.tag))
+        for name in upload:
+            path = target if name == target.name else sidecar
+            commands.append(upload_one(path, args.repo, args.tag))
+        for command in commands:
             print(" ".join(command))
             code = subprocess.run(command, check=False).returncode
             if code != 0:

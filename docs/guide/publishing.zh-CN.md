@@ -26,7 +26,7 @@ python infra/tool/release/pack.py publish dist/<id>.zip --repo <owner>/<repo> --
 
 `github.com/liberalluz/lethebar-pack-template` 里有两个工具、三步工作流和一个能跑
 的示例包；点 **Use this template**，替换示例，跳过上面的手工拼装。它按引擎
-`v0.7.3` 测过，它自己的门禁在对外提供之前跑绿。
+`v0.7.5` 测过，它自己的门禁在对外提供之前跑绿。
 
 ## 一个 tag、一次发布、两个资产
 
@@ -40,6 +40,8 @@ tag 里的版本、`manifest.json` 里的版本、descriptor 文件名里的版�
 三者不一致时，没有任何东西会大声失败——这正是把契约写在这里的原因。
 
 同一个包的第二次发布是新 tag：`v0.1.1`。tag 永不移动。
+
+重跑 `publish` 会先读 release：已经存在且哈希相同的资产不动；缺的补上；不同的拒绝，只有 `--force` 能替换（命令会打印两个哈希）。这样，已发布的产物还是玩家验证过的那一份。
 
 ## README 里的表
 
