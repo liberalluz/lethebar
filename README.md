@@ -13,7 +13,7 @@ English · [简体中文](README.zh-CN.md)
 
 **v0.8.0 is out: a package can remember across runs, and a roll is the same in the same turn.**
 
-The engine still ships one smoke pack, `duel`, so that its own tests have something to open. Every other pack is published from its own repository, and a release of the engine does not ship a story.
+The engine still ships one smoke pack, `duel`, so that its own tests have something to open. Every other pack is published from its own repository, and [the marketplace](https://liberalluz.github.io/lethebar-marketplace/) lists what is published.
 
 ## What it is
 
