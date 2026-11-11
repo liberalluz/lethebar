@@ -25,6 +25,8 @@ are guesswork too.
 | the id is a lowercase slug and never changes | it is the save key, `save:<id>:<slot>` | `V-03` at install |
 | `engine` names a range that contains the running build | an old engine cannot read a new format, and should say so | `V-05` at install |
 
+The package id allows hyphens (`^[a-z0-9-]+$`). Ids you write *inside* a data file do not: an action, a resource, a pool or a relation entity matches `^[a-z][a-z0-9_]*$`, and `V-16` refuses the archive at install otherwise.
+
 The envelope is checked twice on purpose: once by you, on the bytes you are about to publish, and
 once by the engine, on the bytes a player's browser just downloaded. Only the second one protects
 a player, so it exists even if you skipped the first.

@@ -33,8 +33,8 @@ func _init(registry_instance: InstallRegistry = null) -> void:
 	registry = registry_instance if registry_instance != null else InstallRegistry.new()
 
 
-## The first of `paths` that the archive carries, parsed, or null. New names come
-## first, the pre-B105 names after them (ADR-0018).
+## The first of `paths` that the archive carries, parsed, or null. A package
+## names only the file its block reads; there is no second name to fall back to.
 func _first_json(reader: ZIPReader, files: Array, paths: Array) -> Variant:
 	for path in paths:
 		if files.has(path):

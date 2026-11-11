@@ -58,3 +58,16 @@
 ## 一个块一个名字
 
 块的文件按块命名：`data/ledger.json`、`data/relations.json`、`data/hand.json`。v0.7.5 之前的包用 `state.json`、`factions.json`、`cards.json`；引擎只认块名（ADR-0018）。
+
+## 数据文件里的 id
+
+你在数据文件里写的每个 id——动作、资源、池、关系实体——都满足 `^[a-z][a-z0-9_]*$`：小写字母和数字，用下划线连接，以字母开头。连字符不在这个语法里。
+
+| | |
+| --- | --- |
+| 可以 | `send_apan_herb`、`stone`、`trust_apan` |
+| 不行 | `send-apan-herb`、`2stone`、`trust.apan` |
+
+包 id 是唯一的例外：它允许连字符（`^[a-z0-9-]+$`），因为它是 URL 的一段和存档键，不是数据 id。
+
+这条规则不是装饰。动作 id 会复用在翻译文件的 `action.<id>`、存档的 `used` 表、`disable.json`，还会显示在一局里。玩家有存档之后再改就是一次数据迁移，所以第一次就写下划线形式；语法不对时 `V-16` 在安装时拒绝整个包。

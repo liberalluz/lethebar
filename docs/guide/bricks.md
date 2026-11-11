@@ -71,3 +71,16 @@ earlier one wrote.
 ## One name per block
 
 A block's file is named after the block: `data/ledger.json`, `data/relations.json`, `data/hand.json`. Packages published before v0.7.5 used `state.json`, `factions.json` and `cards.json`; the engine reads only the block name now (ADR-0018).
+
+## Ids inside a data file
+
+Every id you write inside a data file — an action, a resource, a pool, a relation entity — matches `^[a-z][a-z0-9_]*$`: lowercase letters and digits, joined with underscores, starting with a letter. A hyphen is not part of that grammar.
+
+| | |
+| --- | --- |
+| good | `send_apan_herb`, `stone`, `trust_apan` |
+| bad | `send-apan-herb`, `2stone`, `trust.apan` |
+
+The package id is the one exception: it allows hyphens (`^[a-z0-9-]+$`) because it is a URL segment and a save key, not a data id.
+
+The rule is not cosmetic. An action id is reused as `action.<id>` in the translation file, stored in the save's `used` table, accepted by `disable.json`, and printed in the run. Changing it after a player has a save is a data migration, so pick the underscore form the first time. `V-16` refuses the archive at install when the grammar is broken.

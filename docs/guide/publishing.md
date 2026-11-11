@@ -42,6 +42,8 @@ they disagree, nothing fails loudly — which is exactly why the contract is wri
 
 A second release of the same pack is a new tag: `v0.1.1`. Tags are never moved.
 
+A re-run of `publish` reads the release before it writes. An asset that is already there with the same hash is left alone; a missing one is uploaded; one that differs is refused, and `--force` is the only way to replace it (the command prints both hashes). That is what keeps a published artifact the same one a player already verified.
+
 ## The README table
 
 A repository's README carries three things a reader checks before installing:
