@@ -27,7 +27,7 @@ about your pack. `hash` writes the descriptor that sits beside the zip; never ed
 
 `github.com/liberalluz/lethebar-pack-template` holds both tools, the three-step workflow and a
 working example pack; click **Use this template**, replace the example, and skip the assembly
-above. It is tested against engine `v0.7.6`, and its own gate ran green before it was offered.
+above. It is tested against engine `v0.8.0`, and its own gate ran green before it was offered.
 
 ## One tag, one release, two assets
 
@@ -134,3 +134,4 @@ all it does. Start from `pack-turn` if a scene has a menu of actions under it, o
 if the run needs a limit of turns. Copying one of them and rewriting the data
 files is faster than starting from an empty directory, because the fields you
 would otherwise forget are already in place.
+

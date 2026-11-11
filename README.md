@@ -2,112 +2,60 @@
 
 English · [简体中文](README.zh-CN.md)
 
-> An engine that ships no gameplay, plus a set of plugins that carry both the story and the rules for playing it.
-> Change the story without rebuilding the engine; change the rules without rebuilding the story.
+> An engine that ships no gameplay, plus packages that carry both the story and
+> the rules for playing it.
+> Change the story without rebuilding the engine; change the rules without
+> rebuilding the story.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE) [![Engine](https://img.shields.io/badge/engine-Godot%204-478cbf.svg)](https://godotengine.org)
 
 ## Status
 
-**v0.7.6 is out: the author tools reconcile before they write, and the Chinese pages are level with the English ones.** Three Kingdoms and
-Cultivation are published from their own repositories — `pack/sanguo/v1.0.0`,
-`pack/sanguo-content/v1.0.0`, `pack/sanguo-hard/v1.0.1` and `pack/cultivation/v1.0.0` — and
-this repository keeps one smoke pack (`duel`) so that the engine's own tests have something
-to open. A world pack is a bundle: it supplies the story and the rules. A layer package names
-a bundle with `target` and changes it — a `content` layer says how the story reads, a `mod`
-layer changes how it plays. The pack page lists the layers that name a pack; a layer starts
-unticked, because it changes rules nobody asked to change, and the save records the set that
-was played with, so a reload rebuilds the run it came from. Since v0.7.2 a package is a layer because its
-manifest says `kind: layer`, not because it carries a `target`, and the pack page can
-remove a package or one of its layers.
+**v0.8.0 is out: a package can remember across runs, and a roll is the same in the same turn.**
 
-Every world repository builds its pack, checks the archive envelope before anything is
-published, and puts two files on a release: `<id>.zip` and `<id>-<version>.json`, the
-descriptor that names the hash of those bytes. The engine repeats that check at install, so a
-pack that arrives truncated or hand-edited is refused before it can be played.
+The engine still ships one smoke pack, `duel`, so that its own tests have something to open. Every other pack is published from its own repository, and a release of the engine does not ship a story.
 
-A player installs a pack from a file: download the zip from the world's release, then pick it
-in the interface. Installing straight from a release URL is not offered, because GitHub does
-not send a CORS header with its release assets and the browser refuses the fetch.
+## What it is
 
-Upgrading: a browser that played the old built-in packs still holds them at version `0.1.0`,
-and `V-03` refuses a second install of the same id. Remove the old package on the pack page
-(press Remove twice), then install the world pack; clearing the site's data is no longer
-needed.
+- **An engine, not a game.** It owns the rules runtime, the render runtime and the save format. Every story, every rule and every picture comes from a pack.
+- **A pack is data.** A pack is a zip with a `manifest.json`; the engine reads it, checks it, and refuses to execute code shipped inside it.
+- **A run is one bundle plus zero or more layers.** The bundle supplies the story and the rules; a layer changes one part of it — `content` says how the story reads, `mod` changes what the numbers do, `assets` replaces pictures and sound.
+- **The same save replays the same run.** The seed comes from the package id and the starting counter, never from the wall clock, and a roll inside one turn does not reroll. It plays in the browser and keeps playing offline after the first load.
 
-Known limits: pictures and sound are drawn into one band and one portrait column, and
-only from PNG, JPEG and WAV; a run's clock is counted in turns or nodes, never in wall
-time; the shipped font covers the BMP and CJK extension A, so extension B still draws
-as boxes; faction names and arc stages are package text and do not follow the reader
-yet; the audience is validated but nothing filters on it yet; and two layers changing
-different fields of the same entry are not treated as a conflict.
+## Architecture
 
-The author's way in shipped with this version: `docs/guide/` explains a pack, its manifest,
-the eight bricks, the two protocols and every refusal code, `templates/` holds two packs
-small enough to read in one screen, and `github.com/liberalluz/lethebar-pack-template` is a
-repository to start from with the gate already wired. `v0.6.0` did not contain any of it.
+Three runtimes share one data layer: the **rules runtime** (`app/core/session.gd`, `protocols/`, `bricks/`) decides how a session advances, the **render runtime** (`app/render/`, `app/ui/`) decides how it is drawn, and the **data layer** (`manifest_schema`, `package_validator`, `package_loader`) decides what a pack may say.
 
-Next: the first real assembly — one run built from packs of two repositories, with a mod and
-a content layer over them. The iOS build is not scheduled; it returns when a device run costs
-more than it saves.
+Dependencies flow one way: `render → session → protocols/bricks`, and everything above reads the data layer rather than the reverse. There are four extension points — a protocol, a brick, a capability, a layer — and the pack format is the only contract between them.
 
-## What it does
+See [the architecture page](docs/specs/architecture.md) and [ADR-0001](docs/decisions/0001-engine-and-language.md).
 
-- **Four layers, one dependency direction** — engine (rules runtime + render runtime), plugin layer (career packs, category packs, mechanics mods), asset layer, meta config. The engine never knows a specific gameplay.
-- **A pack is data, never code** — a pack is a plain zip with a `manifest.json`; the engine interprets the protocol the pack declares and refuses to execute code shipped inside it.
-- **One engine, several ways to play** — the protocol registry ships `linear@1` and `turn_based@1`; switching packs never touches the engine.
-- **Reproducible sessions** — same choices, same result; the seed is derived from the pack id and the starting counter, never from the wall clock.
-- **Offline, with saves** — once loaded, a reload still opens new sessions and existing saves; three save slots per pack.
+## Play
+
+Open [the web build](https://liberalluz.github.io/lethebar/) or an exported build, then install a pack from the packs page: download the zip from the pack's release, pick it as a file, and play. Installing straight from a release URL is not offered, because GitHub does not send a CORS header with its release assets and the browser refuses the fetch. Each pack gets three save slots; once loaded, the build keeps playing offline.
 
 ## Quick start
 
 ```bash
 git clone https://github.com/liberalluz/lethebar.git
 cd lethebar
-python infra/stage_builtin.py                  # stage built-in packs into app/
-godot --path app --headless --quit              # import assets; creates app/.godot/ (git-ignored)
-godot --path app --headless -s res://tests/run_tests.gd   # rule-layer assertions
+python infra/stage_builtin.py                              # stage built-in packs into app/
+godot --path app --headless --quit                          # import assets; creates app/.godot/ (git-ignored)
+godot --path app --headless -s res://tests/run_tests.gd     # rule-layer assertions
 ```
 
-All three commands only check things. To play it, open the exported build or
-`https://liberalluz.github.io/lethebar/`.
+To build the browser bundle, `python infra/export_web.py` (it needs `GODOT_BIN` and `GODOT_TEMPLATE_APPDATA`).
 
-## Commands
-
-| Command | What it does |
-|---|---|
-| `python infra/checks/check_changelog.py` | Fail when a branch has a `feat` or `fix` commit without a new `changelog.d/` fragment |
-| `python infra/checks/check_tree.py` | Verify the repository layout: root entries, and no tracked generated files |
-| `python infra/stage_builtin.py` | Pack `content/builtin/*` into `app/builtin/*.zip` before tests or export |
-| `python infra/export_web.py` | Export the web build to `build/web/`; needs `GODOT_BIN` and `GODOT_TEMPLATE_APPDATA` |
-| `python infra/verify_web.py` | Load that build in headless Chrome and report console output; needs `node` |
-| `godot --path app --headless --quit` | Import assets, rebuild `app/.godot/` |
-| `godot --path app --headless -s res://tests/run_tests.gd` | Rule-layer assertions (protocol, assembly, save encoding) |
-| `python infra/tool/batch/batch.py` | Create the branch and checklist from a batch card |
-
-There is **no CI yet**. The table above is the current gate: a local pass is the only pass. Once CI exists, this table must change in the same PR as the workflow.
+Writing a pack? Start at the [author guide](docs/guide/README.md). The two packs in [`templates/`](templates/) are small enough to read in one screen, and [`lethebar-pack-template`](https://github.com/liberalluz/lethebar-pack-template) is a repository to start from with the gate already wired.
 
 ## Project structure
 
 | Directory | Responsibility |
 |---|---|
-| `app/` | The Godot project root (`project.godot`) and the engine: `core/` (rules runtime), `protocols/` (protocol registry), `render/` (render runtime), `ui/`, `tests/` (headless assertions) |
-| `content/` | Built-in plugin packs and their data, one directory per pack |
-| `infra/` | Build, export and deployment scripts, including `stage_builtin.py` |
-| `infra/tool/` | Vendored Nebula tooling: batch execution, repository policy, release |
-| `docs/` | Specs, decisions, intent ([docs/README.md](docs/README.md)) |
-
-## Architecture
-
-The engine has two layers: the **rules runtime** decides how a session advances, the **render runtime** decides how it is presented. The plugin layer sits above both and joins by declaring which capabilities it uses (`dimension`, `requires`) instead of shipping its own renderer. Dependencies flow one way only: `render → session → protocol → data`.
-
-See [SDD](docs/specs/controlled/SDD.md) for detail and [ADR-0001](docs/decisions/0001-engine-and-language.md) for why it is built this way.
-
-## Plugin format
-
-A pack is a plain zip with a `manifest.json` at its root: `id`, `version`, `specVersion`, `engine`, `protocol`, `capabilities`, `mechanics`, `entry`, `saveSchema`, `assets`.
-
-The engine validates a pack against `V-01`…`V-09` on load: missing assets warn without crashing, an invalid pack is rejected while the game stays usable. See [SDD §3](docs/specs/controlled/SDD.md), [ADR-0002](docs/decisions/0002-plugin-package-zip.md) and [ADR-0003](docs/decisions/0003-plugins-carry-data.md).
+| `app/` | The Godot project and the engine: `core/` (rules runtime), `protocols/`, `render/`, `ui/`, `tests/` |
+| `content/` | The built-in smoke packs, one directory per pack |
+| `infra/` | The batch runner, checks, release and export tools, and the web stack |
+| `docs/` | Intent, specs, decisions, the author guide and the runbooks |
 
 ## Documentation
 
@@ -116,22 +64,20 @@ The engine validates a pack against `V-01`…`V-09` on load: missing assets warn
 | Why this exists | [docs/intent/](docs/intent/) |
 | How it should be | [docs/specs/](docs/specs/) |
 | What was decided and rejected | [docs/decisions/](docs/decisions/) |
-| How to write a pack | [docs/guide/](docs/guide/) |
-
-Where a document goes: how it should be → `specs/`; decided or not → `decisions/`; why → `intent/`; how to operate → `runbooks/`.
+| How to write a pack | [docs/guide/README.md](docs/guide/README.md) |
+| How to cut a release | [docs/runbooks/release.md](docs/runbooks/release.md) |
 
 ## Contributing
 
-- Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR
-- Changing code with AI? Read [CONTRIBUTING.ai.md](CONTRIBUTING.ai.md) too: AI changes need a human reviewer plus tests or evidence, and the author cannot self-approve
-- For plugin-spec feedback, paste a draft `manifest.json` into an issue — it beats abstract discussion
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR.
+- Changing code with AI? Read [CONTRIBUTING.ai.md](CONTRIBUTING.ai.md) too: AI changes need a human reviewer plus tests or evidence, and the author cannot self-approve.
 
 ## Security
 
-See [SECURITY.md](SECURITY.md). Plugin packages are treated as untrusted input.
+See [SECURITY.md](SECURITY.md). A pack is untrusted input: the engine validates it before install and again before a run.
 
 ## License
 
 The engine is licensed under the [Apache License 2.0](LICENSE): commercial use and redistribution are allowed, provided copyright notices and [NOTICE](NOTICE) are kept.
 
-Third-party dependencies and assets are credited in [NOTICE](NOTICE). Plugin packs are licensed by their own authors and are not covered by this repository's license.
+Third-party dependencies and assets are credited in [NOTICE](NOTICE). Packs are licensed by their own authors and are not covered by this repository's license.

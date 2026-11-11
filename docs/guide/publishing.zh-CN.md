@@ -26,7 +26,7 @@ python infra/tool/release/pack.py publish dist/<id>.zip --repo <owner>/<repo> --
 
 `github.com/liberalluz/lethebar-pack-template` 里有两个工具、三步工作流和一个能跑
 的示例包；点 **Use this template**，替换示例，跳过上面的手工拼装。它按引擎
-`v0.7.6` 测过，它自己的门禁在对外提供之前跑绿。
+`v0.8.0` 测过，它自己的门禁在对外提供之前跑绿。
 
 ## 一个 tag、一次发布、两个资产
 
@@ -121,3 +121,4 @@ python infra/tool/release/pack.py badge . --check README.md
 故事从一场戏走到下一场、只做这件事，就从 `pack-min` 开始。一场戏下面有动作菜单，
 或这一局需要回合上限，就从 `pack-turn` 开始。复制一个再改数据文件，比从空目录
 开始快，因为那些你本来会忘的字段已经在位了。
+
