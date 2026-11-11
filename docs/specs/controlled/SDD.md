@@ -817,6 +817,22 @@ A layer's table is declared against its target bundle. Assembly produces one
 table, owned by the bundle, because merged rules carry no provenance and the
 engine cannot say which layer wrote a value.
 
+## 11.24 A roll is derived from the seed and the turn
+
+A bundle may declare `manifest.rolls`: named integer ranges `{from, to}`, at most
+sixteen, each span at most one million, and the `roll@1` capability. `V-48`
+refuses anything else.
+
+`Session.roll(name)` mixes the seed, the current turn, the name and the bundle id
+and maps the result into the range. The same turn always returns the same value;
+different turns return independent values. The derivation does **not** advance
+`rng`, so the hand order and pool draws of an existing package are unchanged.
+
+Rules read `roll.<name>`. An effect spends one with
+`{"key": {"add_roll": "name"}}`, resolved to `{"add": n}` before the effect
+reaches the mechanics. The snapshot carries `seed`; a resume restores it and a
+payload written before B113 falls back to `rng`.
+
 ## 12. Requirement mapping
 
 | REQ | Design |

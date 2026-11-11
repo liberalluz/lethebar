@@ -47,6 +47,7 @@ const KNOWN_CAPABILITIES := [
 	"locale@1",
 	"save@2",
 	"persist@1",
+	"roll@1",
 	"offline@1",
 	"format@2",
 ]
@@ -56,6 +57,10 @@ static func known_capabilities() -> Array:
 	## The test reads this instead of a second copy, so the specification and the
 	## engine cannot drift without one of them failing.
 	return KNOWN_CAPABILITIES
+
+
+static func _is_int(value: Variant) -> bool:
+	return typeof(value) in [TYPE_INT, TYPE_FLOAT] and float(value) == floor(float(value))
 
 
 static func _declares(capabilities: Array, wanted: String) -> bool:
@@ -242,6 +247,33 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 				))
 			elif JSON.stringify(persist_def).to_utf8_buffer().size() > PersistStore.MAX_BYTES:
 				issues.append(_issue("V-47", "persist", "the table is over 4 KiB", true))
+
+	# V-48 — the named rolls a package declares (`roll@1`). A roll is a closed
+	# integer range; the value is derived from the seed and the turn, never
+	# stored, so the range is the whole contract.
+	var rolls_raw: Variant = manifest.get("rolls", null)
+	if rolls_raw != null:
+		if not (rolls_raw is Dictionary):
+			issues.append(_issue("V-48", "rolls", "must be an object of name: {from, to}", true))
+		else:
+			var rolls_def: Dictionary = rolls_raw
+			if not _declares(manifest["capabilities"], "roll@1"):
+				issues.append(_issue("V-48", "rolls", "declared without the roll@1 capability", true))
+			if rolls_def.size() > 16:
+				issues.append(_issue("V-48", "rolls", "at most sixteen rolls", true))
+			for name in rolls_def:
+				var spec: Variant = rolls_def[name]
+				if not (spec is Dictionary):
+					issues.append(_issue("V-48", "rolls", "%s must be an object with from and to" % name, true))
+					continue
+				var low: Variant = (spec as Dictionary).get("from", null)
+				var high: Variant = (spec as Dictionary).get("to", null)
+				if not _is_int(low) or not _is_int(high):
+					issues.append(_issue("V-48", "rolls", "%s needs integer from and to" % name, true))
+				elif int(low) > int(high):
+					issues.append(_issue("V-48", "rolls", "%s has from above to" % name, true))
+				elif int(high) - int(low) > 1000000:
+					issues.append(_issue("V-48", "rolls", "%s spans more than one million" % name, true))
 
 	# V-24 — every requirement is satisfiable right now. A bundle that needs a
 	# package nobody installed is refused at install time, because the player

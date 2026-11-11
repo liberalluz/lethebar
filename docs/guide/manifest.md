@@ -58,6 +58,7 @@ If you want a clean break, publish a new id and say so; do not reuse the old one
 | `meta` | no | object | audience, minutes, pitch, icon: what a shop would show |
 | `content` | no | object | view, density, cast, arc: how this pack tells its story |
 | `persist` | no | object | a small table that survives across runs: `{key: default}` |
+| `rolls` | no | object | named integer ranges for `roll.<name>`: `{name: {from, to}}` |
 
 <!-- /generated:fields -->
 

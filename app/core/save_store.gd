@@ -79,6 +79,7 @@ func write(entry: Dictionary, slot: int, snapshot: Dictionary, preview: String =
 		"node": String(snapshot.get("node", "")),
 		"state": snapshot.get("state", {}).duplicate(true),
 		"rng": int(snapshot.get("rng", 0)),
+		"seed": int(snapshot.get("seed", snapshot.get("rng", 0))),
 		"visited": snapshot.get("visited", []).duplicate(),
 		"finished": bool(snapshot.get("finished", false)),
 		"turn": int(snapshot.get("turn", 1)),
@@ -156,6 +157,7 @@ func read(entry: Dictionary, slot: int) -> Dictionary:
 			"node": String(payload.get("node", "")),
 			"state": payload.get("state", {}),
 			"rng": int(payload.get("rng", 0)),
+			"seed": int(payload.get("seed", payload.get("rng", 0))),
 			"visited": payload.get("visited", []),
 			"finished": bool(payload.get("finished", false)),
 			"turn": int(payload.get("turn", 1)),
@@ -209,6 +211,7 @@ func resume(entry: Dictionary, payload: Dictionary, options: Dictionary = {}) ->
 	session.current = node
 	session.state = payload.get("state", {}).duplicate(true)
 	session.rng = int(payload.get("rng", 1))
+	session.seed = int(payload.get("seed", session.rng))
 	session.visited = payload.get("visited", []).duplicate()
 	session.finished = bool(payload.get("finished", false))
 	session.turn = int(payload.get("turn", 1))

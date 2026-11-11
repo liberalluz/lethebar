@@ -23,6 +23,10 @@ var state: Dictionary
 var visited: Array
 var warnings: Array
 var rng: int
+## The seed the run started from (B113). `rng` advances; this does not, so a
+## roll can be derived from it and stay the same within a turn.
+var seed: int
+var rolls: Dictionary
 var finished: bool
 var locale: String
 var i18n: Dictionary
@@ -155,6 +159,8 @@ static func create(entry: Dictionary, options: Dictionary = {}) -> Session:
 	session.persist_store.load()
 	var counter := int(options.get("start_counter", DEFAULT_START_COUNTER))
 	session.rng = ((session.plugin_id.hash() ^ (counter * 2654435761)) & 0x7FFFFFFF) | 1
+	session.seed = session.rng
+	session.rolls = session.manifest.get("rolls", {})
 	session.protocol = ProtocolRegistry.implementation(session.protocol_id)
 	if session.protocol == null:
 		session.reject("S-01", "no implementation for protocol %s" % session.protocol_id)
@@ -200,6 +206,8 @@ func apply_rules() -> void:
 	var scope := {ManifestSchema.TICK_KEY: float(tick)}
 	for name in persist:
 		scope["persist." + String(name)] = persist[name]
+	for name in rolls:
+		scope["roll." + String(name)] = roll(String(name))
 	var result := Mechanics.apply(rules, state, scope)
 	state = _clamped(result["state"])
 	_absorb(result["warnings"])
@@ -259,7 +267,11 @@ func _split_persist(effects: Array) -> Array:
 			if key.begins_with("persist."):
 				writes.append([key.substr(8), (effect as Dictionary)[name]])
 			else:
-				rest[key] = (effect as Dictionary)[name]
+				var change: Variant = (effect as Dictionary)[name]
+				if change is Dictionary and (change as Dictionary).has("add_roll"):
+					rest[key] = {"add": roll(String((change as Dictionary)["add_roll"]))}
+				else:
+					rest[key] = change
 		if not rest.is_empty():
 			plain.append(rest)
 	return [plain, writes]
@@ -948,6 +960,7 @@ func snapshot() -> Dictionary:
 		"node": current,
 		"state": state.duplicate(true),
 		"rng": rng,
+		"seed": seed,
 		"visited": visited.duplicate(),
 		"finished": finished,
 		"turn": turn,
@@ -1078,6 +1091,26 @@ func restore_pools(saved: Variant) -> void:
 
 func step_rng() -> void:
 	_step_rng()
+
+
+func roll(name: String) -> int:
+	## B113: derived from the seed, the turn, the name and the bundle, so the
+	## same turn always gives the same value and a reload cannot reroll it. The
+	## stream `rng` is not consumed: the hand and the pools keep their order.
+	var spec: Variant = rolls.get(name, null)
+	if not (spec is Dictionary):
+		return 0
+	var low := int((spec as Dictionary).get("from", 0))
+	var high := int((spec as Dictionary).get("to", low))
+	if high < low:
+		return low
+	var span := high - low + 1
+	var text := "%d|%s|%s|%d" % [seed, plugin_id, name, turn]
+	var h := 2166136261
+	for byte in text.to_utf8_buffer():
+		h = ((h ^ int(byte)) * 16777619) & 0xFFFFFFFF
+	h = (h ^ (h >> 13)) & 0xFFFFFFFF
+	return low + int(h % span)
 
 
 func _step_rng() -> void:
