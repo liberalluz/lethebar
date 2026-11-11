@@ -69,6 +69,11 @@ python infra/tool/release/pack.py badge . --check README.md
 可以覆盖。它**从不**回退到 `CHANGELOG.md`：发布说明对玩家讲变了什么，changelog
 讲一个批次做了什么。缺发布说明是错误，不是把批次清单发到玩家标题下的理由。
 
+`publish.py` 只写引擎的发布：正文路径和证据目录都只按引擎版本命名，所以它拒绝
+一个不是该版本的 tag。包的发布属于包自己的仓库——那边的正文在
+`product/release-notes/<id>/<version>.en.md`，证据在
+`records/<YYYY-MM>-release-<id>-<version>/`。
+
 ## 作者门禁
 
 把引擎里的 `infra/ci/author-gate.yml` 复制到 `.github/workflows/gate.yml`，改一行：

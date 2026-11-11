@@ -563,6 +563,14 @@ def main(argv: list[str] | None = None) -> int:
     root = args.root.resolve()
     docs_root = args.docs_root.resolve()
     tag = args.tag or args.version
+    if tag != args.version:
+        print(
+            f"publish.py writes engine releases; tag {tag!r} is not the engine "
+            f"version {args.version!r}. A pack release keeps its notes and "
+            "evidence in its own repository.",
+            file=sys.stderr,
+        )
+        return 2
     try:
         plan = build_plan(
             root,

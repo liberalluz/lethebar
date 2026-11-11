@@ -77,6 +77,12 @@ docs repository; `--body-file` overrides it. It never falls back to
 what a batch did. A missing note is an error, not a reason to publish a batch
 list under a player-facing title.
 
+`publish.py` writes engine releases only: the note path and the evidence
+directory are keyed by the engine version, so it refuses a tag that is not that
+version. A pack's release belongs to the pack's own repository, which keeps its
+note under `product/release-notes/<id>/<version>.en.md` and its evidence under
+`records/<YYYY-MM>-release-<id>-<version>/`.
+
 ## The author gate
 
 Copy `infra/ci/author-gate.yml` from the engine into `.github/workflows/gate.yml` and change one
