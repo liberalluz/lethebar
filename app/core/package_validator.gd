@@ -46,6 +46,7 @@ const KNOWN_CAPABILITIES := [
 	"assets@1",
 	"locale@1",
 	"save@2",
+	"persist@1",
 	"offline@1",
 	"format@2",
 ]
@@ -55,6 +56,14 @@ static func known_capabilities() -> Array:
 	## The test reads this instead of a second copy, so the specification and the
 	## engine cannot drift without one of them failing.
 	return KNOWN_CAPABILITIES
+
+
+static func _declares(capabilities: Array, wanted: String) -> bool:
+	for entry in capabilities:
+		var parsed := ManifestSchema.parse_capability(entry)
+		if not parsed.is_empty() and ManifestSchema.capability_id(parsed[0], parsed[1]) == wanted:
+			return true
+	return false
 
 
 static func _issue(code: String, field: String, message: String, fatal: bool) -> Dictionary:	return {"code": code, "field": field, "message": message, "fatal": fatal}
@@ -203,6 +212,36 @@ static func validate(manifest: Dictionary, context: Dictionary) -> Array:
 				"this engine does not provide %s" % capability,
 				true,
 			))
+
+	# V-47 — the memory table a package declares (`persist@1`). It is a small
+	# typed table: a lower-case key per entry, a scalar or a flat list per value,
+	# and the capability has to be named before the table can be read.
+	var persist_raw: Variant = manifest.get("persist", null)
+	if persist_raw != null:
+		if not (persist_raw is Dictionary):
+			issues.append(_issue("V-47", "persist", "must be an object of key: default", true))
+		else:
+			var persist_def: Dictionary = persist_raw
+			if not _declares(manifest["capabilities"], "persist@1"):
+				issues.append(_issue(
+					"V-47", "persist",
+					"declared without the persist@1 capability",
+					true,
+				))
+			var broken := persist_def.size() > PersistStore.MAX_KEYS
+			if not broken:
+				for name in persist_def:
+					if not PersistStore._valid_id(String(name)) or not PersistStore._valid_value(persist_def[name]):
+						broken = true
+						break
+			if broken:
+				issues.append(_issue(
+					"V-47", "persist",
+					"every key is a lower-case id and every value a scalar or a flat list (at most 32 keys)",
+					true,
+				))
+			elif JSON.stringify(persist_def).to_utf8_buffer().size() > PersistStore.MAX_BYTES:
+				issues.append(_issue("V-47", "persist", "the table is over 4 KiB", true))
 
 	# V-24 — every requirement is satisfiable right now. A bundle that needs a
 	# package nobody installed is refused at install time, because the player

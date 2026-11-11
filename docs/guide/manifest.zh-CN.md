@@ -52,6 +52,7 @@
 | `layer` | 分层时 | string | 不可玩的包补六维中的哪一维 |
 | `collection` | 否 | object | 这个包属于哪个世界：`{id, names}` |
 | `clock` | 否 | object | `{per: turn 或 node, every: n}`；不写就是每回合 |
+| `persist` | 否 | object | 跨局保留的小表：`{键: 默认值}`；最多 32 键、4 KiB，需声明 `persist@1` |
 | `meta` | 否 | object | 受众、时长、简介、图标：商店会显示的东西 |
 | `content` | 否 | object | 视角、密度、阵容、弧光：这个包怎么讲故事 |
 

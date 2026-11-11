@@ -45,6 +45,7 @@ implemented, and a service with no capability is invisible to packages.
 | `save@2` | three slots, previews, resume, durable write | save_store | save file | `B4`, `B23` | `TC-SAVE-001`…`TC-SAVE-003` |
 | `offline@1` | installable web build, package and save survival without a network | service worker | — | `B6`, `B12` | `TC-OFF-001`…`TC-OFF-004` |
 | `format@2` | package format `2.0.0`: `kind`, `layer`, `requires` | validator | manifest | `B15` | `TC-FMT-001` |
+| `persist@1` | a small per-bundle memory table outside the save, written by effects and read by rules | persist_store | persist | `B112` | `run_tests.gd` (`B112`) |
 | `cards.hand@1` | a hand, a deck, a draw and a discard, a resolution order | hand | hand, pools | `B41` | `TC-CARDS-001` |
 
 A package needs none of these by name today: an empty `requires.capabilities`

@@ -32,15 +32,15 @@ last column names a `data/...` file, that is the file the author has to open.
 | `M-01` | `app/core/mechanics.gd:38` | rule without a set clause |
 | `M-02` | `app/core/mechanics.gd:77` | a when clause must be an object, not … |
 | `M-03` | `app/core/mechanics.gd:110` | a set clause must be an object |
-| `S-01` | `app/core/session.gd:143` | no implementation for protocol … |
-| `S-02` | `app/core/session.gd:162` | node … does not exist |
+| `S-01` | `app/core/session.gd:160` | no implementation for protocol … |
+| `S-02` | `app/core/session.gd:179` | node … does not exist |
 | `S-03` | `app/core/checks.gd:38` | no check named … |
-| `S-04` | `app/core/session.gd:256` | no action named … |
-| `S-05` | `app/core/session.gd:260` | reason |
-| `S-06` | `app/core/session.gd:468` | pool … does not exist |
-| `S-07` | `app/core/session.gd:282` | pool … does not exist |
-| `S-08` | `app/core/session.gd:325` | resource.….… |
-| `S-09` | `app/core/session.gd:309` | no card named … in the hand |
+| `S-04` | `app/core/session.gd:313` | no action named … |
+| `S-05` | `app/core/session.gd:317` | reason |
+| `S-06` | `app/core/session.gd:537` | pool … does not exist |
+| `S-07` | `app/core/session.gd:343` | pool … does not exist |
+| `S-08` | `app/core/session.gd:388` | resource.….… |
+| `S-09` | `app/core/session.gd:372` | no card named … in the hand |
 | `SAVE-01` | `app/core/save_store.gd:14` | SAVE-01 |
 | `SAVE-02` | `app/core/save_store.gd:15` | SAVE-02 |
 | `SAVE-03` | `app/core/save_store.gd:16` | SAVE-03 |
@@ -49,36 +49,37 @@ last column names a `data/...` file, that is the file the author has to open.
 | `SAVE-06` | `app/core/save_store.gd:19` | SAVE-06 |
 | `SAVE-07` | `app/core/save_store.gd:20` | SAVE-07 |
 | `SAVE-08` | `app/core/save_store.gd:21` | SAVE-08 |
-| `V-02` | `app/core/package_validator.gd:90` | message |
-| `V-03` | `app/core/package_validator.gd:97` | must match [a-z0-9-]+ |
-| `V-04` | `app/core/package_validator.gd:149` | specVersion |
-| `V-05` | `app/core/package_validator.gd:522` | expected a range like >=4.3.0 <5.0.0 |
-| `V-06` | `app/core/package_validator.gd:533` | protocol |
-| `V-07` | `app/core/package_validator.gd:540` | entry |
-| `V-08` | `app/core/package_validator.gd:660` | declared asset missing from package: … |
-| `V-09` | `app/core/package_validator.gd:545` | must be a positive integer |
-| `V-14` | `app/core/package_validator.gd:554` | ledger.json |
-| `V-16` | `app/core/package_validator.gd:358` | actions.json |
-| `V-17` | `app/core/package_validator.gd:365` | phases.json |
-| `V-18` | `app/core/package_validator.gd:369` | checks.json |
-| `V-19` | `app/core/package_validator.gd:379` | pools.json |
-| `V-20` | `app/core/package_validator.gd:384` | W-02 |
-| `V-21` | `app/core/package_validator.gd:586` | clock |
-| `V-22` | `app/core/package_validator.gd:673` | defaultLocale |
-| `V-23` | `app/core/package_validator.gd:170` | message |
-| `V-24` | `app/core/package_validator.gd:221` | requires |
-| `V-25` | `app/core/package_validator.gd:419` | actions.json |
-| `V-26` | `app/core/package_validator.gd:446` | actions.json |
-| `V-27` | `app/core/package_validator.gd:194` | capabilities |
-| `V-31` | `app/core/package_validator.gd:617` | a rule's relations must be an array |
-| `V-32` | `app/core/package_validator.gd:117` | id must match [a-z0-9-]+ |
-| `V-36` | `app/core/package_validator.gd:463` | hand.json |
-| `V-37` | `app/core/package_validator.gd:513` | hand.json |
-| `V-38` | `app/core/package_validator.gd:473` | hand.json |
-| `V-39` | `app/core/package_validator.gd:493` | hand.json |
-| `V-40` | `app/core/package_validator.gd:243` | manifest.json |
-| `V-41` | `app/core/package_validator.gd:265` | manifest.json |
-| `V-42` | `app/core/package_validator.gd:305` | manifest.json |
+| `V-02` | `app/core/package_validator.gd:99` | message |
+| `V-03` | `app/core/package_validator.gd:106` | must match [a-z0-9-]+ |
+| `V-04` | `app/core/package_validator.gd:158` | specVersion |
+| `V-05` | `app/core/package_validator.gd:561` | expected a range like >=4.3.0 <5.0.0 |
+| `V-06` | `app/core/package_validator.gd:572` | protocol |
+| `V-07` | `app/core/package_validator.gd:579` | entry |
+| `V-08` | `app/core/package_validator.gd:699` | declared asset missing from package: … |
+| `V-09` | `app/core/package_validator.gd:584` | must be a positive integer |
+| `V-14` | `app/core/package_validator.gd:593` | ledger.json |
+| `V-16` | `app/core/package_validator.gd:397` | actions.json |
+| `V-17` | `app/core/package_validator.gd:404` | phases.json |
+| `V-18` | `app/core/package_validator.gd:408` | checks.json |
+| `V-19` | `app/core/package_validator.gd:418` | pools.json |
+| `V-20` | `app/core/package_validator.gd:423` | W-02 |
+| `V-21` | `app/core/package_validator.gd:625` | clock |
+| `V-22` | `app/core/package_validator.gd:712` | defaultLocale |
+| `V-23` | `app/core/package_validator.gd:179` | message |
+| `V-24` | `app/core/package_validator.gd:260` | requires |
+| `V-25` | `app/core/package_validator.gd:458` | actions.json |
+| `V-26` | `app/core/package_validator.gd:485` | actions.json |
+| `V-27` | `app/core/package_validator.gd:203` | capabilities |
+| `V-31` | `app/core/package_validator.gd:656` | a rule's relations must be an array |
+| `V-32` | `app/core/package_validator.gd:126` | id must match [a-z0-9-]+ |
+| `V-36` | `app/core/package_validator.gd:502` | hand.json |
+| `V-37` | `app/core/package_validator.gd:552` | hand.json |
+| `V-38` | `app/core/package_validator.gd:512` | hand.json |
+| `V-39` | `app/core/package_validator.gd:532` | hand.json |
+| `V-40` | `app/core/package_validator.gd:282` | manifest.json |
+| `V-41` | `app/core/package_validator.gd:304` | manifest.json |
+| `V-42` | `app/core/package_validator.gd:344` | manifest.json |
+| `V-47` | `app/core/package_validator.gd:222` | must be an object of key: default |
 
 <!-- /generated:errors -->
 

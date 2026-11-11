@@ -57,6 +57,7 @@ If you want a clean break, publish a new id and say so; do not reuse the old one
 | `clock` | no | object | `{per: turn or node, every: n}`; absent means every turn |
 | `meta` | no | object | audience, minutes, pitch, icon: what a shop would show |
 | `content` | no | object | view, density, cast, arc: how this pack tells its story |
+| `persist` | no | object | a small table that survives across runs: `{key: default}` |
 
 <!-- /generated:fields -->
 

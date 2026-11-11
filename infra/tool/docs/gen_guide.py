@@ -98,6 +98,7 @@ EXTRA = {
     "clock": ("object", "`{per: turn or node, every: n}`; absent means every turn", "no"),
     "meta": ("object", "audience, minutes, pitch, icon: what a shop would show", "no"),
     "content": ("object", "view, density, cast, arc: how this pack tells its story", "no"),
+    "persist": ("object", "a small table that survives across runs: `{key: default}`", "no"),
 }
 
 TYPE_BY_ARRAY = (

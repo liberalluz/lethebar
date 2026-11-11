@@ -798,6 +798,25 @@ on the new version when the node ids it names still exist; an upgrade that
 renames or deletes those nodes makes the save unreadable, and `saveSchema` is
 still one-way, so rolling back does not make a newer save readable.
 
+## 11.23 A package may remember across runs
+
+A bundle may declare `manifest.persist`, a table of named defaults, and the
+`persist@1` capability. The table is typed: a key is a lower-case id, a value is
+a scalar or a flat array of scalars, and a key never changes type. At most 32
+keys and 4 KiB of JSON; `V-47` refuses anything larger, mistyped, or declared
+without the capability.
+
+The table is stored under `memory:<bundle id>` in the same key-value backend as
+the saves. It is read when a session is created, written when an effect names
+`persist.<key>` (`value` or `add`), and exposed to rules as `persist.<key>` in
+the same scope as the tick. It is deliberately **not** part of `snapshot()` or a
+save payload: a replay of an old save sees the current memory, not the memory
+the run had (ADR-0019).
+
+A layer's table is declared against its target bundle. Assembly produces one
+table, owned by the bundle, because merged rules carry no provenance and the
+engine cannot say which layer wrote a value.
+
 ## 12. Requirement mapping
 
 | REQ | Design |

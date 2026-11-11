@@ -28,7 +28,7 @@ const STRING_FIELDS := ["id", "version", "specVersion", "engine", "name", "proto
 ## the pack's own title per locale.
 const OPTIONAL_STRING_FIELDS := ["defaultLocale"]
 const OPTIONAL_LIST_FIELDS := ["locales"]
-const OPTIONAL_MAP_FIELDS := ["names", "clock"]
+const OPTIONAL_MAP_FIELDS := ["names", "clock", "persist"]
 ## The only two meanings `clock.per` has: a turn of the action menu, or a node
 ## of a linear story. Anything else is out of scope for format 2.0.0.
 const CLOCK_UNITS := ["turn", "node"]
