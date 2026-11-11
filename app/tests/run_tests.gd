@@ -85,6 +85,7 @@ func _initialize() -> void:
 	_case_layer_dimensions()
 	_case_layer_entry()
 	_case_persist()
+	_case_rolls()
 	_case_asset_layers()
 	_case_layer_identity()
 	_case_removal()
@@ -325,7 +326,7 @@ func _case_det_001() -> void:
 	)
 	var keys: Array = JSON.parse_string(first).keys()
 	keys.sort()
-	var expected := ["drawn", "finished", "node", "plugin", "pools", "protocol", "relations", "rng", "schema", "state", "tick", "turn", "used", "version", "visited"]
+	var expected := ["drawn", "finished", "node", "plugin", "pools", "protocol", "relations", "rng", "schema", "seed", "state", "tick", "turn", "used", "version", "visited"]
 	_check("TC-DET-001: the payload keeps its declared shape", str(keys) == str(expected), str(keys))
 
 
@@ -4258,6 +4259,65 @@ func _case_persist() -> void:
 	var bulk := _package("pst-many", {"id": "pst-many", "capabilities": ["persist@1"], "mechanics": [], "persist": many})
 	var refused: Dictionary = shell.loader.import_bytes(bulk, _context())
 	_check("B112: too many keys are refused", String(refused.get("status", "")) == "rejected", String(refused.get("code", "")))
+
+
+func _case_rolls() -> void:
+	## B113: a roll is derived from seed, turn, name and bundle, so a reload in
+	## the same turn cannot reroll it and the hand/pool stream is untouched.
+	_section("B113 a roll is the same in the same turn")
+	var actions := {
+		"actions": [
+			{
+				"id": "swing",
+				"label": "Swing",
+				"effects": [{"gold": {"add_roll": "loot"}}],
+			},
+		],
+	}
+	var shell := _shell()
+	var bytes := _package(
+		"rll",
+		{
+			"id": "rll",
+			"capabilities": ["roll@1"],
+			"mechanics": [],
+			"rolls": {"loot": {"from": 1, "to": 6}},
+		},
+		[],
+		[],
+		{},
+		{"rules": [{"when": {"key": "roll.loot", "op": "gte", "value": 1}, "set": {"flagged": 1}}]},
+		{"data/actions.json": JSON.stringify(actions, "\t").to_utf8_buffer()},
+	)
+	var installed: Dictionary = shell.loader.import_bytes(bytes, _context())
+	_check("B113: the package installs", String(installed.get("status", "")) == "installed", str(installed.get("code", "")))
+	var entry: Dictionary = shell.loader.registry.entry("rll")
+	var first := Session.create(entry, {"start_counter": 1})
+	var roll: int = first.roll("loot")
+	_check("B113: the value is inside the range", roll >= 1 and roll <= 6, str(roll))
+	var second := Session.create(entry, {"start_counter": 1})
+	_check("B113: the same seed and turn give the same value", second.roll("loot") == roll, "%d != %d" % [second.roll("loot"), roll])
+	_check("B113: the snapshot carries the seed", (first.snapshot() as Dictionary).has("seed"))
+	first.act("swing")
+	_check("B113: an effect spends the roll", int(first.state.get("gold", 0)) == roll, str(first.state))
+	first.apply_rules()
+	_check("B113: a rule reads the roll", int(first.state.get("flagged", 0)) == 1, str(first.state))
+	var bad := [
+		{"id": "rll-shape", "capabilities": ["roll@1"], "rolls": {"loot": [1, 6]}},
+		{"id": "rll-order", "capabilities": ["roll@1"], "rolls": {"loot": {"from": 6, "to": 1}}},
+		{"id": "rll-wide", "capabilities": ["roll@1"], "rolls": {"loot": {"from": 1, "to": 2000000}}},
+		{"id": "rll-text", "capabilities": ["roll@1"], "rolls": {"loot": {"from": "1", "to": 6}}},
+	]
+	for overrides in bad:
+		var broken := _package(String(overrides["id"]), overrides)
+		var refused: Dictionary = shell.loader.import_bytes(broken, _context())
+		_check("B113: %s is refused" % String(overrides["id"]), String(refused.get("code", "")) == "V-48", String(refused.get("code", "")))
+	var many := {}
+	for i in 17:
+		many["r%d" % i] = {"from": 1, "to": 2}
+	var bulk := _package("rll-many", {"id": "rll-many", "capabilities": ["roll@1"], "rolls": many})
+	var refused_many: Dictionary = shell.loader.import_bytes(bulk, _context())
+	_check("B113: more than sixteen rolls are refused", String(refused_many.get("code", "")) == "V-48", String(refused_many.get("code", "")))
 
 
 func _case_meta() -> void:

@@ -53,6 +53,7 @@
 | `collection` | 否 | object | 这个包属于哪个世界：`{id, names}` |
 | `clock` | 否 | object | `{per: turn 或 node, every: n}`；不写就是每回合 |
 | `persist` | 否 | object | 跨局保留的小表：`{键: 默认值}`；最多 32 键、4 KiB，需声明 `persist@1` |
+| `rolls` | 否 | object | 带名字的整数区间，给 `roll.<名称>` 用：`{名称: {from, to}}`；最多 16 个、跨度不超过一百万，需声明 `roll@1` |
 | `meta` | 否 | object | 受众、时长、简介、图标：商店会显示的东西 |
 | `content` | 否 | object | 视角、密度、阵容、弧光：这个包怎么讲故事 |
 

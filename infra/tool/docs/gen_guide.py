@@ -99,6 +99,7 @@ EXTRA = {
     "meta": ("object", "audience, minutes, pitch, icon: what a shop would show", "no"),
     "content": ("object", "view, density, cast, arc: how this pack tells its story", "no"),
     "persist": ("object", "a small table that survives across runs: `{key: default}`", "no"),
+    "rolls": ("object", "named integer ranges for `roll.<name>`: `{name: {from, to}}`", "no"),
 }
 
 TYPE_BY_ARRAY = (

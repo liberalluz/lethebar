@@ -111,3 +111,28 @@ the memory is the player's, the save is the run's. Keys are lower-case ids,
 values are scalars or flat arrays; at most 32 keys and 4 KiB. A layer's table is
 declared against its target bundle. `V-47` refuses a table that is too large,
 mistyped, or declared without the capability.
+
+## Rolls that do not reroll
+
+Declare named integer ranges and name `roll@1`:
+
+```json
+{
+  "capabilities": ["text@1", "roll@1"],
+  "rolls": {"loot": {"from": 1, "to": 6}}
+}
+```
+
+A rule reads `roll.loot`; an effect spends it:
+
+```json
+{"when": {"key": "roll.loot", "op": "gte", "value": 5}, "set": {"rare": 1}}
+{"effects": [{"gold": {"add_roll": "loot"}}]}
+```
+
+The value is derived from the run's seed and the current turn, so saving and
+reloading in the same turn gives the same number, and the next turn gives
+another. Rolling does not advance the hand or the pool order. A player who edits
+the save can edit the seed: this stops a reload from rerolling, it is not
+anti-cheat. A range is at most one million wide, and a manifest declares at most
+sixteen rolls (`V-48`).
