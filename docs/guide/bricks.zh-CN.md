@@ -57,4 +57,4 @@
 
 ## 一个块一个名字
 
-块的文件按块命名：`data/ledger.json`、`data/relations.json`、`data/hand.json`。v0.7.5 之前的包用 `state.json`、`factions.json`、`cards.json`；引擎仍能读，但新包应该用块名（ADR-0018）。
+块的文件按块命名：`data/ledger.json`、`data/relations.json`、`data/hand.json`。v0.7.5 之前的包用 `state.json`、`factions.json`、`cards.json`；引擎只认块名（ADR-0018）。

@@ -79,7 +79,7 @@ replacement pack gets a new id; the old one is not reused.
 ## What a layer points at
 
 ```json
-{ "kind": "layer", "layer": "mod", "target": "sanguo", "requires": ["sanguo"] }
+{ "kind": "layer", "layer": "mod", "target": "sanguo", "requires": [{ "id": "sanguo", "version": "1.0.0" }] }
 ```
 
 `target` is the id of the pack the layer changes — in practice a `bundle`, since

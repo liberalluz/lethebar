@@ -8,15 +8,15 @@ when you skip one.
 
 ## The six commands
 
-Run them from the repository that holds your pack. `pack.py` and `check_pack.py` are two files you
-copy from the engine; nothing else from the engine is needed.
+Run them from the repository that holds your pack. `pack.py`, `check_pack.py` and `fixtures.py` are
+three files you copy from the engine; nothing else from the engine is needed.
 
 ```text
 python infra/tool/release/pack.py self-test      # the tools work on this machine
 python infra/tool/release/pack.py build packs/<id> --out dist
 python infra/checks/check_pack.py dist/<id>.zip  # the envelope and the manifest
 python infra/tool/release/pack.py hash dist/<id>.zip   # writes dist/<id>-<version>.json
-python infra/tool/release/preflight.py --pack dist/<id>.zip --repo <owner>/<repo> --tag pack/<id>/v<version>
+python infra/tool/release/preflight.py --pack packs/<id> --repo <owner>/<repo> --tag pack/<id>/v<version>
 python infra/tool/release/pack.py publish dist/<id>.zip --repo <owner>/<repo> --tag pack/<id>/v<version> --apply
 ```
 

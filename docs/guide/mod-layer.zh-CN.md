@@ -32,7 +32,7 @@ your-world-repository/
   "kind": "layer",
   "layer": "mod",
   "target": "sanguo",
-  "requires": ["sanguo"],
+  "requires": [{ "id": "sanguo", "version": "1.0.0" }],
   "engine": ">=4.7.0 <5.0.0",
   "name": "Three Kingdoms, harder",
   "defaultLocale": "en",

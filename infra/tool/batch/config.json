@@ -192,6 +192,14 @@
         "infra/checks/check_capabilities.py"
       ],
       "cwd": "."
+    },
+    {
+      "name": "examples",
+      "command": [
+        "python",
+        "infra/checks/check_guide_examples.py"
+      ],
+      "cwd": "."
     }
   ],
   "release_checks": [

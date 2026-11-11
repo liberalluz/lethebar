@@ -7,7 +7,7 @@
 
 ## 六条命令
 
-在放你的包的那个仓里运行。`pack.py` 和 `check_pack.py` 是从引擎复制过来的两个
+在放你的包的那个仓里运行。`pack.py`、`check_pack.py` 和 `fixtures.py` 是从引擎复制过来的三个
 文件；引擎的其他东西都不需要。
 
 ```text
@@ -15,7 +15,7 @@ python infra/tool/release/pack.py self-test      # 工具在这台机器上能�
 python infra/tool/release/pack.py build packs/<id> --out dist
 python infra/checks/check_pack.py dist/<id>.zip  # 信封与 manifest
 python infra/tool/release/pack.py hash dist/<id>.zip   # 写 dist/<id>-<version>.json
-python infra/tool/release/preflight.py --pack dist/<id>.zip --repo <owner>/<repo> --tag pack/<id>/v<version>
+python infra/tool/release/preflight.py --pack packs/<id> --repo <owner>/<repo> --tag pack/<id>/v<version>
 python infra/tool/release/pack.py publish dist/<id>.zip --repo <owner>/<repo> --tag pack/<id>/v<version> --apply
 ```
 

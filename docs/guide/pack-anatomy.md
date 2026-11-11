@@ -93,7 +93,7 @@ smallest one, in full, against the bundle above:
   "kind": "layer",
   "layer": "content",
   "target": "sanguo",
-  "requires": ["sanguo"],
+  "requires": [{ "id": "sanguo", "version": "1.0.0" }],
   "engine": ">=4.7.0 <5.0.0",
   "name": "Three Kingdoms, in the first person",
   "defaultLocale": "en",
