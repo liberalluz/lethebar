@@ -33,6 +33,7 @@ ROOT_DIRECTORIES = {
 }
 
 ROOT_FILES = {
+    "codemagic.yaml",
     "README.md",
     "README.zh-CN.md",
     "CONTRIBUTING.md",
