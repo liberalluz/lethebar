@@ -106,7 +106,10 @@ var _picker: FileDialog = null
 ## with `window.prompt`, which does not exist off the web.
 var _link_dialog: AcceptDialog = null
 var _link_url: LineEdit = null
-var _link_digest: LineEdit = null
+## The long-press menu over the address field: a phone has no right click, and
+## the engine's LineEdit does not surface the system paste menu on touch.
+var _link_menu: PopupMenu = null
+var _touch_started := 0
 ## The JS callback must stay referenced from here: assigning it to `window` alone
 ## lets the engine collect it, and the bridge then exists but never calls back.
 var _import_callback: JavaScriptObject = null
@@ -744,12 +747,13 @@ func try_import(bytes: PackedByteArray) -> Dictionary:
 
 
 func install_from_url(url: String, expected_sha256: String, fetch: Callable) -> Dictionary:
-	## A package that arrives over the wire. `PackageLoader.import_url` hashes
-	## the bytes before anything is written, so a truncated download or a wrong
-	## digest stops here with V-01 or V-43 and this screen shows the refusal the
-	## same way it shows a malformed file.
-	if url.strip_edges().is_empty() or expected_sha256.strip_edges().is_empty():
-		open_notice("V-43", Locale.text("ui.link_refused"))
+	## A package that arrives over the wire. When a digest is given,
+	## `PackageLoader.import_url` hashes the bytes before anything is written, so
+	## a truncated download or a wrong digest stops here with V-43. An empty
+	## digest trusts the transport; the package still has to pass every check in
+	## `import_bytes`, and a refusal is shown the same way as a bad file.
+	if url.strip_edges().is_empty():
+		open_notice("V-01", Locale.text("ui.link_refused"))
 		return current_view()
 	return _after_install(loader.import_url(url, expected_sha256, _context(), fetch))
 
@@ -799,21 +803,31 @@ func request_install() -> void:
 	if _picker != null and is_instance_valid(_picker):
 		_picker.popup_centered_ratio(dialog_ratio(0.6))
 		return
-	_picker = FileDialog.new()
-	_picker.access = FileDialog.ACCESS_FILESYSTEM
-	_picker.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-	_picker.add_filter("*.zip", "Plugin package")
-	_picker.file_selected.connect(_on_file_chosen)
-	_picker.canceled.connect(_on_picker_closed)
+	_picker = _make_picker()
 	add_child(_picker)
 	_picker.popup_centered_ratio(dialog_ratio(0.6))
 
 
+func _make_picker() -> FileDialog:
+	## Built apart from `request_install` so a test can read the flags without
+	## opening a platform dialog.
+	var picker := FileDialog.new()
+	picker.access = FileDialog.ACCESS_FILESYSTEM
+	picker.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	## On a phone Godot has no window to draw: the native branch hands the job to
+	## the platform's document picker (UIDocumentPicker on iOS).
+	picker.use_native_dialog = true
+	picker.add_filter("*.zip", "Plugin package")
+	picker.file_selected.connect(_on_file_chosen)
+	picker.canceled.connect(_on_picker_closed)
+	return picker
+
+
 func request_link_install() -> void:
-	## A browser has no file system and no dialog of its own, so the address and
-	## the digest are asked for with two prompts. The digest is not optional:
-	## without it `import_url` would compare against nothing and the screen would
-	## claim a file it never checked.
+	## A browser has no file system and no dialog of its own, so the address is
+	## asked for with a prompt. The digest is optional: on a phone there is no
+	## keyboard path to a 64-character hex string, and the package still has to
+	## pass every check in `import_bytes`.
 	if not OS.has_feature("web"):
 		_open_link_dialog()
 		return
@@ -822,18 +836,16 @@ func request_link_install() -> void:
 	)).strip_edges()
 	if url.is_empty():
 		return
-	var digest := String(JavaScriptBridge.eval(
-		"window.prompt(%s) || ''" % JSON.stringify(Locale.text("ui.link_digest")), true
-	)).strip_edges()
 	var fetch := func(address: String) -> PackedByteArray:
 		return await Downloader.fetch(self, address)
-	install_from_url(url, digest, fetch)
+	install_from_url(url, "", fetch)
 
 
 func _open_link_dialog() -> void:
-	## A native build has no page prompt: the address and the digest are asked
-	## for in a dialog the engine owns, so the same install path works on a
-	## phone. It is the same pair `install_from_url` already verifies.
+	## A native build has no page prompt: the address is asked for in a dialog
+	## the engine owns, so the same install path works on a phone. The digest is
+	## not asked for: a phone keyboard has no path to 64 hex characters, and the
+	## package still has to pass every check in `import_bytes`.
 	if _link_dialog != null and is_instance_valid(_link_dialog):
 		_link_dialog.popup_centered_ratio(dialog_ratio(0.5))
 		return
@@ -844,10 +856,14 @@ func _open_link_dialog() -> void:
 	box.add_theme_constant_override("separation", 8)
 	_link_url = LineEdit.new()
 	_link_url.placeholder_text = Locale.text("ui.link_ask")
-	_link_digest = LineEdit.new()
-	_link_digest.placeholder_text = Locale.text("ui.link_digest")
 	box.add_child(_link_url)
-	box.add_child(_link_digest)
+	var trust := Label.new()
+	trust.text = Locale.text("ui.link_trust")
+	trust.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(trust)
+	_attach_text_menu(_link_url)
+	if is_narrow():
+		_link_url.custom_minimum_size.y = MIN_TOUCH
 	_link_dialog.add_child(box)
 	_link_dialog.confirmed.connect(_confirm_link_install)
 	add_child(_link_dialog)
@@ -858,10 +874,71 @@ func _confirm_link_install() -> void:
 	var address := _link_url.text.strip_edges()
 	if address.is_empty():
 		return
-	var digest := _link_digest.text.strip_edges()
 	var fetch := func(target: String) -> PackedByteArray:
 		return await Downloader.fetch(self, target)
-	install_from_url(address, digest, fetch)
+	install_from_url(address, "", fetch)
+
+
+func _attach_text_menu(field: LineEdit) -> void:
+	## Touch has no right click: a long press opens the four commands a text
+	## field needs, over the engine's own clipboard.
+	_link_menu = PopupMenu.new()
+	_link_menu.name = "TextMenu"
+	_link_menu.add_item(Locale.text("ui.paste"), 0)
+	_link_menu.add_item(Locale.text("ui.copy"), 1)
+	_link_menu.add_item(Locale.text("ui.cut"), 2)
+	_link_menu.add_item(Locale.text("ui.select_all"), 3)
+	_link_menu.id_pressed.connect(
+		func(id: int) -> void: _text_menu_action(field, id)
+	)
+	field.add_child(_link_menu)
+	field.gui_input.connect(
+		func(event: InputEvent) -> void: _on_text_touch(field, event)
+	)
+
+
+func _on_text_touch(field: LineEdit, event: InputEvent) -> void:
+	if event is InputEventScreenTouch:
+		var touch := event as InputEventScreenTouch
+		if touch.pressed:
+			_touch_started = Time.get_ticks_msec()
+			return
+		if Time.get_ticks_msec() - _touch_started >= 500:
+			_show_text_menu(field)
+		return
+	if event is InputEventMouseButton:
+		var click := event as InputEventMouseButton
+		if click.pressed and click.button_index == MOUSE_BUTTON_RIGHT:
+			_show_text_menu(field)
+
+
+func _show_text_menu(field: LineEdit) -> void:
+	if _link_menu == null or not is_instance_valid(_link_menu):
+		return
+	_link_menu.position = Vector2i(field.get_screen_position() + Vector2(0, field.size.y))
+	_link_menu.popup()
+
+
+func _text_menu_action(field: LineEdit, id: int) -> void:
+	match id:
+		0:
+			_paste_into(field, DisplayServer.clipboard_get())
+		1:
+			DisplayServer.clipboard_set(field.get_selected_text())
+		2:
+			DisplayServer.clipboard_set(field.get_selected_text())
+			field.delete_text(field.get_selection_from_column(), field.get_selection_to_column())
+		3:
+			field.select_all()
+	if _link_menu != null and is_instance_valid(_link_menu):
+		_link_menu.hide()
+
+
+func _paste_into(field: LineEdit, text: String) -> void:
+	if text.is_empty():
+		return
+	field.insert_text_at_caret(text)
+	field.caret_column = field.text.length()
 
 
 func _on_picker_closed() -> void:

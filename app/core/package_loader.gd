@@ -223,10 +223,12 @@ func import_bytes(bytes: PackedByteArray, context: Dictionary = {}) -> Dictionar
 func import_url(url: String, expected_sha256: String, context: Dictionary, fetch: Callable) -> Dictionary:
 	## Installs a package that was downloaded rather than handed over (REQ-046).
 	##
-	## The hash is the only thing standing between a truncated download and a
-	## package that installs and then refuses to open, so the bytes are hashed
-	## before they reach `import_bytes` and a mismatch stops the install with
-	## V-43, naming the expected and the actual digest.
+	## A digest is the only thing standing between a truncated download and a
+	## package that installs and then refuses to open, so when the caller has
+	## one the bytes are hashed before they reach `import_bytes` and a mismatch
+	## stops the install with V-43, naming the expected and the actual digest.
+	## An empty digest means the caller chose to trust the transport; the bytes
+	## still have to pass every check in `import_bytes`.
 	##
 	## The caller supplies the bytes, never a socket: this file lives under
 	## `res://core`, and TC-OFF-003 holds that no runtime source in `core` or
@@ -238,14 +240,15 @@ func import_url(url: String, expected_sha256: String, context: Dictionary, fetch
 	if not fetched is PackedByteArray or (fetched as PackedByteArray).is_empty():
 		return _rejected("V-01", "package", "could not download the package from %s" % url, [])
 	var bytes: PackedByteArray = fetched
-	var actual := digest_of(bytes)
 	var expected := expected_sha256.strip_edges().to_lower()
-	if actual != expected:
-		return _rejected(
-			"V-43", "package",
-			"the package from %s hashes to %s, not the expected %s" % [url, actual, expected],
-			[],
-		)
+	if not expected.is_empty():
+		var actual := digest_of(bytes)
+		if actual != expected:
+			return _rejected(
+				"V-43", "package",
+				"the package from %s hashes to %s, not the expected %s" % [url, actual, expected],
+				[],
+			)
 	return import_bytes(bytes, context)
 
 

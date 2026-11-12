@@ -55,6 +55,10 @@ ui.layer_pending	%s is declared but not applied by this engine version yet.
 ui.remove_layers_first	Remove its layers first: %s.
 ui.restore_previous	Restore %s
 ui.link_ask	Paste the address of a .zip package.
-ui.link_digest	Paste its sha256 (64 hex characters).
-ui.link_refused	Nothing was installed. The address and the digest were not enough to accept this file.
+ui.link_trust	No digest is asked for; without one the download is trusted. The package still has to pass every check.
+ui.link_refused	Nothing was installed. The address was empty or the file did not pass the checks.
+ui.paste	Paste
+ui.copy	Copy
+ui.cut	Cut
+ui.select_all	Select all
 ui.layer_not_story	%s is a layer, not a story. Tick it on the pack page.
