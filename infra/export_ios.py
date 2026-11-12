@@ -74,6 +74,28 @@ def unstage_preset(staged: Path) -> None:
         staged.unlink()
 
 
+STAGE = ROOT / "infra" / "stage_builtin.py"
+BUILTIN = ROOT / "content" / "builtin"
+
+
+def stage_command() -> list:
+    """The built-in pack is generated, so a clean checkout has no zip to export."""
+    return [sys.executable, str(STAGE)]
+
+
+def build_commands(godot: str, scheme: str) -> list:
+    project = OUT / "Lethebar.xcodeproj"
+    derived = OUT / "build"
+    product = derived / "Build" / "Products" / "Release-iphoneos" / "Lethebar.app"
+    ipa = OUT / "Lethebar-unsigned.ipa"
+    return [
+        stage_command(),
+        export_command(godot, APP, PRESET, project),
+        xcode_command(project, scheme, derived),
+        package_command(product, OUT / "Payload", ipa),
+    ]
+
+
 def self_test() -> int:
     failures = []
     if refusal("win32") == "":
@@ -93,10 +115,17 @@ def self_test() -> int:
         failures.append("the preset source or the staged path moved")
     if "stage_preset" not in globals() or "unstage_preset" not in globals():
         failures.append("staging helpers are missing")
+    commands = build_commands("godot", "Lethebar")
+    if len(commands) != 4:
+        failures.append("the build chain lost a step")
+    if not commands[0][-1].endswith("stage_builtin.py"):
+        failures.append("the built-in pack is not staged before the export")
+    if STAGE.name != "stage_builtin.py":
+        failures.append("the staging script moved")
     for failure in failures:
         print(f"[fail] {failure}")
     if not failures:
-        print("self-test: 6 cases, 0 failure(s)")
+        print("self-test: 9 cases, 0 failure(s)")
     return 1 if failures else 0
 
 
@@ -121,19 +150,14 @@ def main(argv: list) -> int:
     if not (templates / "ios.zip").is_file():
         print(f"the iOS export templates are missing: install {GODOT_VERSION} templates at {templates}")
         return 2
+    if not any(BUILTIN.iterdir()):
+        print(f"no built-in pack to stage under {BUILTIN}")
+        return 2
     if args.check:
         print("ok: macOS, Xcode and the iOS export templates are present")
         return 0
 
-    project = OUT / "Lethebar.xcodeproj"
-    derived = OUT / "build"
-    product = derived / "Build" / "Products" / "Release-iphoneos" / "Lethebar.app"
-    ipa = OUT / "Lethebar-unsigned.ipa"
-    commands = [
-        export_command(args.godot, APP, PRESET, project),
-        xcode_command(project, args.scheme, derived),
-        package_command(product, OUT / "Payload", ipa),
-    ]
+    commands = build_commands(args.godot, args.scheme)
     if args.dry_run:
         print(f"copy {PRESET_SOURCE} -> {PRESET_STAGED}")
         for command in commands:

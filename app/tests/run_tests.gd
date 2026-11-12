@@ -1020,11 +1020,26 @@ func _case_install_url() -> void:
 		func(_url: String) -> PackedByteArray: return bytes,
 	)
 	_check("TC-INSTALL-001: a second install of the same id says so", String(again.get("install", "")) == "already", str(again.get("install")))
-	var blank := shell.install_from_url("https://example.invalid/pack.zip", "", func(_url: String) -> PackedByteArray: return bytes)
+	var blank_bytes := _package("blank-fixture", {"id": "blank-pack", "name": "Blank Pack"})
+	var blank := shell.install_from_url(
+		"https://example.invalid/blank.zip",
+		"",
+		func(_url: String) -> PackedByteArray: return blank_bytes,
+	)
 	_check(
-		"TC-INSTALL-001: a link install without a digest is refused",
-		String(blank.get("code", "")) == "V-43",
-		String(blank.get("code", "")),
+		"TC-INSTALL-001: a link install without a digest trusts the transport",
+		shell.builtin_ids.has("blank-pack") and String(blank.get("install", "")) == "installed",
+		"%s / %s" % [String(blank.get("status", "")), String(blank.get("install", ""))],
+	)
+	var no_address := shell.install_from_url(
+		"",
+		"",
+		func(_url: String) -> PackedByteArray: return blank_bytes,
+	)
+	_check(
+		"TC-INSTALL-001: a blank address is refused with V-01",
+		String(no_address.get("code", "")) == "V-01",
+		String(no_address.get("code", "")),
 	)
 
 
@@ -1180,7 +1195,31 @@ func _case_native_paths() -> void:
 	_check("B115: no welcome download notice off the web", native.notice_text(false) == "", native.notice_text(false))
 	native.request_link_install()
 	_check("B115: a link install opens a dialog", native._link_dialog != null)
-	_check("B115: the dialog asks for an address and a digest", native._link_url != null and native._link_digest != null)
+	_check(
+		"B119: the dialog asks for an address and a trust line",
+		native._link_url != null and native._link_menu != null,
+	)
+	native._paste_into(native._link_url, "https://example.invalid/pack.zip")
+	_check(
+		"B119: paste fills the address",
+		native._link_url.text == "https://example.invalid/pack.zip",
+		native._link_url.text,
+	)
+	var picker: FileDialog = native._make_picker()
+	_check("B119: the picker asks the platform for its dialog", picker.use_native_dialog, str(picker.use_native_dialog))
+	_check("B119: the picker keeps the zip filter", String(picker.filters[0]).contains("*.zip"), str(picker.filters))
+	picker.free()
+	var narrow = _shell()
+	narrow.size_override = Vector2(390, 844)
+	narrow._apply_metrics()
+	narrow._open_link_dialog()
+	_check(
+		"B119: the address field is a touch target",
+		narrow._link_url.custom_minimum_size.y >= 44,
+		str(narrow._link_url.custom_minimum_size.y),
+	)
+	if narrow._link_dialog != null:
+		narrow._link_dialog.queue_free()
 	if native._link_dialog != null:
 		native._link_dialog.queue_free()
 
