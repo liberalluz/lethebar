@@ -65,3 +65,8 @@ app/export_presets.cfg
 .nebula/
 .nebula-skills.json
 # END NEBULA MANAGED
+
+# GDExtension build outputs
+/godot-cpp/
+/app/ios/bin/
+.sconsign.dblite

@@ -1,0 +1,15 @@
+#!/usr/bin/env python
+import os
+
+godot_cpp = ARGUMENTS.get("godot_cpp", os.environ.get("GODOT_CPP", "godot-cpp"))
+env = SConscript(os.path.join(godot_cpp, "SConstruct"))
+env.Append(CPPPATH=["."])
+
+sources = Glob("*.cpp") + Glob("*.mm")
+
+if env["platform"] == "ios":
+    env.Append(CCFLAGS=["-fobjc-arc"])
+    env.Append(LINKFLAGS=["-framework", "UIKit", "-framework", "UniformTypeIdentifiers"])
+
+library = env.StaticLibrary("bin/lethebar_native", sources)
+Default(library)

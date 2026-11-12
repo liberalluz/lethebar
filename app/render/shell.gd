@@ -102,6 +102,7 @@ var _audio: AudioStreamPlayer
 var _picture_slots: Array = []
 ## Set while a desktop picker is open, so a second click does not stack dialogs.
 var _picker: FileDialog = null
+var _native: NativeUI = null
 ## The native build asks for a link in a dialog the engine owns; a page asks
 ## with `window.prompt`, which does not exist off the web.
 var _link_dialog: AcceptDialog = null
@@ -800,6 +801,9 @@ func request_install() -> void:
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("window.lethebarAskForFile && window.lethebarAskForFile();", true)
 		return
+	if native().available():
+		native().pick_zip()
+		return
 	if _picker != null and is_instance_valid(_picker):
 		_picker.popup_centered_ratio(dialog_ratio(0.6))
 		return
@@ -829,6 +833,15 @@ func request_link_install() -> void:
 	## keyboard path to a 64-character hex string, and the package still has to
 	## pass every check in `import_bytes`.
 	if not OS.has_feature("web"):
+		if native().available():
+			native().ask_for_url(
+				Locale.text("ui.install_link"),
+				Locale.text("ui.link_trust"),
+				Locale.text("ui.link_ask"),
+				Locale.text("ui.install"),
+				Locale.text("ui.back"),
+			)
+			return
 		_open_link_dialog()
 		return
 	var url := String(JavaScriptBridge.eval(
@@ -950,6 +963,27 @@ func _on_picker_closed() -> void:
 func _on_file_chosen(path: String) -> void:
 	_on_picker_closed()
 	install_from_bytes(FileAccess.get_file_as_bytes(path))
+
+
+func native() -> NativeUI:
+	## Built once and kept: the plugin's signals arrive asynchronously, long
+	## after the button that asked for them was pressed.
+	if _native == null:
+		_native = NativeUI.new()
+		if _native.available():
+			_native.zip_picked.connect(_on_file_chosen)
+			_native.zip_cancelled.connect(_on_picker_closed)
+			_native.url_entered.connect(_on_native_url)
+	return _native
+
+
+func _on_native_url(url: String) -> void:
+	var address := url.strip_edges()
+	if address.is_empty():
+		return
+	var fetch := func(target: String) -> PackedByteArray:
+		return await Downloader.fetch(self, target)
+	install_from_url(address, "", fetch)
 
 
 func _connect_import_bridge() -> void:
