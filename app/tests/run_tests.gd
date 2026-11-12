@@ -53,6 +53,7 @@ func _initialize() -> void:
 	_case_slot_layout()
 	_case_version()
 	_case_locale()
+	_case_native_paths()
 	_case_i18n()
 	_case_i18n_labels()
 	_case_format()
@@ -1164,6 +1165,23 @@ func _case_version() -> void:
 		numeric,
 		shell.version_string()
 	)
+
+
+func _case_native_paths() -> void:
+	## The three surfaces that assumed a page: the language, the download hint
+	## and the install dialog. The suite runs without the web feature, so these
+	## exercise the native branches.
+	_check("B115: a Chinese OS tag maps to zh-CN", Locale.pick("zh_CN") == "zh-CN", Locale.pick("zh_CN"))
+	_check("B115: an unknown tag falls back to en", Locale.pick("xx_YY") == "en", Locale.pick("xx_YY"))
+	_check("B115: the browser reader follows the OS", Locale._browser() == Locale.pick(OS.get_locale()), Locale._browser())
+	var native = _shell()
+	_check("B115: no download size off the web", native.payload_label(false) == "", native.payload_label(false))
+	_check("B115: no welcome download notice off the web", native.notice_text(false) == "", native.notice_text(false))
+	native.request_link_install()
+	_check("B115: a link install opens a dialog", native._link_dialog != null)
+	_check("B115: the dialog asks for an address and a digest", native._link_url != null and native._link_digest != null)
+	if native._link_dialog != null:
+		native._link_dialog.queue_free()
 
 
 func _case_locale() -> void:
@@ -5235,7 +5253,7 @@ func _case_boot() -> void:
 		"bytes": 44040192,
 		"error": "",
 	}
-	var first := shell.notice_text()
+	var first := shell.notice_text(true)
 	_check(
 		"TC-BOOT-001: the first visit names the download size",
 		first.contains("42 MB"),
@@ -5247,7 +5265,7 @@ func _case_boot() -> void:
 		first
 	)
 	shell._welcome_seen = true
-	_check("TC-BOOT-001: a later visit says nothing", shell.notice_text() == "", shell.notice_text())
+	_check("TC-BOOT-001: a later visit says nothing", shell.notice_text(true) == "", shell.notice_text(true))
 	shell._cache_state = {
 		"ready": true,
 		"controlled": true,
@@ -5255,7 +5273,7 @@ func _case_boot() -> void:
 		"bytes": 44040192,
 		"error": "QuotaExceededError",
 	}
-	var failed := shell.notice_text()
+	var failed := shell.notice_text(true)
 	_check(
 		"TC-BOOT-001: a refused cache write is named",
 		failed.contains("QuotaExceededError"),
@@ -5263,7 +5281,7 @@ func _case_boot() -> void:
 	)
 	_check("TC-BOOT-001: the failure replaces the first-visit line", failed != first, failed)
 	Locale.set_current("zh-CN")
-	var chinese := shell.notice_text()
+	var chinese := shell.notice_text(true)
 	_check(
 		"TC-BOOT-001: the failure line is translated too",
 		chinese.contains("QuotaExceededError") and chinese != failed,
@@ -5272,8 +5290,8 @@ func _case_boot() -> void:
 	Locale.set_current("en")
 	_check(
 		"TC-BOOT-001: the page publishes the payload size",
-		shell.payload_label() == "42 MB",
-		shell.payload_label()
+		shell.payload_label(true) == "42 MB",
+		shell.payload_label(true)
 	)
 	shell.queue_free()
 
