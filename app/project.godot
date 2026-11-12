@@ -28,4 +28,5 @@ theme/custom_font="res://render/fonts/NotoSansSC-Regular.woff2"
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
 
