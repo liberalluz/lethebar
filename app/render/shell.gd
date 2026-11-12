@@ -90,6 +90,11 @@ var _audio: AudioStreamPlayer
 var _picture_slots: Array = []
 ## Set while a desktop picker is open, so a second click does not stack dialogs.
 var _picker: FileDialog = null
+## The native build asks for a link in a dialog the engine owns; a page asks
+## with `window.prompt`, which does not exist off the web.
+var _link_dialog: AcceptDialog = null
+var _link_url: LineEdit = null
+var _link_digest: LineEdit = null
 ## The JS callback must stay referenced from here: assigning it to `window` alone
 ## lets the engine collect it, and the bridge then exists but never calls back.
 var _import_callback: JavaScriptObject = null
@@ -171,22 +176,27 @@ func show_landing() -> String:
 	return screen
 
 
-func notice_text() -> String:
+func notice_text(web: bool = OS.has_feature("web")) -> String:
 	## A failed cache write first (the player can act on it), then the size, once.
+	if not web:
+		return ""
 	var error := String(_cache_state.get("error", ""))
 	if error != "":
 		return Locale.text("ui.cache_failed") % error
 	if _welcome_seen:
 		return ""
-	var text := Locale.text("ui.first_visit") % payload_label()
+	var text := Locale.text("ui.first_visit") % payload_label(web)
 	if _is_ios_safari():
 		text = "%s %s" % [text, Locale.text("ui.install_hint")]
 	return text
 
 
-func payload_label() -> String:
+func payload_label(web: bool = OS.has_feature("web")) -> String:
 	## The page publishes this build's exact size; a build without the shim keeps
-	## the measured fallback rather than guessing small.
+	## the measured fallback rather than guessing small. A native build never
+	## downloaded a payload, so it has no size to announce.
+	if not web:
+		return ""
 	var bytes := int(_cache_state.get("bytes", 0))
 	if bytes <= 0:
 		return "42 MB"
@@ -793,7 +803,7 @@ func request_link_install() -> void:
 	## without it `import_url` would compare against nothing and the screen would
 	## claim a file it never checked.
 	if not OS.has_feature("web"):
-		open_notice("V-43", Locale.text("ui.link_refused"))
+		_open_link_dialog()
 		return
 	var url := String(JavaScriptBridge.eval(
 		"window.prompt(%s) || ''" % JSON.stringify(Locale.text("ui.link_ask")), true
@@ -806,6 +816,40 @@ func request_link_install() -> void:
 	var fetch := func(address: String) -> PackedByteArray:
 		return await Downloader.fetch(self, address)
 	install_from_url(url, digest, fetch)
+
+
+func _open_link_dialog() -> void:
+	## A native build has no page prompt: the address and the digest are asked
+	## for in a dialog the engine owns, so the same install path works on a
+	## phone. It is the same pair `install_from_url` already verifies.
+	if _link_dialog != null and is_instance_valid(_link_dialog):
+		_link_dialog.popup_centered_ratio(0.5)
+		return
+	_link_dialog = AcceptDialog.new()
+	_link_dialog.title = Locale.text("ui.install_link")
+	_link_dialog.ok_button_text = Locale.text("ui.install")
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	_link_url = LineEdit.new()
+	_link_url.placeholder_text = Locale.text("ui.link_ask")
+	_link_digest = LineEdit.new()
+	_link_digest.placeholder_text = Locale.text("ui.link_digest")
+	box.add_child(_link_url)
+	box.add_child(_link_digest)
+	_link_dialog.add_child(box)
+	_link_dialog.confirmed.connect(_confirm_link_install)
+	add_child(_link_dialog)
+	_link_dialog.popup_centered_ratio(0.5)
+
+
+func _confirm_link_install() -> void:
+	var address := _link_url.text.strip_edges()
+	if address.is_empty():
+		return
+	var digest := _link_digest.text.strip_edges()
+	var fetch := func(target: String) -> PackedByteArray:
+		return await Downloader.fetch(self, target)
+	install_from_url(address, digest, fetch)
 
 
 func _on_picker_closed() -> void:

@@ -28,6 +28,11 @@ static func normalize(tag: String) -> String:
 	return FALLBACK
 
 
+## A tag from the browser or the OS, mapped onto a supported code.
+static func pick(tag: String) -> String:
+	return normalize(tag)
+
+
 ## The active language. Reads the stored choice once, then the browser, then
 ## the fallback.
 static func current() -> String:
@@ -94,9 +99,6 @@ static func _stored() -> String:
 
 static func _browser() -> String:
 	if OS.has_feature("web"):
-		var raw = JavaScriptBridge.eval("navigator.language || ''")
-		if raw != null:
-			var tag := normalize(str(raw))
-			if SUPPORTED.has(tag):
-				return tag
-	return FALLBACK
+		var raw: Variant = JavaScriptBridge.eval("navigator.language || ''")
+		return pick("" if raw == null else str(raw))
+	return pick(OS.get_locale())
