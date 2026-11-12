@@ -1,0 +1,36 @@
+workflows:
+  ios-unsigned:
+    name: iOS unsigned
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      vars:
+        GODOT_VERSION: "4.7.2"
+        GODOT_BIN: /tmp/godot/Godot.app/Contents/MacOS/Godot
+    scripts:
+      - name: Install Godot and the iOS templates
+        script: |
+          set -euo pipefail
+          mkdir -p /tmp/godot
+          curl -fsSL -o /tmp/godot/godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_macos.universal.zip"
+          unzip -q /tmp/godot/godot.zip -d /tmp/godot
+          curl -fsSL -o /tmp/godot/templates.tpz \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mkdir -p /tmp/godot/templates
+          unzip -q /tmp/godot/templates.tpz -d /tmp/godot/templates
+          mkdir -p "$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION}.stable"
+          cp -R /tmp/godot/templates/templates/. \
+            "$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION}.stable/"
+      - name: Check the host and the templates
+        script: |
+          set -euo pipefail
+          python3 infra/export_ios.py --godot "$GODOT_BIN" --check
+          python3 infra/export_ios.py --godot "$GODOT_BIN" --dry-run
+      - name: Export and build the unsigned ipa
+        script: |
+          set -euo pipefail
+          python3 infra/export_ios.py --godot "$GODOT_BIN"
+    artifacts:
+      - build/ios/Lethebar-unsigned.ipa
+      - build/ios/build/Build/Products/Release-iphoneos/*.app
