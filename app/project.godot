@@ -30,3 +30,10 @@ renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
 
+[display]
+
+; A phone is held either way. The shell reflows from the window it is given
+; instead of scaling a fixed canvas, so there is no stretch mode to set (B118).
+window/handheld/orientation=6
+window/stretch/mode="disabled"
+

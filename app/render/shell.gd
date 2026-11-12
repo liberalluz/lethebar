@@ -25,6 +25,13 @@ const HAND_LABEL_CHARS := 18
 ## A card face is drawn beside its label, so it stays small enough for a
 ## narrow window to hold a hand of four (REQ-037).
 const CARD_ICON_SIZE := 48.0
+## A phone held upright is narrower than the desktop window the shell grew up
+## in. Below this width the column gets one margin and every button a finger
+## sized target; above it the window keeps the shape it always had (B118).
+const NARROW_WIDTH := 600.0
+const MIN_TOUCH := 44.0
+const NARROW_MARGIN := 12
+const WIDE_MARGIN := 24
 
 const SCREEN_LANDING := "landing"
 const SCREEN_PLUGINS := "plugins"
@@ -57,6 +64,10 @@ var session: Session = null
 var entry: Dictionary = {}
 var notice := {"code": "", "message": ""}
 var builtin_ids: Array = []
+## Tests hand the shell a viewport without opening one; a positive override
+## stands in for the window size, so the narrow and wide paths are both
+## exercised in the same suite (B118).
+var size_override := Vector2.ZERO
 ## Where the loader stages a package while reading it. The browser keeps the
 ## default; tests point it at a writable res:// folder (SDD §3.1 keeps packages
 ## in memory, so this is the reader's scratch file, not storage).
@@ -78,6 +89,7 @@ var _hand_columns := 0
 var _layout_width := 0.0
 var _status: RichTextLabel
 var _margin: MarginContainer
+var _scroll: ScrollContainer
 var _box: VBoxContainer
 ## One picture band sits between the heading and the prose: a wide slot for the
 ## scene (or its background fallback) and a narrow one on the right for a
@@ -785,7 +797,7 @@ func request_install() -> void:
 		JavaScriptBridge.eval("window.lethebarAskForFile && window.lethebarAskForFile();", true)
 		return
 	if _picker != null and is_instance_valid(_picker):
-		_picker.popup_centered_ratio(0.6)
+		_picker.popup_centered_ratio(dialog_ratio(0.6))
 		return
 	_picker = FileDialog.new()
 	_picker.access = FileDialog.ACCESS_FILESYSTEM
@@ -794,7 +806,7 @@ func request_install() -> void:
 	_picker.file_selected.connect(_on_file_chosen)
 	_picker.canceled.connect(_on_picker_closed)
 	add_child(_picker)
-	_picker.popup_centered_ratio(0.6)
+	_picker.popup_centered_ratio(dialog_ratio(0.6))
 
 
 func request_link_install() -> void:
@@ -823,7 +835,7 @@ func _open_link_dialog() -> void:
 	## for in a dialog the engine owns, so the same install path works on a
 	## phone. It is the same pair `install_from_url` already verifies.
 	if _link_dialog != null and is_instance_valid(_link_dialog):
-		_link_dialog.popup_centered_ratio(0.5)
+		_link_dialog.popup_centered_ratio(dialog_ratio(0.5))
 		return
 	_link_dialog = AcceptDialog.new()
 	_link_dialog.title = Locale.text("ui.install_link")
@@ -1141,15 +1153,20 @@ func _build_chrome() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	for side in ["left", "top", "right", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 24)
 	add_child(margin)
 	_margin = margin
+	# A phone held upright has less height than a desktop window: a column that
+	# does not fit has to scroll, or its last button is simply not reachable.
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	margin.add_child(scroll)
+	_scroll = scroll
 	var box := VBoxContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	box.add_theme_constant_override("separation", 12)
-	margin.add_child(box)
+	scroll.add_child(box)
 	_box = box
 	_heading = Label.new()
 	_heading.add_theme_font_size_override("font_size", 28)
@@ -1194,6 +1211,66 @@ func _build_chrome() -> void:
 	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_status.add_theme_color_override("default_color", Color(0.7, 0.7, 0.7))
 	box.add_child(_status)
+	_apply_metrics()
+
+
+func viewport_size() -> Vector2:
+	## The window the shell reflows for. Tests hand it a size instead of opening
+	## one, so both the narrow and the wide path run without a display (B118).
+	if size_override.x > 0.0 and size_override.y > 0.0:
+		return size_override
+	return get_viewport_rect().size
+
+
+func is_narrow() -> bool:
+	return viewport_size().x < NARROW_WIDTH
+
+
+func dialog_ratio(wide: float) -> float:
+	## A dialog that takes half a desktop window leaves a phone with two
+	## characters per line; on a narrow window it takes the width it can get.
+	return 1.0 if is_narrow() else wide
+
+
+func _apply_metrics() -> void:
+	## One place decides the padding, the heading size and the gap between rows.
+	## Called when the chrome is built and again whenever the window changes, so
+	## rotating the phone re-measures instead of keeping the old width.
+	if _margin == null:
+		return
+	var inset := _safe_insets()
+	var pad := float(NARROW_MARGIN if is_narrow() else WIDE_MARGIN)
+	_margin.add_theme_constant_override("margin_left", int(pad + inset.x))
+	_margin.add_theme_constant_override("margin_top", int(pad + inset.y))
+	_margin.add_theme_constant_override("margin_right", int(pad + inset.z))
+	_margin.add_theme_constant_override("margin_bottom", int(pad + inset.w))
+	if _heading != null:
+		_heading.add_theme_font_size_override("font_size", 24 if is_narrow() else 28)
+	if _box != null:
+		_box.add_theme_constant_override("separation", 10 if is_narrow() else 12)
+
+
+func _safe_insets() -> Vector4:
+	## A notch and the home indicator live outside the safe area. Desktop
+	## reports none, so the same call is harmless there.
+	if not (OS.has_feature("ios") or OS.has_feature("android")):
+		return Vector4.ZERO
+	var safe := DisplayServer.get_display_safe_area()
+	var screen := DisplayServer.screen_get_size()
+	if screen.x <= 0 or screen.y <= 0:
+		return Vector4.ZERO
+	var scale := float(screen.x) / maxf(viewport_size().x, 1.0)
+	return Vector4(
+		float(safe.position.x) / scale,
+		float(safe.position.y) / scale,
+		float(screen.x - safe.end.x) / scale,
+		float(screen.y - safe.end.y) / scale,
+	)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED and _margin != null:
+		_apply_metrics()
 
 
 func _install_builtins() -> void:
@@ -1488,7 +1565,8 @@ func hand_row_count() -> int:
 func _layout_width_available() -> float:
 	if _layout_width > 0.0:
 		return _layout_width
-	return maxf(get_viewport_rect().size.x - 48.0, CARD_COLUMN_MIN)
+	var pad := float(NARROW_MARGIN * 2 if is_narrow() else WIDE_MARGIN * 2)
+	return maxf(viewport_size().x - pad, CARD_COLUMN_MIN)
 
 
 func _fill_hand_rows() -> void:
@@ -1635,6 +1713,8 @@ func _warn(view: Dictionary, code: String, message: String) -> void:
 func _button(label: String, handler: Callable) -> Button:
 	var button := Button.new()
 	button.text = label
+	if is_narrow():
+		button.custom_minimum_size = Vector2(0.0, MIN_TOUCH)
 	button.pressed.connect(handler)
 	return button
 

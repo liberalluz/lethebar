@@ -95,6 +95,7 @@ func _initialize() -> void:
 	_case_wire3()
 	_case_limits()
 	_case_boot()
+	_case_layout()
 	_case_assets()
 
 	print("")
@@ -5238,6 +5239,52 @@ func _case_limits() -> void:
 		_context(),
 	)
 	_check("TC-SAFE-001: a package inside the envelope installs", fits["status"] == "installed", String(fits.get("code", "")))
+
+
+func _case_layout() -> void:
+	## TC-WIRE-005: the same column reflows for a phone held upright, and a
+	## rotation does not change the run underneath it (B118).
+	var shell := _shell()
+	shell.size_override = Vector2(390.0, 844.0)
+	shell._apply_metrics()
+	_check("TC-WIRE-005: a narrow window is narrow", shell.is_narrow(), str(shell.viewport_size()))
+	var touch := shell._button("x", func() -> void: pass)
+	_check(
+		"TC-WIRE-005: a narrow button is a 44 px target",
+		touch.custom_minimum_size.y >= 44.0,
+		str(touch.custom_minimum_size),
+	)
+	_check(
+		"TC-WIRE-005: a narrow dialog takes the window",
+		shell.dialog_ratio(0.5) == 1.0,
+		str(shell.dialog_ratio(0.5)),
+	)
+	_check(
+		"TC-WIRE-005: the narrow column fits the window",
+		shell._layout_width_available() <= 390.0,
+		str(shell._layout_width_available()),
+	)
+	shell.size_override = Vector2(844.0, 390.0)
+	shell._apply_metrics()
+	var wide := shell._button("x", func() -> void: pass)
+	_check(
+		"TC-WIRE-005: a wide window keeps the small control",
+		not shell.is_narrow() and wide.custom_minimum_size.y == 0.0,
+		str(wide.custom_minimum_size),
+	)
+	var context := {"engine_version": "4.7.2", "work_dir": FIXTURE_DIR}
+	var loader := PackageLoader.new()
+	loader.import_bytes(_base_package("narrow-base"), context)
+	var entries: Array = loader.assemble([{"id": "narrow-base"}]).get("entries", [])
+	var session: Session = null
+	if not entries.is_empty():
+		session = Session.create(entries[0], {})
+	shell.session = session
+	var before: Dictionary = session.snapshot() if session != null else {}
+	shell.size_override = Vector2(390.0, 844.0)
+	shell._apply_metrics()
+	var after: Dictionary = session.snapshot() if session != null else {}
+	_check("TC-WIRE-005: rotating does not change the run", before == after, str(before))
 
 
 func _case_boot() -> void:
