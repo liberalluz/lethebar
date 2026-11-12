@@ -14,6 +14,9 @@ env:
   # keeps its 4.x ABI, so bindings built here run on the 4.7 engine.
   GODOT_CPP_REF: godot-4.5-stable
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-26
@@ -66,3 +69,15 @@ jobs:
             app/ios/bin/*.a
             godot-cpp.sha256
           retention-days: 90
+
+      - name: Publish the library
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view ios-tools-v0.8.0 >/dev/null 2>&1; then
+            gh release create ios-tools-v0.8.0 --target main \
+              --title "iOS tools v0.8.0" \
+              --notes "The arm64 plugin and the bindings, merged into one static library. The app build downloads this and never compiles godot-cpp itself."
+          fi
+          gh release upload ios-tools-v0.8.0 app/ios/bin/liblethebar_native.a --clobber
+          gh release view ios-tools-v0.8.0 --json assets --jq '.assets[].name'
