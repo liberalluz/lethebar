@@ -98,7 +98,7 @@ static void replace_method(id target, SEL selector, IMP replacement, IMP *origin
 	method_setImplementation(method, replacement);
 }
 
-void lethebar_install_open_url_hook() {
+void godot::lethebar_install_open_url_hook() {
 	static bool installed = false;
 	if (installed) {
 		return;
