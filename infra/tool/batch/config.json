@@ -200,6 +200,15 @@
         "infra/checks/check_guide_examples.py"
       ],
       "cwd": "."
+    },
+    {
+      "name": "export-ios",
+      "command": [
+        "python",
+        "infra/export_ios.py",
+        "--dry-run"
+      ],
+      "cwd": "."
     }
   ],
   "release_checks": [

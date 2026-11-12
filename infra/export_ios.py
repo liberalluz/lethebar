@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "app"
 PRESET = "iOS"
 OUT = ROOT / "build" / "ios"
+IPA = OUT / "Lethebar-unsigned.ipa"
 PRESET_SOURCE = ROOT / "infra" / "export_presets" / "ios.cfg"
 PRESET_STAGED = APP / "export_presets.cfg"
 GODOT_VERSION = "4.7.2.stable"
@@ -87,12 +88,11 @@ def build_commands(godot: str, scheme: str) -> list:
     project = OUT / "Lethebar.xcodeproj"
     derived = OUT / "build"
     product = derived / "Build" / "Products" / "Release-iphoneos" / "Lethebar.app"
-    ipa = OUT / "Lethebar-unsigned.ipa"
     return [
         stage_command(),
         export_command(godot, APP, PRESET, project),
         xcode_command(project, scheme, derived),
-        package_command(product, OUT / "Payload", ipa),
+        package_command(product, OUT / "Payload", IPA),
     ]
 
 
@@ -122,6 +122,8 @@ def self_test() -> int:
         failures.append("the built-in pack is not staged before the export")
     if STAGE.name != "stage_builtin.py":
         failures.append("the staging script moved")
+    if IPA.name != "Lethebar-unsigned.ipa" or IPA.parent != OUT:
+        failures.append("the ipa path moved")
     for failure in failures:
         print(f"[fail] {failure}")
     if not failures:
@@ -141,6 +143,14 @@ def main(argv: list) -> int:
     if args.self_test:
         return self_test()
 
+    commands = build_commands(args.godot, args.scheme)
+    if args.dry_run:
+        print(f"copy {PRESET_SOURCE} -> {PRESET_STAGED}")
+        for command in commands:
+            print(" ".join(command))
+        print(f"unsigned ipa: {IPA}")
+        return 0
+
     host = platform.system().lower()
     message = refusal(host)
     if message:
@@ -157,13 +167,6 @@ def main(argv: list) -> int:
         print("ok: macOS, Xcode and the iOS export templates are present")
         return 0
 
-    commands = build_commands(args.godot, args.scheme)
-    if args.dry_run:
-        print(f"copy {PRESET_SOURCE} -> {PRESET_STAGED}")
-        for command in commands:
-            print(" ".join(command))
-        return 0
-
     OUT.mkdir(parents=True, exist_ok=True)
     stage_preset(PRESET_SOURCE, PRESET_STAGED)
     try:
@@ -171,7 +174,7 @@ def main(argv: list) -> int:
             subprocess.run(command, check=True, cwd=ROOT)
     finally:
         unstage_preset(PRESET_STAGED)
-    print(f"unsigned ipa: {ipa}")
+    print(f"unsigned ipa: {IPA}")
     return 0
 
 
