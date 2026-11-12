@@ -44,6 +44,14 @@ jobs:
           scons -C app/ios platform=ios arch=arm64 target=template_release godot_cpp=../../godot-cpp
           ls -l app/ios/bin/
 
+      - name: Merge the plugin and the bindings
+        run: |
+          libtool -static -o app/ios/bin/combined.a \
+            app/ios/bin/liblethebar_native.a \
+            godot-cpp/bin/libgodot-cpp.ios.template_release.arm64.a
+          mv app/ios/bin/combined.a app/ios/bin/liblethebar_native.a
+          ls -l app/ios/bin/
+
       - name: Name the library
         run: |
           ls -l godot-cpp/bin/ app/ios/bin/

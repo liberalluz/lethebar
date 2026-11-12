@@ -4,4 +4,4 @@ compatibility_minimum = "4.2"
 reloadable = false
 
 [libraries]
-ios.arm64 = "res://ios/bin/liblethebar_native.ios.template_release.arm64.a"
+ios.arm64 = "res://ios/bin/liblethebar_native.a"

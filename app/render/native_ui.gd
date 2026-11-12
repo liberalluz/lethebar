@@ -9,6 +9,7 @@ signal url_entered(url: String)
 signal url_cancelled
 signal zip_picked(path: String)
 signal zip_cancelled
+signal url_opened(path: String)
 
 const PLUGIN_CLASS := "LethebarIOS"
 
@@ -57,6 +58,7 @@ func _connect() -> void:
 		["url_cancelled", _on_url_cancelled],
 		["zip_picked", _on_zip_picked],
 		["zip_cancelled", _on_zip_cancelled],
+		["url_opened", _on_url_opened],
 	]
 	for pair in pairs:
 		if _plugin.has_signal(pair[0]):
@@ -77,3 +79,9 @@ func _on_zip_picked(path: String) -> void:
 
 func _on_zip_cancelled() -> void:
 	zip_cancelled.emit()
+
+
+func _on_url_opened(path: String) -> void:
+	## A document opened from Files or Messages: the system hands us the file,
+	## the shell decides what to do with it.
+	url_opened.emit(path)

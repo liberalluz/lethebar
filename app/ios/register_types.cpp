@@ -10,6 +10,7 @@ static void initialize_lethebar_module(ModuleInitializationLevel level) {
 		return;
 	}
 	ClassDB::register_class<LethebarNative>();
+	lethebar_install_open_url_hook();
 }
 
 static void uninitialize_lethebar_module(ModuleInitializationLevel level) {

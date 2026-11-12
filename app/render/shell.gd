@@ -974,6 +974,7 @@ func native() -> NativeUI:
 			_native.zip_picked.connect(_on_file_chosen)
 			_native.zip_cancelled.connect(_on_picker_closed)
 			_native.url_entered.connect(_on_native_url)
+			_native.url_opened.connect(_on_file_opened)
 	return _native
 
 
@@ -984,6 +985,12 @@ func _on_native_url(url: String) -> void:
 	var fetch := func(target: String) -> PackedByteArray:
 		return await Downloader.fetch(self, target)
 	install_from_url(address, "", fetch)
+
+
+func _on_file_opened(path: String) -> void:
+	## A package opened from Files or Messages: iOS already copied it into our
+	## storage, so it takes the same road as a file the picker returned.
+	_on_file_chosen(path)
 
 
 func _connect_import_bridge() -> void:
