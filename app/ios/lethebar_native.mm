@@ -163,12 +163,15 @@ void LethebarNative::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("available"), &LethebarNative::available);
 	ClassDB::bind_method(D_METHOD("ask_for_url", "title", "message", "placeholder", "confirm", "cancel", "initial"), &LethebarNative::ask_for_url);
 	ClassDB::bind_method(D_METHOD("pick_zip"), &LethebarNative::pick_zip);
+	ClassDB::bind_method(D_METHOD("download", "url"), &LethebarNative::download);
 
 	ADD_SIGNAL(MethodInfo("url_entered", PropertyInfo(Variant::STRING, "url")));
 	ADD_SIGNAL(MethodInfo("url_cancelled"));
 	ADD_SIGNAL(MethodInfo("zip_picked", PropertyInfo(Variant::STRING, "path")));
 	ADD_SIGNAL(MethodInfo("zip_cancelled"));
 	ADD_SIGNAL(MethodInfo("url_opened", PropertyInfo(Variant::STRING, "path")));
+	ADD_SIGNAL(MethodInfo("downloaded", PropertyInfo(Variant::STRING, "path")));
+	ADD_SIGNAL(MethodInfo("download_failed", PropertyInfo(Variant::STRING, "reason")));
 }
 
 bool LethebarNative::available() const {
@@ -255,4 +258,63 @@ void LethebarNative::emit_open(const String &path) {
 	} else {
 		pending_open = path.utf8().get_data();
 	}
+}
+
+void LethebarNative::emit_downloaded(const String &path) {
+	if (instance) {
+		instance->emit_signal("downloaded", path);
+	}
+}
+
+void LethebarNative::emit_download_failed(const String &reason) {
+	if (instance) {
+		instance->emit_signal("download_failed", reason);
+	}
+}
+
+void LethebarNative::download(const String &url) {
+	NSString *address = [NSString stringWithUTF8String:url.utf8().get_data()];
+	NSURL *target = [NSURL URLWithString:address];
+	if (target == nil || target.scheme.length == 0) {
+		emit_download_failed("not a URL");
+		return;
+	}
+	NSURLSessionDownloadTask *task = [[NSURLSession sharedSession]
+		downloadTaskWithURL:target
+		completionHandler:^(NSURL *location, NSURLResponse *response, NSError *error) {
+			if (error != nil || location == nil) {
+				NSString *why = error != nil ? error.localizedDescription : @"no file";
+				dispatch_async(dispatch_get_main_queue(), ^{
+					LethebarNative::emit_download_failed(String::utf8(why.UTF8String));
+				});
+				return;
+			}
+			NSInteger status = [(NSHTTPURLResponse *)response statusCode];
+			if (status != 200) {
+				String why = String("HTTP ") + String::num_int64(status);
+				dispatch_async(dispatch_get_main_queue(), ^{
+					LethebarNative::emit_download_failed(why);
+				});
+				return;
+			}
+			NSString *name = target.lastPathComponent;
+			if (name.length == 0) {
+				name = @"package.zip";
+			}
+			NSString *dest = [NSTemporaryDirectory() stringByAppendingPathComponent:name];
+			NSFileManager *files = [NSFileManager defaultManager];
+			[files removeItemAtPath:dest error:nil];
+			NSError *move = nil;
+			if (![files moveItemAtURL:location toURL:[NSURL fileURLWithPath:dest] error:&move]) {
+				NSString *why = move != nil ? move.localizedDescription : @"could not keep the file";
+				dispatch_async(dispatch_get_main_queue(), ^{
+					LethebarNative::emit_download_failed(String::utf8(why.UTF8String));
+				});
+				return;
+			}
+			dispatch_async(dispatch_get_main_queue(), ^{
+				LethebarNative::emit_downloaded(String::utf8(dest.UTF8String));
+			});
+		}];
+	[task resume];
 }

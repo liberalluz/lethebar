@@ -22,12 +22,15 @@ public:
 	bool available() const;
 	void ask_for_url(const String &title, const String &message, const String &placeholder, const String &confirm, const String &cancel, const String &initial);
 	void pick_zip();
+	void download(const String &url);
 
 	static void emit_url(const String &url);
 	static void emit_url_cancelled();
 	static void emit_zip(const String &path);
 	static void emit_zip_cancelled();
 	static void emit_open(const String &path);
+	static void emit_downloaded(const String &path);
+	static void emit_download_failed(const String &reason);
 
 private:
 	static LethebarNative *instance;

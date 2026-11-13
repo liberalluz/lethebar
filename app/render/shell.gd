@@ -975,6 +975,8 @@ func native() -> NativeUI:
 			_native.zip_cancelled.connect(_on_picker_closed)
 			_native.url_entered.connect(_on_native_url)
 			_native.url_opened.connect(_on_file_opened)
+			_native.downloaded.connect(_on_native_downloaded)
+			_native.download_failed.connect(_on_native_download_failed)
 	return _native
 
 
@@ -982,9 +984,20 @@ func _on_native_url(url: String) -> void:
 	var address := url.strip_edges()
 	if address.is_empty():
 		return
+	if native().available():
+		native().download(address)
+		return
 	var fetch := func(target: String) -> PackedByteArray:
 		return await Downloader.fetch(self, target)
 	install_from_url(address, "", fetch)
+
+
+func _on_native_downloaded(path: String) -> void:
+	_on_file_chosen(path)
+
+
+func _on_native_download_failed(reason: String) -> void:
+	open_notice("V-01", "could not download the package: %s" % reason)
 
 
 func _on_file_opened(path: String) -> void:

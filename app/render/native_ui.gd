@@ -10,6 +10,8 @@ signal url_cancelled
 signal zip_picked(path: String)
 signal zip_cancelled
 signal url_opened(path: String)
+signal downloaded(path: String)
+signal download_failed(reason: String)
 
 const PLUGIN_CLASS := "LethebarNative"
 
@@ -50,6 +52,15 @@ func pick_zip() -> void:
 	_plugin.pick_zip()
 
 
+func download(url: String) -> void:
+	## The platform's own HTTP stack follows the redirect to the asset host and
+	## keeps the system's proxy, TLS and timeout rules. The engine's HTTPRequest
+	## fails on the same address from a phone.
+	if _plugin == null:
+		return
+	_plugin.download(url)
+
+
 func _connect() -> void:
 	if _plugin == null:
 		return
@@ -59,6 +70,8 @@ func _connect() -> void:
 		["zip_picked", _on_zip_picked],
 		["zip_cancelled", _on_zip_cancelled],
 		["url_opened", _on_url_opened],
+		["downloaded", _on_downloaded],
+		["download_failed", _on_download_failed],
 	]
 	for pair in pairs:
 		if _plugin.has_signal(pair[0]):
@@ -85,3 +98,11 @@ func _on_url_opened(path: String) -> void:
 	## A document opened from Files or Messages: the system hands us the file,
 	## the shell decides what to do with it.
 	url_opened.emit(path)
+
+
+func _on_downloaded(path: String) -> void:
+	downloaded.emit(path)
+
+
+func _on_download_failed(reason: String) -> void:
+	download_failed.emit(reason)
