@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.9.0 - 2026-11-13
+
+### Added
+- One `iOS` export preset, an exporter that refuses to pretend on a non-Mac host, a Codemagic workflow that produces an unsigned ipa, and a runbook that walks the build onto a phone before any paid account exists.
+- On iOS the two fields are the system's: a native text field with the real edit menu (one localized `Paste`, no AutoFill), a native document picker that reaches Files and iCloud, and a zip shared from Files opens the app and imports.
+- A link install downloads through `NSURLSession`, so a 302 to a release-assets host is followed instead of being read as a failed request.
+
+### Changed
+- The shell reflows for a window narrower than 600 px: 12 px margins, a 24 px heading, a 44 px minimum button, a column that scrolls when it does not fit, and a dialog that takes the width it can get. A phone held upright reads the same controls; the wide layout keeps the shape it had.
+- The project asks for a sensor orientation instead of a fixed one, and insets the shell by the display safe area where the platform reports one.
+- A link install without a digest trusts the transport; the package still has to pass every check in `import_bytes`, and a digest that is given is still compared.
+- The gate runs `python infra/export_ios.py --dry-run`, so a dangling name in the exporter's entry point fails on Windows before macOS.
+
+### Fixed
+- A native build no longer behaves like a page: the interface language comes from the operating system instead of falling back to English, the first-visit screen no longer announces a download that did not happen, and a pack link is installed through an in-app dialog instead of being refused.
+- The iOS preset exports again. The project now imports ETC2/ASTC, the flag whose absence makes Godot report `configuration errors:` without a reason, and the preset names a 1024 icon instead of leaving every size to a project icon that did not exist.
+- The phone can install a pack. The picker asks the platform for its document picker instead of drawing a desktop window, the link dialog asks for an address only and opens a long-press menu with paste, copy, cut and select all, and the export stages the built-in pack before it exports.
+- The iOS exporter prints the ipa path from one module constant, so `main()` no longer references a local that `build_commands()` owns.
+- `--self-test` checks the constant's name and parent.
+- The plugin class name is `LethebarNative`, so the bridge is found on the device.
+- The pending path is a `std::string`, so the image initializer no longer calls engine strings before they are bound.
+- Installing a layer returns to the pack page instead of starting the layer at its entry; the kind is read from the installed manifest.
+
 ## v0.8.0 - 2026-11-11
 
 ### Added

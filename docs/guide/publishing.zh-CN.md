@@ -26,7 +26,7 @@ python infra/tool/release/pack.py publish dist/<id>.zip --repo <owner>/<repo> --
 
 `github.com/liberalluz/lethebar-pack-template` 里有两个工具、三步工作流和一个能跑
 的示例包；点 **Use this template**，替换示例，跳过上面的手工拼装。它按引擎
-`v0.8.0` 测过，它自己的门禁在对外提供之前跑绿。
+`v0.9.0` 测过，它自己的门禁在对外提供之前跑绿。
 
 ## 一个 tag、一次发布、两个资产
 

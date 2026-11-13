@@ -11,7 +11,7 @@ English · [简体中文](README.zh-CN.md)
 
 ## Status
 
-**v0.8.0 is out: a package can remember across runs, and a roll is the same in the same turn.**
+**v0.9.0 is out: the engine runs on a phone. iOS builds from a Codemagic workflow, and typing, choosing a package and opening one from Files go through the system.**
 
 The engine still ships one smoke pack, `duel`, so that its own tests have something to open. Every other pack is published from its own repository, and [the marketplace](https://liberalluz.github.io/lethebar-marketplace/) lists what is published.
 
