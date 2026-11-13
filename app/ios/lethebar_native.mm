@@ -146,9 +146,9 @@ void godot::lethebar_install_open_url_hook() {
 
 LethebarNative::LethebarNative() {
 	instance = this;
-	if (!pending_open.is_empty()) {
-		String path = pending_open;
-		pending_open = String();
+	if (!pending_open.empty()) {
+		String path = String::utf8(pending_open.c_str());
+		pending_open.clear();
 		emit_signal("url_opened", path);
 	}
 }
@@ -253,6 +253,6 @@ void LethebarNative::emit_open(const String &path) {
 	if (instance) {
 		instance->emit_signal("url_opened", path);
 	} else {
-		pending_open = path;
+		pending_open = path.utf8().get_data();
 	}
 }

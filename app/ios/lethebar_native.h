@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/core/class_db.hpp>
 
@@ -29,7 +31,10 @@ public:
 
 private:
 	static LethebarNative *instance;
-	static String pending_open;
+	// A godot::String cannot exist before the engine binds its functions: a
+	// static one runs its constructor in the image's initializers, where the
+	// interface is still null. The pending path lives in std::string instead.
+	static std::string pending_open;
 };
 
 // Installs the hook that hands a document opened in Files or Messages to the
