@@ -780,6 +780,13 @@ func _after_install(result: Dictionary) -> Dictionary:
 	if not already:
 		builtin_ids.append(plugin_id)
 	packages.persist(record)
+	if String(record.get("kind", "bundle")) == "layer":
+		# A layer has no scene of its own: it changes the bundle it names, so the
+		# pack page is where it belongs. Starting it would show an empty run.
+		open_plugins()
+		var listed := current_view()
+		listed["install"] = "already" if already and stored_version == String(record.get("version", "")) else "installed"
+		return listed
 	saves.mark_writing()
 	_writing = true
 	entry = record
