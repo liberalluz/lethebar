@@ -7,7 +7,7 @@
 using namespace godot;
 
 LethebarNative *LethebarNative::instance = nullptr;
-String LethebarNative::pending_open;
+std::string LethebarNative::pending_open;
 
 static NSString *to_ns(const String &value) {
 	return [NSString stringWithUTF8String:value.utf8().get_data()];
