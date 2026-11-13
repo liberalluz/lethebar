@@ -1,0 +1,15 @@
+{
+  "algorithm": "sha256",
+  "baseline": "BL-17",
+  "files": {
+    "docs/specs/controlled/SDD.md": "e450d4c521b6645d69e577b0a65001daeff1954dcaecde49b036b48882bcfe73",
+    "docs/specs/controlled/SDD.zh-CN.md": "ab1f2fcbb0b01777aebef6274873920152ea36c2e770d7e855727499ece93ea8",
+    "docs/specs/controlled/SRS.md": "7c2b1ddcb672968feb42744b229637e1f6e04b463a1006776d9f82626b56b7f9",
+    "docs/specs/controlled/SRS.zh-CN.md": "877542712b5a6db85d5a72bf658f1fcffae2bbaeb579b9168477c82e183a766f",
+    "docs/specs/controlled/STD.md": "d5b24a985e907db0152ca5a604f1127c7fd9ff4d921622b44a96d4f3187a9d83",
+    "docs/specs/controlled/STD.zh-CN.md": "14b0fd821d1c7777b69ca741679c0b7f87933469a4416efa8192e21484064303",
+    "docs/specs/controlled/STP.md": "95b3ac6278f6c2c3b65a854cf60a82bdbfa8abb44407eb80f2f69442525c8568",
+    "docs/specs/controlled/STP.zh-CN.md": "460cd488ce6ae5b03c8f9b96d06cc6c9f47194adb30ee19875647fb3c255b114"
+  },
+  "version": 1
+}
