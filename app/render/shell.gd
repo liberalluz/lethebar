@@ -780,7 +780,8 @@ func _after_install(result: Dictionary) -> Dictionary:
 	if not already:
 		builtin_ids.append(plugin_id)
 	packages.persist(record)
-	if String(record.get("kind", "bundle")) == "layer":
+	var record_manifest: Dictionary = record.get("manifest", {}) if record.get("manifest", null) is Dictionary else {}
+	if String(record_manifest.get("kind", "bundle")) == "layer":
 		# A layer has no scene of its own: it changes the bundle it names, so the
 		# pack page is where it belongs. Starting it would show an empty run.
 		open_plugins()
