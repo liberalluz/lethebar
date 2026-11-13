@@ -11,7 +11,7 @@ signal zip_picked(path: String)
 signal zip_cancelled
 signal url_opened(path: String)
 
-const PLUGIN_CLASS := "LethebarIOS"
+const PLUGIN_CLASS := "LethebarNative"
 
 var _plugin: Object = null
 
