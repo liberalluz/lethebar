@@ -36,12 +36,13 @@ func ask_for_url(
 	confirm: String,
 	cancel: String,
 	initial: String = "",
+	paste: String = "",
 ) -> void:
 	## A system alert brings its own text field: the edit menu, the magnifier and
 	## the paste prompt are the platform's, not ours.
 	if _plugin == null:
 		return
-	_plugin.ask_for_url(title, message, placeholder, confirm, cancel, initial)
+	_plugin.ask_for_url(title, message, placeholder, confirm, cancel, initial, paste)
 
 
 func pick_zip() -> void:

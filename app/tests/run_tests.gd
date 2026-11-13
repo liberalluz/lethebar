@@ -1242,6 +1242,7 @@ class FakeNative extends Node:
 		_confirm: String,
 		_cancel: String,
 		_initial: String = "",
+		_paste: String = "",
 	) -> void:
 		asked += 1
 		last_title = title

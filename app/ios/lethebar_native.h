@@ -20,7 +20,7 @@ public:
 	~LethebarNative() override;
 
 	bool available() const;
-	void ask_for_url(const String &title, const String &message, const String &placeholder, const String &confirm, const String &cancel, const String &initial);
+	void ask_for_url(const String &title, const String &message, const String &placeholder, const String &confirm, const String &cancel, const String &initial, const String &paste);
 	void pick_zip();
 	void download(const String &url);
 

@@ -36,6 +36,7 @@ static UIViewController *root_view_controller() {
 // Go key behaves like the confirm button.
 @interface LethebarField : NSObject <UITextFieldDelegate>
 @property (nonatomic, weak) UIAlertController *alert;
+@property (nonatomic, copy) NSString *pasteLabel;
 @end
 
 @implementation LethebarField
@@ -45,6 +46,26 @@ static UIViewController *root_view_controller() {
 	[self.alert dismissViewControllerAnimated:YES completion:nil];
 	LethebarNative::emit_url(String::utf8(text.UTF8String));
 	return NO;
+}
+
+- (UIMenu *)textField:(UITextField *)textField
+	editMenuForCharactersInRange:(NSRange)range
+	suggestedActions:(NSArray<UIMenuElement *> *)suggestedActions API_AVAILABLE(ios(16.0)) {
+	// The system menu says Paste and AutoFill in the phone's language. The app
+	// has its own language switch, so the menu is replaced with the one word the
+	// app already knows how to say.
+	__weak UITextField *field = textField;
+	NSString *label = self.pasteLabel.length ? self.pasteLabel : @"Paste";
+	UIAction *paste = [UIAction actionWithTitle:label
+		image:nil
+		identifier:nil
+		handler:^(__kindof UIAction *action) {
+			NSString *text = UIPasteboard.generalPasteboard.string;
+			if (text.length > 0) {
+				[field insertText:text];
+			}
+		}];
+	return [UIMenu menuWithTitle:@"" children:@[paste]];
 }
 
 @end
@@ -161,7 +182,7 @@ LethebarNative::~LethebarNative() {
 
 void LethebarNative::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("available"), &LethebarNative::available);
-	ClassDB::bind_method(D_METHOD("ask_for_url", "title", "message", "placeholder", "confirm", "cancel", "initial"), &LethebarNative::ask_for_url);
+	ClassDB::bind_method(D_METHOD("ask_for_url", "title", "message", "placeholder", "confirm", "cancel", "initial", "paste"), &LethebarNative::ask_for_url);
 	ClassDB::bind_method(D_METHOD("pick_zip"), &LethebarNative::pick_zip);
 	ClassDB::bind_method(D_METHOD("download", "url"), &LethebarNative::download);
 
@@ -178,13 +199,14 @@ bool LethebarNative::available() const {
 	return true;
 }
 
-void LethebarNative::ask_for_url(const String &title, const String &message, const String &placeholder, const String &confirm, const String &cancel, const String &initial) {
+void LethebarNative::ask_for_url(const String &title, const String &message, const String &placeholder, const String &confirm, const String &cancel, const String &initial, const String &paste) {
 	NSString *title_text = to_ns(title);
 	NSString *message_text = to_ns(message);
 	NSString *placeholder_text = to_ns(placeholder);
 	NSString *confirm_text = to_ns(confirm);
 	NSString *cancel_text = to_ns(cancel);
 	NSString *initial_text = to_ns(initial);
+	NSString *paste_text = to_ns(paste);
 
 	UIAlertController *alert = [UIAlertController alertControllerWithTitle:title_text
 																 message:message_text
@@ -201,6 +223,7 @@ void LethebarNative::ask_for_url(const String &title, const String &message, con
 			field_delegate = [[LethebarField alloc] init];
 		}
 		field_delegate.alert = alert;
+		field_delegate.pasteLabel = paste_text;
 		field.delegate = field_delegate;
 	}];
 	[alert addAction:[UIAlertAction actionWithTitle:confirm_text

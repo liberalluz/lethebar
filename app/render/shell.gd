@@ -840,6 +840,8 @@ func request_link_install() -> void:
 				Locale.text("ui.link_ask"),
 				Locale.text("ui.install"),
 				Locale.text("ui.back"),
+				"",
+				Locale.text("ui.paste"),
 			)
 			return
 		_open_link_dialog()
