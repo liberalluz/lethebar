@@ -1,0 +1,84 @@
+name: godot-cpp
+
+# Builds the C++ bindings for iOS once per engine line. The app build downloads
+# the library from a release and never compiles godot-cpp itself.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "app/ios/**"
+      - ".github/workflows/godot-cpp.yml"
+
+env:
+  # godot-cpp has no 4.6/4.7 tag yet; 4.5 is the newest release tag. GDExtension
+  # keeps its 4.x ABI, so bindings built here run on the 4.7 engine.
+  GODOT_CPP_REF: godot-4.5-stable
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore the bindings source
+        uses: actions/cache@v4
+        with:
+          path: godot-cpp
+          key: godot-cpp-${{ env.GODOT_CPP_REF }}
+
+      - name: Clone godot-cpp
+        run: |
+          if [ ! -d godot-cpp ]; then
+            git clone --depth 1 --branch "$GODOT_CPP_REF" https://github.com/godotengine/godot-cpp
+          fi
+
+      - name: Build the iOS arm64 library
+        run: |
+          brew install scons
+          cd godot-cpp
+          scons platform=ios arch=arm64 target=template_release -j"$(sysctl -n hw.ncpu)"
+
+      - name: Build the plugin against the bindings
+        run: |
+          scons -C app/ios platform=ios arch=arm64 target=template_release godot_cpp=../../godot-cpp
+          ls -l app/ios/bin/
+
+      - name: Merge the plugin and the bindings
+        run: |
+          libtool -static -o app/ios/bin/combined.a \
+            app/ios/bin/liblethebar_native.a \
+            godot-cpp/bin/libgodot-cpp.ios.template_release.arm64.a
+          mv app/ios/bin/combined.a app/ios/bin/liblethebar_native.a
+          ls -l app/ios/bin/
+
+      - name: Name the library
+        run: |
+          ls -l godot-cpp/bin/ app/ios/bin/
+          shasum -a 256 godot-cpp/bin/*.a app/ios/bin/*.a | tee godot-cpp.sha256
+          cat godot-cpp.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: godot-cpp-ios
+          path: |
+            godot-cpp/bin/*.a
+            app/ios/bin/*.a
+            godot-cpp.sha256
+          retention-days: 90
+
+      - name: Publish the library
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view ios-tools-v0.8.0 >/dev/null 2>&1; then
+            gh release create ios-tools-v0.8.0 --target main \
+              --title "iOS tools v0.8.0" \
+              --notes "The arm64 plugin and the bindings, merged into one static library. The app build downloads this and never compiles godot-cpp itself."
+          fi
+          gh release upload ios-tools-v0.8.0 app/ios/bin/liblethebar_native.a --clobber
+          gh release view ios-tools-v0.8.0 --json assets --jq '.assets[].name'

@@ -102,6 +102,7 @@ var _audio: AudioStreamPlayer
 var _picture_slots: Array = []
 ## Set while a desktop picker is open, so a second click does not stack dialogs.
 var _picker: FileDialog = null
+var _native: NativeUI = null
 ## The native build asks for a link in a dialog the engine owns; a page asks
 ## with `window.prompt`, which does not exist off the web.
 var _link_dialog: AcceptDialog = null
@@ -779,6 +780,14 @@ func _after_install(result: Dictionary) -> Dictionary:
 	if not already:
 		builtin_ids.append(plugin_id)
 	packages.persist(record)
+	var record_manifest: Dictionary = record.get("manifest", {}) if record.get("manifest", null) is Dictionary else {}
+	if String(record_manifest.get("kind", "bundle")) == "layer":
+		# A layer has no scene of its own: it changes the bundle it names, so the
+		# pack page is where it belongs. Starting it would show an empty run.
+		open_plugins()
+		var listed := current_view()
+		listed["install"] = "already" if already and stored_version == String(record.get("version", "")) else "installed"
+		return listed
 	saves.mark_writing()
 	_writing = true
 	entry = record
@@ -799,6 +808,9 @@ func request_install() -> void:
 	## the editor.
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("window.lethebarAskForFile && window.lethebarAskForFile();", true)
+		return
+	if native().available():
+		native().pick_zip()
 		return
 	if _picker != null and is_instance_valid(_picker):
 		_picker.popup_centered_ratio(dialog_ratio(0.6))
@@ -829,6 +841,17 @@ func request_link_install() -> void:
 	## keyboard path to a 64-character hex string, and the package still has to
 	## pass every check in `import_bytes`.
 	if not OS.has_feature("web"):
+		if native().available():
+			native().ask_for_url(
+				Locale.text("ui.install_link"),
+				Locale.text("ui.link_trust"),
+				Locale.text("ui.link_ask"),
+				Locale.text("ui.install"),
+				Locale.text("ui.back"),
+				"",
+				Locale.text("ui.paste"),
+			)
+			return
 		_open_link_dialog()
 		return
 	var url := String(JavaScriptBridge.eval(
@@ -950,6 +973,47 @@ func _on_picker_closed() -> void:
 func _on_file_chosen(path: String) -> void:
 	_on_picker_closed()
 	install_from_bytes(FileAccess.get_file_as_bytes(path))
+
+
+func native() -> NativeUI:
+	## Built once and kept: the plugin's signals arrive asynchronously, long
+	## after the button that asked for them was pressed.
+	if _native == null:
+		_native = NativeUI.new()
+		if _native.available():
+			_native.zip_picked.connect(_on_file_chosen)
+			_native.zip_cancelled.connect(_on_picker_closed)
+			_native.url_entered.connect(_on_native_url)
+			_native.url_opened.connect(_on_file_opened)
+			_native.downloaded.connect(_on_native_downloaded)
+			_native.download_failed.connect(_on_native_download_failed)
+	return _native
+
+
+func _on_native_url(url: String) -> void:
+	var address := url.strip_edges()
+	if address.is_empty():
+		return
+	if native().available():
+		native().download(address)
+		return
+	var fetch := func(target: String) -> PackedByteArray:
+		return await Downloader.fetch(self, target)
+	install_from_url(address, "", fetch)
+
+
+func _on_native_downloaded(path: String) -> void:
+	_on_file_chosen(path)
+
+
+func _on_native_download_failed(reason: String) -> void:
+	open_notice("V-01", "could not download the package: %s" % reason)
+
+
+func _on_file_opened(path: String) -> void:
+	## A package opened from Files or Messages: iOS already copied it into our
+	## storage, so it takes the same road as a file the picker returned.
+	_on_file_chosen(path)
 
 
 func _connect_import_bridge() -> void:

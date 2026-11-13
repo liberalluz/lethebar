@@ -22,6 +22,13 @@ workflows:
           mkdir -p "$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION}.stable"
           cp -R /tmp/godot/templates/templates/. \
             "$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION}.stable/"
+      - name: Fetch the GDExtension library
+        script: |
+          set -euo pipefail
+          mkdir -p app/ios/bin
+          base="https://github.com/liberalluz/lethebar/releases/download/ios-tools-v0.8.0"
+          curl -fsSL -o app/ios/bin/liblethebar_native.a "$base/liblethebar_native.a"
+          ls -l app/ios/bin/
       - name: Check the host and the templates
         script: |
           set -euo pipefail

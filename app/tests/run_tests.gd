@@ -54,6 +54,7 @@ func _initialize() -> void:
 	_case_version()
 	_case_locale()
 	_case_native_paths()
+	_case_native_ui()
 	_case_i18n()
 	_case_i18n_labels()
 	_case_format()
@@ -1222,6 +1223,59 @@ func _case_native_paths() -> void:
 		narrow._link_dialog.queue_free()
 	if native._link_dialog != null:
 		native._link_dialog.queue_free()
+
+
+class FakeNative extends Node:
+	signal url_entered(url: String)
+	signal url_cancelled
+	signal zip_picked(path: String)
+	signal zip_cancelled
+
+	var asked := 0
+	var picked := 0
+	var last_title := ""
+
+	func ask_for_url(
+		title: String,
+		_message: String,
+		_placeholder: String,
+		_confirm: String,
+		_cancel: String,
+		_initial: String = "",
+		_paste: String = "",
+	) -> void:
+		asked += 1
+		last_title = title
+
+	func pick_zip() -> void:
+		picked += 1
+
+
+func _case_native_ui() -> void:
+	## TC-IOS-001: on iOS the two install paths and the link field come from the
+	## system; a desktop keeps the engine's widgets.
+	var fake := FakeNative.new()
+	var bridge := NativeUI.new(fake)
+	_check("TC-IOS-001: the plugin is found when it is there", bridge.available())
+	var seen: Array = []
+	bridge.zip_picked.connect(func(path: String) -> void: seen.append(path))
+	fake.emit_signal("zip_picked", "/tmp/a.zip")
+	_check("TC-IOS-001: a picked file is forwarded", seen == ["/tmp/a.zip"], str(seen))
+	var shell := _shell()
+	shell._native = bridge
+	shell.request_install()
+	_check(
+		"TC-IOS-001: the package button asks the system",
+		fake.picked == 1,
+		str(fake.picked),
+	)
+	shell.request_link_install()
+	_check(
+		"TC-IOS-001: the link button asks the system",
+		fake.asked == 1 and not fake.last_title.is_empty(),
+		str(fake.asked),
+	)
+	_check("TC-IOS-001: a desktop has no native UI", not NativeUI.new().available())
 
 
 func _case_locale() -> void:
