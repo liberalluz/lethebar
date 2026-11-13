@@ -71,6 +71,7 @@ jobs:
           retention-days: 90
 
       - name: Publish the library
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
